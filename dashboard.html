@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tedbot 2.0 - Paper Trading Dashboard</title>
+    <title>Tedbot 2.0 - AI-Powered Self-Learning Trading System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -104,6 +104,28 @@
         .last-update {
             font-size: 0.875rem;
             color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .thesis-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--neon-green);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 8px 16px;
+            border: 1px solid var(--neon-green);
+            border-radius: 6px;
+            background: rgba(0, 255, 65, 0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .thesis-link:hover {
+            background: rgba(0, 255, 65, 0.15);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 255, 65, 0.2);
         }
         
         /* Stats Grid - 2x2 */
@@ -451,14 +473,18 @@
             <div class="header-content">
                 <div class="header-left">
                     <h1>Tedbot 2.0</h1>
-                    <p class="subtitle">AI-Powered Catalyst Trading System</p>
+                    <p class="subtitle">AI-Powered Self-Learning Trading System</p>
                 </div>
                 <div class="header-right">
                     <div class="live-indicator">
                         <span class="live-dot"></span>
-                        LIVE
+                        <span>LIVE AND LEARNING</span>
                     </div>
                     <div class="last-update" id="headerUpdateTime">Last update: --</div>
+                    <a href="TEDBOT_THESIS.md" target="_blank" class="thesis-link">
+                        <span>📄</span>
+                        <span>Read The Thesis</span>
+                    </a>
                 </div>
             </div>
         </header>
