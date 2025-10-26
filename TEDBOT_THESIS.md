@@ -91,8 +91,6 @@ This is machine learning in action—transparent and auditable:
 
 Watch the win rate improve. Watch losing patterns get eliminated. Watch the system get smarter.
 
-**This is the future of systematic trading.**
-
 ---
 
 ## Live Results
