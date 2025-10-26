@@ -1,0 +1,6 @@
+Catalyst_Type,Total_Trades,Winners,Losers,Win_Rate_Percent,Avg_Return_Winners_Percent,Avg_Return_Losers_Percent,Net_Avg_Return_Percent,Best_Trade_Percent,Worst_Trade_Percent,Avg_Hold_Days,Optimal_Exit_Day,Sample_Size_Confidence
+Earnings_Beat,0,0,0,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,Low
+Sector_Momentum,0,0,0,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,Low
+Analyst_Upgrade,0,0,0,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,Low
+Technical_Breakout,0,0,0,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,Low
+Binary_Event,0,0,0,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,Low

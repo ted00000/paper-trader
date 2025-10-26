@@ -1,0 +1,42 @@
+{
+  "account_value": 1000.00,
+  "starting_capital": 1000.00,
+  "total_return_dollars": 0.00,
+  "total_return_percent": 0.00,
+  "total_trading_days": 0,
+  "total_trades_completed": 0,
+  "winning_trades": 0,
+  "losing_trades": 0,
+  "overall_win_rate": 0.00,
+  "current_win_streak": 0,
+  "current_loss_streak": 0,
+  "longest_win_streak": 0,
+  "longest_loss_streak": 0,
+  "best_trade": {
+    "ticker": "",
+    "date": "",
+    "return_percent": 0.00,
+    "return_dollars": 0.00
+  },
+  "worst_trade": {
+    "ticker": "",
+    "date": "",
+    "return_percent": 0.00,
+    "return_dollars": 0.00
+  },
+  "best_day": {
+    "date": "",
+    "portfolio_return_percent": 0.00,
+    "portfolio_return_dollars": 0.00
+  },
+  "worst_day": {
+    "date": "",
+    "portfolio_return_percent": 0.00,
+    "portfolio_return_dollars": 0.00
+  },
+  "average_hold_time_days": 0.00,
+  "average_winner_percent": 0.00,
+  "average_loser_percent": 0.00,
+  "largest_drawdown_percent": 0.00,
+  "last_updated": "2025-10-24T00:00:00Z"
+}
