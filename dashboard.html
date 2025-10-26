@@ -587,7 +587,9 @@
                 
             } catch (error) {
                 console.error('Error loading data:', error);
-                document.getElementById('portfolioContent').innerHTML = 
+                const container = document.getElementById('portfolioContent');
+                container.classList.remove('loading');
+                container.innerHTML = 
                     '<div class="error">Unable to load data. Please ensure the system is running.</div>';
             }
         }
@@ -631,8 +633,11 @@
         
         function updatePortfolio(data) {
             const container = document.getElementById('portfolioContent');
+            
+            // CRITICAL FIX: Remove loading class FIRST, before any checks
             container.classList.remove('loading');
             
+            // Check if positions exist
             if (!data.positions || data.positions.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
