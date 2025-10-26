@@ -437,6 +437,9 @@
         function updatePortfolio(data) {
             const container = document.getElementById('portfolioContent');
             
+            // Remove loading class immediately
+            container.classList.remove('loading');
+            
             if (!data.positions || data.positions.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
