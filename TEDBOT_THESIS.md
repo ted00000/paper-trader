@@ -128,16 +128,6 @@ Demonstrate that autonomous systems combining artificial intelligence with stati
 
 ---
 
-## Questions?
-
-**Want to know more?**  
-Contact via the project repository or watch the dashboard for ongoing results.
-
-**Interested in the methodology?**  
-Technical details and system architecture available to qualified partners and institutional investors.
-
----
-
 **Last Updated:** October 26, 2025  
 **Version:** 2.0  
 **Status:** 🟢 Live
