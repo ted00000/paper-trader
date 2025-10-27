@@ -621,41 +621,49 @@
         }
         
         function updateStats(data) {
-            document.getElementById('accountValue').textContent = 
-                '$' + data.account_value.toFixed(2);
-            
-            const returnElement = document.getElementById('totalReturn');
-            const returnValue = data.total_return_percent.toFixed(2);
-            returnElement.textContent = (returnValue >= 0 ? '+' : '') + returnValue + '%';
-            returnElement.className = 'stat-value ' + (returnValue >= 0 ? 'positive' : 'negative');
-            
-            const returnDollars = document.getElementById('totalReturnDollars');
-            const dollarValue = data.total_return_dollars.toFixed(2);
-            returnDollars.textContent = (dollarValue >= 0 ? '+' : '') + '$' + Math.abs(dollarValue).toFixed(2);
-            
-            // Show current streak
-            const streakContainer = document.getElementById('currentStreak');
-            if (data.current_win_streak > 0) {
-                streakContainer.innerHTML = `<div class="streak-box win">🔥 ${data.current_win_streak} Win Streak</div>`;
-            } else if (data.current_loss_streak > 0) {
-                streakContainer.innerHTML = `<div class="streak-box loss">❄️ ${data.current_loss_streak} Loss Streak</div>`;
-            } else {
-                streakContainer.innerHTML = '';
-            }
-            
-            const winRate = data.total_trades_completed > 0 
-                ? (data.winning_trades / data.total_trades_completed * 100).toFixed(1)
-                : '0.0';
-            document.getElementById('winRate').textContent = winRate + '%';
-            
-            document.getElementById('winLossRatio').textContent = 
-                data.winning_trades + 'W / ' + data.losing_trades + 'L';
-            
-            document.getElementById('totalTrades').textContent = data.total_trades_completed;
-            
-            document.getElementById('avgHoldTime').textContent = 
-                'Avg Hold: ' + data.average_hold_time_days.toFixed(1) + ' days';
-        }
+    document.getElementById('accountValue').textContent = 
+        '$' + data.account_value.toFixed(2);
+    
+    // Update the "Starting" line to include cash remaining
+    const startingLine = document.querySelector('.stat-card .stat-change');
+    if (data.cash_remaining !== undefined) {
+        startingLine.innerHTML = `Starting: $1,000.00<br>Cash: $${data.cash_remaining.toFixed(2)}`;
+    } else {
+        startingLine.textContent = 'Starting: $1,000.00';
+    }
+    
+    const returnElement = document.getElementById('totalReturn');
+    const returnValue = data.total_return_percent.toFixed(2);
+    returnElement.textContent = (returnValue >= 0 ? '+' : '') + returnValue + '%';
+    returnElement.className = 'stat-value ' + (returnValue >= 0 ? 'positive' : 'negative');
+    
+    const returnDollars = document.getElementById('totalReturnDollars');
+    const dollarValue = data.total_return_dollars.toFixed(2);
+    returnDollars.textContent = (dollarValue >= 0 ? '+' : '') + '$' + Math.abs(dollarValue).toFixed(2);
+    
+    // Show current streak
+    const streakContainer = document.getElementById('currentStreak');
+    if (data.current_win_streak > 0) {
+        streakContainer.innerHTML = `<div class="streak-box win">🔥 ${data.current_win_streak} Win Streak</div>`;
+    } else if (data.current_loss_streak > 0) {
+        streakContainer.innerHTML = `<div class="streak-box loss">❄️ ${data.current_loss_streak} Loss Streak</div>`;
+    } else {
+        streakContainer.innerHTML = '';
+    }
+    
+    const winRate = data.total_trades_completed > 0 
+        ? (data.winning_trades / data.total_trades_completed * 100).toFixed(1)
+        : '0.0';
+    document.getElementById('winRate').textContent = winRate + '%';
+    
+    document.getElementById('winLossRatio').textContent = 
+        data.winning_trades + 'W / ' + data.losing_trades + 'L';
+    
+    document.getElementById('totalTrades').textContent = data.total_trades_completed;
+    
+    document.getElementById('avgHoldTime').textContent = 
+        'Avg Hold: ' + data.average_hold_time_days.toFixed(1) + ' days';
+}
         
         function updatePortfolio(data) {
             const container = document.getElementById('portfolioContent');
