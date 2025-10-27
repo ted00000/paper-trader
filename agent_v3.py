@@ -249,10 +249,14 @@ RECENT LESSONS LEARNED:
         print(f"   ✓ Updated portfolio: {len(positions)} positions")
         
         # Update account status
-        total_value = sum(p['position_size'] for p in positions)
-        
+        total_invested = sum(p['position_size'] for p in positions)
+        cash_remaining = 1000.00 - total_invested
+        total_value = total_invested + cash_remaining
+
         account_data = {
             "account_value": total_value,
+            "cash_remaining": cash_remaining,
+            "total_invested": total_invested,
             "starting_capital": 1000.00,
             "total_return_dollars": 0.00,
             "total_return_percent": 0.00,
