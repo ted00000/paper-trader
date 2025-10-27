@@ -277,7 +277,7 @@ RECENT LESSONS LEARNED:
             "average_winner_percent": 0.00,
             "average_loser_percent": 0.00,
             "largest_drawdown_percent": 0.00,
-            "last_updated": now + 'Z'
+            "last_updated": now
         }
         
         with open(self.account_file, 'w') as f:
