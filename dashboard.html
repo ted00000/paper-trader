@@ -811,16 +811,22 @@
         }
         
         function updateLastUpdated(timestamp) {
-            if (timestamp) {
-                const date = new Date(timestamp);
-                const timeStr = date.toLocaleString('en-US', { 
-                    dateStyle: 'medium', 
-                    timeStyle: 'short' 
-                });
-                document.getElementById('updateTime').textContent = timeStr;
-                document.getElementById('headerUpdateTime').textContent = 'Last update: ' + timeStr;
-            }
-        }
+    if (timestamp) {
+        // Parse ISO timestamp and ensure correct timezone interpretation
+        const date = new Date(timestamp);
+        
+        // Format with explicit timezone display
+        const timeStr = date.toLocaleString('en-US', { 
+            dateStyle: 'medium', 
+            timeStyle: 'short',
+            timeZone: 'America/New_York',
+            hour12: true
+        });
+        
+        document.getElementById('updateTime').textContent = timeStr + ' ET';
+        document.getElementById('headerUpdateTime').textContent = 'Last update: ' + timeStr + ' ET';
+    }
+}
         
         loadData();
         setInterval(loadData, REFRESH_INTERVAL);
