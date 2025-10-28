@@ -53,6 +53,7 @@ class TradingAgent:
         self.trades_csv = self.project_dir / 'trade_history' / 'completed_trades.csv'
         self.pending_file = self.project_dir / 'portfolio_data' / 'pending_positions.json'
         self.exclusions_file = self.project_dir / 'strategy_evolution' / 'catalyst_exclusions.json'
+        self.daily_activity_file = self.project_dir / 'portfolio_data' / 'daily_activity.json'
     
     # =====================================================================
     # ALPHA VANTAGE PRICE FETCHING
@@ -829,10 +830,66 @@ RECENT LESSONS LEARNED:
             print("   ✗ Portfolio creation failed\n")
             return False
     
+    def create_daily_activity_summary(self, closed_trades):
+        """
+        Create daily activity summary for dashboard
+        Shows what happened today: positions closed, P&L summary
+        """
+
+        # Get current portfolio to see what's still open
+        open_positions = []
+        if self.portfolio_file.exists():
+            with open(self.portfolio_file, 'r') as f:
+                portfolio = json.load(f)
+                open_positions = portfolio.get('positions', [])
+
+        # Calculate summary stats
+        total_closed = len(closed_trades)
+        winners = [t for t in closed_trades if t['return_percent'] > 0]
+        losers = [t for t in closed_trades if t['return_percent'] <= 0]
+
+        total_pl_dollars = sum(t['return_dollars'] for t in closed_trades)
+
+        # Create activity summary
+        activity = {
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'time': datetime.now().strftime('%H:%M:%S'),
+            'summary': {
+                'positions_closed': total_closed,
+                'winners': len(winners),
+                'losers': len(losers),
+                'total_pl_dollars': round(total_pl_dollars, 2),
+                'open_positions': len(open_positions)
+            },
+            'closed_today': [
+                {
+                    'ticker': t['ticker'],
+                    'entry_date': t['entry_date'],
+                    'exit_date': t['exit_date'],
+                    'entry_price': t['entry_price'],
+                    'exit_price': t['exit_price'],
+                    'shares': t['shares'],
+                    'hold_days': t['hold_days'],
+                    'return_percent': round(t['return_percent'], 2),
+                    'return_dollars': round(t['return_dollars'], 2),
+                    'exit_reason': t['exit_reason'],
+                    'catalyst': t['catalyst_type'],
+                    'thesis': t['thesis']
+                }
+                for t in closed_trades
+            ]
+        }
+
+        # Save to file
+        with open(self.daily_activity_file, 'w') as f:
+            json.dump(activity, f, indent=2)
+
+        print(f"   ✓ Created daily activity summary: {total_closed} closed, ${total_pl_dollars:.2f} P&L")
+
     def execute_analyze_command(self):
         """
         Execute ANALYZE command (4:30 PM)
-        
+
         SAME AS v4.2 - No changes needed:
         - Fetch current prices (Alpha Vantage)
         - Update portfolio with latest P&L
@@ -841,39 +898,46 @@ RECENT LESSONS LEARNED:
         - Log closed trades to CSV
         - Update account status
         - Call Claude for analysis and commentary
+        - Create daily activity summary for dashboard
         """
-        
+
         print("\n" + "="*60)
         print("EXECUTING 'ANALYZE' COMMAND - EVENING PERFORMANCE UPDATE")
         print("="*60 + "\n")
-        
+
         # Update prices and check exits
         closed_trades = self.update_portfolio_prices_and_check_exits()
-        
+
+        # Create daily activity summary for dashboard
+        if closed_trades:
+            print("\n4. Creating daily activity summary...")
+            self.create_daily_activity_summary(closed_trades)
+            print()
+
         # Call Claude for analysis
         print("\n" + "="*60)
         print("CALLING CLAUDE FOR ANALYSIS")
         print("="*60 + "\n")
-        
+
         print("1. Loading optimized context...")
         context = self.load_optimized_context('analyze')
         print("   ✓ Context loaded\n")
-        
+
         print("2. Calling Claude API for performance analysis...")
         response = self.call_claude_api('analyze', context)
         print("   ✓ Response received\n")
-        
+
         print("3. Saving response...")
         self.save_response('analyze', response)
         print("   ✓ Complete\n")
-        
+
         print("="*60)
         print("ANALYZE COMMAND COMPLETE")
         print("="*60)
         if closed_trades:
             print(f"\n✓ {len(closed_trades)} positions closed and logged to CSV")
         print()
-        
+
         return True
 
 # =====================================================================
