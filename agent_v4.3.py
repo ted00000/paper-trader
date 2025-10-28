@@ -110,17 +110,17 @@ class TradingAgent:
     # =====================================================================
     
     def call_claude_api(self, command, context):
-        """Call Claude API with optimized context"""
-        
+        """Call Claude API with optimized context and retry logic"""
+
         if not CLAUDE_API_KEY:
             raise ValueError("CLAUDE_API_KEY environment variable not set")
-        
+
         headers = {
             'x-api-key': CLAUDE_API_KEY,
             'anthropic-version': '2023-06-01',
             'content-type': 'application/json'
         }
-        
+
         if command == 'go':
             user_message = """Execute the 'go' command: Select 10 stocks for the portfolio.
 
@@ -149,7 +149,7 @@ At the END of your analysis, you MUST output a JSON block in this EXACT format:
 Include your full analysis and reasoning BEFORE the JSON block, but the JSON MUST be present at the end for the system to parse."""
         else:
             user_message = command
-        
+
         system_prompt = f"""You are the Paper Trading Lab assistant.
 
 Project Context:
@@ -159,18 +159,50 @@ Execute the user's command following the PROJECT_INSTRUCTIONS.md guidelines.
 Pay special attention to CATALYST EXCLUSIONS - do not use any catalyst types that are marked as excluded.
 
 CRITICAL: When executing 'go' command, you MUST include a properly formatted JSON block at the end of your response."""
-        
+
         payload = {
             'model': CLAUDE_MODEL,
             'max_tokens': 4096,
             'system': system_prompt,
             'messages': [{'role': 'user', 'content': user_message}]
         }
-        
-        response = requests.post(CLAUDE_API_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        
-        return response.json()
+
+        # Retry logic with exponential backoff
+        max_retries = 3
+        base_timeout = 120  # Increased from 60 to 120 seconds
+
+        for attempt in range(max_retries):
+            try:
+                timeout = base_timeout * (attempt + 1)  # 120s, 240s, 360s
+                print(f"   API call attempt {attempt + 1}/{max_retries} (timeout: {timeout}s)...")
+
+                response = requests.post(
+                    CLAUDE_API_URL,
+                    headers=headers,
+                    json=payload,
+                    timeout=timeout
+                )
+                response.raise_for_status()
+
+                return response.json()
+
+            except requests.exceptions.Timeout as e:
+                if attempt < max_retries - 1:
+                    wait_time = 5 * (attempt + 1)
+                    print(f"   ⚠️ Timeout after {timeout}s. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"   ✗ Failed after {max_retries} attempts")
+                    raise
+
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    wait_time = 5 * (attempt + 1)
+                    print(f"   ⚠️ Request error: {type(e).__name__}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"   ✗ Failed after {max_retries} attempts")
+                    raise
     
     def load_optimized_context(self, command):
         """Load optimized context for command"""
@@ -182,10 +214,10 @@ CRITICAL: When executing 'go' command, you MUST include a properly formatted JSO
         if instructions_file.exists():
             context['instructions'] = instructions_file.read_text()[:5000]
         
-        # Load strategy rules
+        # Load strategy rules (limit to 8000 chars to prevent timeout)
         strategy_file = self.project_dir / 'strategy_evolution' / 'strategy_rules.md'
         if strategy_file.exists():
-            context['strategy'] = strategy_file.read_text()
+            context['strategy'] = strategy_file.read_text()[:8000]
         
         # Load catalyst exclusions
         exclusions = self.load_catalyst_exclusions()
