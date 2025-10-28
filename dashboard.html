@@ -769,19 +769,24 @@
         
         function updateChart(data) {
             const ctx = document.getElementById('performanceChart');
-            
+
             if (performanceChart) {
                 performanceChart.destroy();
             }
-            
-            const openPositions = Math.max(0, 10 - data.total_trades_completed);
-            
+
+            // Calculate from available data
+            const totalTrades = data.total_trades || 0;
+            const winRate = data.win_rate_percent || 0;
+            const winners = totalTrades > 0 ? Math.round(totalTrades * winRate / 100) : 0;
+            const losers = totalTrades - winners;
+            const openPositions = Math.max(0, 10 - totalTrades);
+
             performanceChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: ['Winners', 'Losers', 'Open Positions'],
                     datasets: [{
-                        data: [data.winning_trades, data.losing_trades, openPositions],
+                        data: [winners, losers, openPositions],
                         backgroundColor: [
                             'rgba(0, 255, 65, 0.8)',
                             'rgba(255, 68, 68, 0.8)',
