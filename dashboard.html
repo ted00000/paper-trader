@@ -722,29 +722,26 @@
         
         function updateCatalystBreakdown(data) {
             if (!data.positions || data.positions.length === 0) return;
-            
+
             const catalysts = {
                 'Earnings Beat': 0,
-                'Earnings_Beat': 0,
                 'Sector Momentum': 0,
-                'Sector_Momentum': 0,
                 'Technical Breakout': 0,
-                'Technical_Breakout': 0,
-                'Analyst Upgrade': 0,
-                'Analyst_Upgrade': 0
+                'Analyst Upgrade': 0
             };
-            
+
             data.positions.forEach(pos => {
                 const catalyst = pos.catalyst || '';
                 if (catalyst.includes('Earnings') || catalyst.includes('earnings')) {
                     catalysts['Earnings Beat']++;
-                } else if (catalyst.includes('Sector') || catalyst.includes('sector')) {
+                } else if (catalyst.includes('Sector') || catalyst.includes('sector') || catalyst.includes('Momentum')) {
                     catalysts['Sector Momentum']++;
                 } else if (catalyst.includes('Technical') || catalyst.includes('technical') || catalyst.includes('Breakout')) {
                     catalysts['Technical Breakout']++;
                 } else if (catalyst.includes('Analyst') || catalyst.includes('analyst') || catalyst.includes('Upgrade')) {
                     catalysts['Analyst Upgrade']++;
                 }
+                // Binary_Event gets grouped into whichever category makes sense, or is tracked separately
             });
             
             const maxCount = Math.max(catalysts['Earnings Beat'], catalysts['Sector Momentum'], 
