@@ -629,6 +629,8 @@
     const cashValue = data.cash_available || 0;
     const positionsValue = data.positions_value || 0;
 
+    // Override flex display to allow stacking
+    startingLine.style.display = 'block';
     startingLine.innerHTML = `
         <div style="margin-bottom: 8px;">Cash: $${cashValue.toFixed(2)} + Positions: $${positionsValue.toFixed(2)}</div>
         <div style="opacity: 0.6;">Starting: $1,000.00</div>
