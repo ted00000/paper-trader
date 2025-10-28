@@ -62,7 +62,7 @@ chmod +x agent.py
 echo "   ✓ Permissions set"
 echo ""
 
-# Step 5: Install Alpha Vantage if needed
+# Step 5: Check dependencies
 echo "5. Checking dependencies..."
 source venv/bin/activate
 pip show requests >/dev/null 2>&1 || pip install --break-system-packages requests
@@ -76,7 +76,7 @@ crontab -l 2>/dev/null | grep "agent.py" || echo "   (none found)"
 echo ""
 echo "   New schedule:"
 echo "   - 8:45 AM: GO (select stocks)"
-echo "   - 9:31 AM: EXECUTE (enter with real prices)"
+echo "   - 9:30 AM: EXECUTE (enter with real prices)"
 echo "   - 4:30 PM: ANALYZE (update & close positions)"
 echo ""
 read -p "   Update crontab? (y/n) " -n 1 -r
@@ -92,7 +92,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     cat >> /tmp/crontab_new.txt << 'EOF'
 # Paper Trading Lab v4.3
 45 8 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent.py go >> /var/log/trading_go.log 2>&1
-31 9 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent.py execute >> /var/log/trading_execute.log 2>&1
+30 9 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent.py execute >> /var/log/trading_execute.log 2>&1
 30 16 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent.py analyze >> /var/log/trading_analyze.log 2>&1
 EOF
     
@@ -119,10 +119,15 @@ echo "✓ Backup: $BACKUP_DIR"
 echo "✓ Version: 4.3"
 echo "✓ Symlink: agent.py -> agent_v4.3.py"
 echo ""
+echo "WORKFLOW:"
+echo "  8:45 AM - GO: Select stocks, save to pending"
+echo "  9:30 AM - EXECUTE: Enter with real prices"
+echo "  4:30 PM - ANALYZE: Update & close positions"
+echo ""
 echo "TEST COMMANDS:"
-echo "  python3 agent.py go       # Select stocks (8:45 AM)"
-echo "  python3 agent.py execute  # Enter positions (9:31 AM)"
-echo "  python3 agent.py analyze  # Update positions (4:30 PM)"
+echo "  python3 agent.py go       # Select stocks"
+echo "  python3 agent.py execute  # Enter positions"
+echo "  python3 agent.py analyze  # Update positions"
 echo ""
 echo "ROLLBACK:"
 echo "  cp -r $BACKUP_DIR/* $PROJECT_DIR/"
