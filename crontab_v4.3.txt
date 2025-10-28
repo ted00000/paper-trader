@@ -1,0 +1,17 @@
+# Paper Trading Lab - Crontab v4.3
+# Timezone: America/New_York (ET)
+# Updated: Oct 27, 2025
+
+# STOCK SELECTION (Pre-market analysis)
+# Runs at 8:45 AM ET - analyzes pre-market data, selects 10 stocks
+45 8 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent.py go >> /var/log/trading_go.log 2>&1
+
+# POSITION EXECUTION (Market open)
+# Runs at 9:31 AM ET - executes entries with real open prices
+31 9 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent.py execute >> /var/log/trading_execute.log 2>&1
+
+# PORTFOLIO UPDATE (After market close)
+# Runs at 4:30 PM ET - updates prices, checks stops/targets, logs closed trades
+30 16 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent.py analyze >> /var/log/trading_analyze.log 2>&1
+
+# End of crontab
