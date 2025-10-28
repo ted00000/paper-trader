@@ -86,19 +86,25 @@ class TradingAgent:
                 url = f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHAVANTAGE_API_KEY}'
                 response = requests.get(url, timeout=10)
                 data = response.json()
-                
+
                 if 'Global Quote' in data and data['Global Quote']:
                     price = float(data['Global Quote']['05. price'])
                     prices[ticker] = price
                     print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f}")
                 else:
-                    print(f"   [{i}/{len(tickers)}] {ticker}: No data (using entry price)")
-                
+                    # Debug: show what we actually received
+                    if 'Note' in data:
+                        print(f"   [{i}/{len(tickers)}] {ticker}: API limit reached - {data['Note']}")
+                    elif 'Error Message' in data:
+                        print(f"   [{i}/{len(tickers)}] {ticker}: API error - {data['Error Message']}")
+                    else:
+                        print(f"   [{i}/{len(tickers)}] {ticker}: No data (using entry price)")
+
                 # Alpha Vantage rate limit: 5 calls/minute for free tier
                 # Sleep 12 seconds between calls to stay under limit
                 if i < len(tickers):
                     time.sleep(12)
-                    
+
             except Exception as e:
                 print(f"   ⚠️ Error fetching {ticker}: {e}")
         
