@@ -630,9 +630,8 @@
     const positionsValue = data.positions_value || 0;
 
     startingLine.innerHTML = `
-        Cash: $${cashValue.toFixed(2)} + Positions: $${positionsValue.toFixed(2)}<br>
-        <br>
-        <span style="opacity: 0.6;">Starting: $1,000.00</span>
+        <div style="margin-bottom: 8px;">Cash: $${cashValue.toFixed(2)} + Positions: $${positionsValue.toFixed(2)}</div>
+        <div style="opacity: 0.6;">Starting: $1,000.00</div>
     `;
     
     const returnElement = document.getElementById('totalReturn');
