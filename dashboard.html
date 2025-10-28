@@ -597,7 +597,45 @@
     <script>
         const REFRESH_INTERVAL = 60000; // 1 minute
         let performanceChart = null;
-        
+
+        function updateMarketStatus() {
+            const now = new Date();
+            const etTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const day = etTime.getDay(); // 0 = Sunday, 6 = Saturday
+            const hours = etTime.getHours();
+            const minutes = etTime.getMinutes();
+            const totalMinutes = hours * 60 + minutes;
+
+            const liveIndicator = document.querySelector('.live-indicator span:last-child');
+
+            // Check if weekend
+            if (day === 0 || day === 6) {
+                liveIndicator.textContent = 'MARKET CLOSED';
+                return;
+            }
+
+            // NYSE schedule (ET):
+            // Pre-market: 4:00 AM - 9:30 AM
+            // Market Open: 9:30 AM - 4:00 PM
+            // Post-market: 4:00 PM - 8:00 PM
+            // Market Closed: 8:00 PM - 4:00 AM
+
+            const preMarketStart = 4 * 60; // 4:00 AM = 240 minutes
+            const marketOpen = 9 * 60 + 30; // 9:30 AM = 570 minutes
+            const marketClose = 16 * 60; // 4:00 PM = 960 minutes
+            const postMarketEnd = 20 * 60; // 8:00 PM = 1200 minutes
+
+            if (totalMinutes >= preMarketStart && totalMinutes < marketOpen) {
+                liveIndicator.textContent = 'PRE-MARKET';
+            } else if (totalMinutes >= marketOpen && totalMinutes < marketClose) {
+                liveIndicator.textContent = 'MARKET OPEN';
+            } else if (totalMinutes >= marketClose && totalMinutes < postMarketEnd) {
+                liveIndicator.textContent = 'POST-MARKET';
+            } else {
+                liveIndicator.textContent = 'MARKET CLOSED';
+            }
+        }
+
         async function loadData() {
             try {
                 const [accountResponse, portfolioResponse] = await Promise.all([
@@ -861,7 +899,12 @@
     }
 }
         
+        // Initialize
+        updateMarketStatus();
         loadData();
+
+        // Update market status every minute
+        setInterval(updateMarketStatus, REFRESH_INTERVAL);
         setInterval(loadData, REFRESH_INTERVAL);
     </script>
 </body>
