@@ -8,7 +8,7 @@
 
 # POSITION EXECUTION (Market open)
 # Runs at 9:31 AM ET - executes entries with real open prices
-31 9 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent.py execute >> /var/log/trading_execute.log 2>&1
+30 9 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent.py execute >> /var/log/trading_execute.log 2>&1
 
 # PORTFOLIO UPDATE (After market close)
 # Runs at 4:30 PM ET - updates prices, checks stops/targets, logs closed trades
