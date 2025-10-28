@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Runtime data - portfolio and trades
+portfolio_data/*.json
+trade_history/*.csv
+daily_reviews/*.json
+
+# Keep directory structure but ignore contents
+!portfolio_data/.gitkeep
+!trade_history/.gitkeep
+!daily_reviews/.gitkeep
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
