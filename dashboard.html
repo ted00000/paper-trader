@@ -577,6 +577,13 @@
                             </div>
                             <div class="performance-value" id="analystCount">0</div>
                         </div>
+                        <div class="performance-item">
+                            <div class="performance-label">Binary Events</div>
+                            <div class="performance-bar">
+                                <div class="performance-bar-fill" id="binaryBar" style="width: 0%"></div>
+                            </div>
+                            <div class="performance-value" id="binaryCount">0</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -727,7 +734,8 @@
                 'Earnings Beat': 0,
                 'Sector Momentum': 0,
                 'Technical Breakout': 0,
-                'Analyst Upgrade': 0
+                'Analyst Upgrade': 0,
+                'Binary Event': 0
             };
 
             data.positions.forEach(pos => {
@@ -740,28 +748,39 @@
                     catalysts['Technical Breakout']++;
                 } else if (catalyst.includes('Analyst') || catalyst.includes('analyst') || catalyst.includes('Upgrade')) {
                     catalysts['Analyst Upgrade']++;
+                } else if (catalyst.includes('Binary') || catalyst.includes('binary')) {
+                    catalysts['Binary Event']++;
                 }
-                // Binary_Event gets grouped into whichever category makes sense, or is tracked separately
             });
-            
-            const maxCount = Math.max(catalysts['Earnings Beat'], catalysts['Sector Momentum'], 
-                                     catalysts['Technical Breakout'], catalysts['Analyst Upgrade'], 1);
-            
+
+            const maxCount = Math.max(
+                catalysts['Earnings Beat'],
+                catalysts['Sector Momentum'],
+                catalysts['Technical Breakout'],
+                catalysts['Analyst Upgrade'],
+                catalysts['Binary Event'],
+                1
+            );
+
             document.getElementById('earningsCount').textContent = catalysts['Earnings Beat'];
-            document.getElementById('earningsBar').style.width = 
+            document.getElementById('earningsBar').style.width =
                 (catalysts['Earnings Beat'] / maxCount * 100) + '%';
-            
+
             document.getElementById('sectorCount').textContent = catalysts['Sector Momentum'];
-            document.getElementById('sectorBar').style.width = 
+            document.getElementById('sectorBar').style.width =
                 (catalysts['Sector Momentum'] / maxCount * 100) + '%';
-            
+
             document.getElementById('technicalCount').textContent = catalysts['Technical Breakout'];
-            document.getElementById('technicalBar').style.width = 
+            document.getElementById('technicalBar').style.width =
                 (catalysts['Technical Breakout'] / maxCount * 100) + '%';
-            
+
             document.getElementById('analystCount').textContent = catalysts['Analyst Upgrade'];
-            document.getElementById('analystBar').style.width = 
+            document.getElementById('analystBar').style.width =
                 (catalysts['Analyst Upgrade'] / maxCount * 100) + '%';
+
+            document.getElementById('binaryCount').textContent = catalysts['Binary Event'];
+            document.getElementById('binaryBar').style.width =
+                (catalysts['Binary Event'] / maxCount * 100) + '%';
         }
         
         function updateChart(data) {
