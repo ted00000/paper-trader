@@ -132,7 +132,7 @@ At the END of your analysis, you MUST output a JSON block in this EXACT format:
     {
       "ticker": "AAPL",
       "entry_price": 175.50,
-      "position_size": 100,
+      "position_size": 100.00,
       "catalyst": "Earnings_Beat",
       "sector": "Technology",
       "confidence": "High",
@@ -145,6 +145,10 @@ At the END of your analysis, you MUST output a JSON block in this EXACT format:
   "portfolio_value": 1000.00
 }
 ```
+
+CRITICAL: position_size must ALWAYS be exactly 100.00 (dollars, not shares).
+DO NOT calculate shares in the JSON - the system will calculate shares later based on real market prices.
+Every position must have position_size: 100.00
 
 Include your full analysis and reasoning BEFORE the JSON block, but the JSON MUST be present at the end for the system to parse."""
         else:
