@@ -162,7 +162,7 @@ CRITICAL: When executing 'go' command, you MUST include a properly formatted JSO
 
         payload = {
             'model': CLAUDE_MODEL,
-            'max_tokens': 4096,
+            'max_tokens': 8192,  # Increased from 4096 to handle full response with JSON
             'system': system_prompt,
             'messages': [{'role': 'user', 'content': user_message}]
         }
