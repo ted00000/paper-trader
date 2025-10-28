@@ -151,6 +151,13 @@ CRITICAL: position_size must ALWAYS be exactly 100.00 (dollars, not shares).
 DO NOT calculate shares in the JSON - the system will calculate shares later based on real market prices.
 Every position must have position_size: 100.00
 
+CRITICAL: stop_loss and price_target calculation rules:
+- stop_loss = entry_price * 0.90 (10% below entry - where we exit to cut losses)
+- price_target = entry_price * 1.10 (10% above entry - where we take profits)
+- Example: If entry_price is $100, then stop_loss = $90.00 and price_target = $110.00
+- Stop loss must ALWAYS be BELOW entry price
+- Price target must ALWAYS be ABOVE entry price
+
 Include your full analysis and reasoning BEFORE the JSON block, but the JSON MUST be present at the end for the system to parse."""
         else:
             user_message = command
@@ -329,6 +336,19 @@ RECENT LESSONS LEARNED:
             position_size = float(pos.get('position_size', 100))
             shares = position_size / entry_price if entry_price > 0 else 0
             
+            # Validate and fix stop_loss and price_target
+            stop_loss = float(pos.get('stop_loss', 0))
+            price_target = float(pos.get('price_target', 0))
+
+            # Safety check: stop_loss must be below entry, target must be above
+            if stop_loss >= entry_price or stop_loss == 0:
+                stop_loss = entry_price * 0.90  # 10% stop loss
+                print(f"   ⚠️ Fixed invalid stop_loss for {pos.get('ticker')}: ${stop_loss:.2f}")
+
+            if price_target <= entry_price or price_target == 0:
+                price_target = entry_price * 1.10  # 10% profit target
+                print(f"   ⚠️ Fixed invalid price_target for {pos.get('ticker')}: ${price_target:.2f}")
+
             position = {
                 "ticker": pos.get('ticker', ''),
                 "entry_date": datetime.now().strftime('%Y-%m-%d'),
@@ -341,8 +361,8 @@ RECENT LESSONS LEARNED:
                 "catalyst": pos.get('catalyst', ''),
                 "sector": pos.get('sector', ''),
                 "confidence": pos.get('confidence', 'Medium'),
-                "stop_loss": float(pos.get('stop_loss', 0)),
-                "price_target": float(pos.get('price_target', 0)),
+                "stop_loss": round(stop_loss, 2),
+                "price_target": round(price_target, 2),
                 "thesis": pos.get('thesis', ''),
                 "days_held": 0
             }
