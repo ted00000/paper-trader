@@ -758,19 +758,39 @@ RECENT LESSONS LEARNED:
         
         print("3. Extracting JSON from response...")
         portfolio_json = self.extract_json_from_response(response_text)
-        
+
         if portfolio_json:
-            # Save to PENDING file (not current_portfolio.json)
+            # NEW: Fetch real prices for selected stocks and update JSON
+            print(f"   ✓ Extracted {len(portfolio_json.get('positions', []))} selections\n")
+
+            print("4. Fetching real prices for selected stocks...")
+            positions = portfolio_json.get('positions', [])
+            tickers = [p['ticker'] for p in positions]
+            real_prices = self.fetch_current_prices(tickers)
+
+            # Update positions with real prices
+            for pos in positions:
+                ticker = pos['ticker']
+                if ticker in real_prices:
+                    old_price = pos.get('entry_price', 0)
+                    pos['entry_price'] = real_prices[ticker]
+                    # Recalculate stop_loss and price_target based on real price
+                    pos['stop_loss'] = round(real_prices[ticker] * 0.90, 2)
+                    pos['price_target'] = round(real_prices[ticker] * 1.10, 2)
+                    print(f"   ✓ {ticker}: Updated ${old_price:.2f} → ${real_prices[ticker]:.2f}")
+            print()
+
+            # Save to PENDING file with real prices
             portfolio_json['selection_time'] = datetime.now().isoformat()
             with open(self.pending_file, 'w') as f:
                 json.dump(portfolio_json, f, indent=2)
-            print(f"   ✓ Saved {len(portfolio_json.get('positions', []))} selections to pending\n")
+            print(f"   ✓ Saved selections to pending with real prices\n")
         else:
             print("   ⚠️ No JSON found - selections not saved\n")
-        
-        print("4. Validating selections...")
+
+        print("5. Validating selections...")
         is_valid, violations = self.validate_trade_decisions(response_text)
-        
+
         if violations:
             print("   ⚠️ VALIDATION WARNINGS:")
             for v in violations:
@@ -778,8 +798,8 @@ RECENT LESSONS LEARNED:
             print()
         else:
             print("   ✓ All selections validated\n")
-        
-        print("5. Saving response...")
+
+        print("6. Saving response...")
         self.save_response('go', response)
         print("   ✓ Complete\n")
         
