@@ -531,26 +531,6 @@
             </div>
 
             <div>
-                <!-- Today's Activity Section -->
-                <div class="section" id="todayActivitySection" style="margin-bottom: 24px; display: none;">
-                    <div class="section-header">
-                        <h2 class="section-title">Today's Activity</h2>
-                        <span class="section-badge" id="activityTime">--</span>
-                    </div>
-                    <div id="todayActivityContent"></div>
-                </div>
-
-                <!-- Recently Closed Section -->
-                <div class="section" id="recentlyClosedSection" style="margin-bottom: 24px; display: none;">
-                    <div class="section-header">
-                        <h2 class="section-title">Recently Closed (Last 7 Days)</h2>
-                        <span class="section-badge" id="recentlyClosedCount">0 Trades</span>
-                    </div>
-                    <div id="recentlyClosedContent"></div>
-                </div>
-            </div>
-
-            <div>
                 <div class="section">
                     <div class="section-header">
                         <h2 class="section-title">Performance</h2>
@@ -604,7 +584,25 @@
                 </div>
             </div>
         </div>
-        
+
+        <!-- Today's Activity Section -->
+        <div class="section" id="todayActivitySection" style="margin-bottom: 24px; display: none;">
+            <div class="section-header">
+                <h2 class="section-title">Today's Activity</h2>
+                <span class="section-badge" id="activityTime">--</span>
+            </div>
+            <div id="todayActivityContent"></div>
+        </div>
+
+        <!-- Recently Closed Section -->
+        <div class="section" id="recentlyClosedSection" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">Recently Closed (Last 7 Days)</h2>
+                <span class="section-badge" id="recentlyClosedCount">0 Trades</span>
+            </div>
+            <div id="recentlyClosedContent"></div>
+        </div>
+
         <div class="footer">
             Last updated: <span class="footer-time" id="updateTime">--</span>
             <br>
