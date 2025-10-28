@@ -621,16 +621,18 @@
         }
         
         function updateStats(data) {
-    document.getElementById('accountValue').textContent = 
+    document.getElementById('accountValue').textContent =
         '$' + data.account_value.toFixed(2);
-    
-    // Update the "Starting" line to include cash remaining
+
+    // Update to show breakdown: Cash + Positions = Account Value
     const startingLine = document.querySelector('.stat-card .stat-change');
-    if (data.cash_remaining !== undefined) {
-        startingLine.innerHTML = `Starting: $1,000.00<br>Cash: $${data.cash_remaining.toFixed(2)}`;
-    } else {
-        startingLine.textContent = 'Starting: $1,000.00';
-    }
+    const cashValue = data.cash_available || 0;
+    const positionsValue = data.positions_value || 0;
+
+    startingLine.innerHTML = `
+        Cash: $${cashValue.toFixed(2)} + Positions: $${positionsValue.toFixed(2)}<br>
+        <span style="opacity: 0.6;">Starting: $1,000.00</span>
+    `;
     
     const returnElement = document.getElementById('totalReturn');
     const returnValue = data.total_return_percent.toFixed(2);
