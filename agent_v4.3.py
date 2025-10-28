@@ -39,6 +39,7 @@ import traceback
 # Configuration
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
 ALPHAVANTAGE_API_KEY = os.environ.get('ALPHAVANTAGE_API_KEY', '')
+POLYGON_API_KEY = os.environ.get('POLYGON_API_KEY', '')
 CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages'
 CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
 PROJECT_DIR = Path(__file__).parent
@@ -61,55 +62,63 @@ class TradingAgent:
     
     def fetch_current_prices(self, tickers):
         """
-        Fetch current prices using Alpha Vantage API
-        
-        FREE TIER LIMITATION:
-        - GLOBAL_QUOTE returns most recent available data
-        - During market hours (9:30 AM - 4:00 PM): Returns yesterday's close
-        - After market close (4:30 PM+): Returns today's close
-        - For real-time/15-min delayed: Requires premium subscription
-        
-        This is acceptable for paper trading. Entry prices will be ~1-3% off
-        actual market open, but the learning system will still work correctly.
+        Fetch current prices using Polygon.io API
+
+        STARTER PLAN ($29/mo):
+        - 15-minute delayed data (perfect for swing trading)
+        - Unlimited API calls (no daily/minute rate limits)
+        - At 9:30 AM EXECUTE: Gets ~9:15 AM prices
+        - At 4:30 PM ANALYZE: Gets ~4:15 PM prices (essentially closing prices)
+
+        This is ideal for swing trading with multi-day holds.
         """
-        
-        if not ALPHAVANTAGE_API_KEY:
-            print("   ⚠️ ALPHAVANTAGE_API_KEY not set - using entry prices")
+
+        if not POLYGON_API_KEY:
+            print("   ⚠️ POLYGON_API_KEY not set - using entry prices")
             return {}
-        
+
         prices = {}
-        
-        print(f"   Fetching prices for {len(tickers)} tickers via Alpha Vantage...")
-        
+
+        print(f"   Fetching prices for {len(tickers)} tickers via Polygon.io...")
+
         for i, ticker in enumerate(tickers, 1):
             try:
-                url = f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={ALPHAVANTAGE_API_KEY}'
+                # Use snapshot endpoint for 15-min delayed price
+                url = f'https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/{ticker}?apiKey={POLYGON_API_KEY}'
                 response = requests.get(url, timeout=10)
                 data = response.json()
 
-                if 'Global Quote' in data and data['Global Quote']:
-                    price = float(data['Global Quote']['05. price'])
-                    prices[ticker] = price
-                    print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f}")
+                if data.get('status') == 'OK' and 'ticker' in data:
+                    ticker_data = data['ticker']
+
+                    # Try to get last trade price (most recent)
+                    if 'lastTrade' in ticker_data and ticker_data['lastTrade']:
+                        price = float(ticker_data['lastTrade']['p'])
+                        prices[ticker] = price
+                        print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f}")
+                    # Fallback to previous day close if no recent trade
+                    elif 'prevDay' in ticker_data and ticker_data['prevDay']:
+                        price = float(ticker_data['prevDay']['c'])
+                        prices[ticker] = price
+                        print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f} (prev close)")
+                    else:
+                        print(f"   [{i}/{len(tickers)}] {ticker}: No price data available")
                 else:
                     # Debug: show what we actually received
-                    if 'Note' in data:
-                        print(f"   [{i}/{len(tickers)}] {ticker}: API limit reached - {data['Note']}")
-                    elif 'Error Message' in data:
-                        print(f"   [{i}/{len(tickers)}] {ticker}: API error - {data['Error Message']}")
+                    if 'error' in data:
+                        print(f"   [{i}/{len(tickers)}] {ticker}: API error - {data['error']}")
                     else:
-                        print(f"   [{i}/{len(tickers)}] {ticker}: No data (using entry price)")
+                        print(f"   [{i}/{len(tickers)}] {ticker}: No data (status: {data.get('status', 'unknown')})")
 
-                # Alpha Vantage rate limit: 5 calls/minute for free tier
-                # Sleep 12 seconds between calls to stay under limit
-                if i < len(tickers):
-                    time.sleep(12)
+                # No rate limiting needed for Starter plan (unlimited calls)
+                # Small delay to be respectful to API
+                time.sleep(0.1)
 
             except Exception as e:
                 print(f"   ⚠️ Error fetching {ticker}: {e}")
-        
+
         print(f"   ✓ Fetched {len(prices)}/{len(tickers)} prices")
-        
+
         return prices
     
     # =====================================================================
