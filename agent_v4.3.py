@@ -563,8 +563,10 @@ RECENT LESSONS LEARNED:
             'entry_date': position['entry_date'],
             'exit_date': exit_date.strftime('%Y-%m-%d'),
             'ticker': position['ticker'],
+            'premarket_price': position.get('premarket_price', entry_price),
             'entry_price': entry_price,
             'exit_price': exit_price,
+            'gap_percent': position.get('gap_percent', 0),
             'shares': shares,
             'position_size': position['position_size'],
             'hold_days': hold_days,
@@ -592,10 +594,10 @@ RECENT LESSONS LEARNED:
             with open(self.trades_csv, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow([
-                    'Trade_ID', 'Entry_Date', 'Exit_Date', 'Ticker', 
-                    'Entry_Price', 'Exit_Price', 'Shares', 'Position_Size',
-                    'Hold_Days', 'Return_Percent', 'Return_Dollars', 
-                    'Exit_Reason', 'Catalyst_Type', 'Sector', 
+                    'Trade_ID', 'Entry_Date', 'Exit_Date', 'Ticker',
+                    'Premarket_Price', 'Entry_Price', 'Exit_Price', 'Gap_Percent',
+                    'Shares', 'Position_Size', 'Hold_Days', 'Return_Percent', 'Return_Dollars',
+                    'Exit_Reason', 'Catalyst_Type', 'Sector',
                     'Confidence_Level', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After'
                 ])
@@ -607,8 +609,10 @@ RECENT LESSONS LEARNED:
                 trade_data.get('entry_date', ''),
                 trade_data.get('exit_date', ''),
                 trade_data.get('ticker', ''),
+                trade_data.get('premarket_price', 0),
                 trade_data.get('entry_price', 0),
                 trade_data.get('exit_price', 0),
+                trade_data.get('gap_percent', 0),
                 trade_data.get('shares', 0),
                 trade_data.get('position_size', 0),
                 trade_data.get('hold_days', 0),
@@ -768,11 +772,13 @@ RECENT LESSONS LEARNED:
             tickers = [p['ticker'] for p in positions]
             real_prices = self.fetch_current_prices(tickers)
 
-            # Update positions with real prices
+            # Update positions with real prices and save pre-market price for gap analysis
             for pos in positions:
                 ticker = pos['ticker']
                 if ticker in real_prices:
                     old_price = pos.get('entry_price', 0)
+                    # Save pre-market price for gap calculation later
+                    pos['premarket_price'] = round(old_price, 2)
                     pos['entry_price'] = real_prices[ticker]
                     # Recalculate stop_loss and price_target based on real price
                     pos['stop_loss'] = round(real_prices[ticker] * 0.90, 2)
@@ -848,17 +854,24 @@ RECENT LESSONS LEARNED:
         real_prices = self.fetch_current_prices(tickers)
         print()
         
-        print("3. Updating positions with real prices...")
+        print("3. Updating positions with real prices and calculating gaps...")
         for pos in positions:
             ticker = pos['ticker']
             if ticker in real_prices:
+                # Calculate gap from pre-market to market open
+                premarket_price = pos.get('premarket_price', real_prices[ticker])
+                gap_percent = ((real_prices[ticker] - premarket_price) / premarket_price * 100) if premarket_price > 0 else 0
+                pos['gap_percent'] = round(gap_percent, 2)
+
                 # Update with real market price
                 pos['entry_price'] = real_prices[ticker]
                 pos['current_price'] = real_prices[ticker]
                 # Recalculate shares based on real price
                 pos['shares'] = pos.get('position_size', 100) / real_prices[ticker]
+
+                gap_str = f"Gap: {gap_percent:+.1f}%" if abs(gap_percent) > 0.5 else "No gap"
                 print(f"   ✓ {ticker}: Entry=${real_prices[ticker]:.2f}, "
-                      f"Shares={pos['shares']:.2f}")
+                      f"Shares={pos['shares']:.2f}, {gap_str}")
             else:
                 # Use estimated price from GO command
                 print(f"   ⚠️ {ticker}: Using estimated price ${pos.get('entry_price', 0):.2f}")
