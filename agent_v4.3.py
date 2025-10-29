@@ -191,7 +191,11 @@ class TradingAgent:
         }
 
         if command == 'go':
-            user_message = """Execute the 'go' command: Select 10 stocks for the portfolio.
+            today_date = datetime.now().strftime('%A, %B %d, %Y')
+            user_message = f"""Execute the 'go' command: Select 10 stocks for the portfolio.
+
+TODAY'S DATE: {today_date}
+NOTE: This is a FRESH portfolio selection for today. Do not repeat yesterday's picks unless the catalysts are still actively valid today.
 
 CRITICAL OUTPUT REQUIREMENT:
 At the END of your analysis, you MUST output a JSON block in this EXACT format:
