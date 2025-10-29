@@ -46,7 +46,7 @@ PROJECT_DIR = Path(__file__).parent
 
 class TradingAgent:
     """Production-ready trading agent v4.3 - Complete implementation"""
-    
+
     def __init__(self):
         self.project_dir = PROJECT_DIR
         self.portfolio_file = self.project_dir / 'portfolio_data' / 'current_portfolio.json'
@@ -55,7 +55,60 @@ class TradingAgent:
         self.pending_file = self.project_dir / 'portfolio_data' / 'pending_positions.json'
         self.exclusions_file = self.project_dir / 'strategy_evolution' / 'catalyst_exclusions.json'
         self.daily_activity_file = self.project_dir / 'portfolio_data' / 'daily_activity.json'
-    
+
+        # Ensure required data files exist
+        self._ensure_data_files()
+
+    def _ensure_data_files(self):
+        """
+        Auto-create required data files if they don't exist.
+        Prevents 404 errors on dashboard after git pull.
+        """
+        # Ensure completed_trades.csv exists with headers
+        if not self.trades_csv.exists():
+            self.trades_csv.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.trades_csv, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    'Trade_ID', 'Entry_Date', 'Exit_Date', 'Ticker',
+                    'Premarket_Price', 'Entry_Price', 'Exit_Price', 'Gap_Percent',
+                    'Shares', 'Position_Size', 'Hold_Days', 'Return_Percent', 'Return_Dollars',
+                    'Exit_Reason', 'Catalyst_Type', 'Sector',
+                    'Confidence_Level', 'Stop_Loss', 'Price_Target',
+                    'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After'
+                ])
+
+        # Ensure daily_activity.json exists
+        if not self.daily_activity_file.exists():
+            self.daily_activity_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.daily_activity_file, 'w') as f:
+                json.dump({"recent_activity": [], "recently_closed": []}, f, indent=2)
+
+        # Ensure account_status.json exists
+        if not self.account_file.exists():
+            self.account_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.account_file, 'w') as f:
+                json.dump({
+                    "account_value": 1000.00,
+                    "cash_balance": 1000.00,
+                    "positions_value": 0.00,
+                    "total_return_percent": 0.00,
+                    "total_return_dollars": 0.00,
+                    "last_updated": ""
+                }, f, indent=2)
+
+        # Ensure current_portfolio.json exists
+        if not self.portfolio_file.exists():
+            self.portfolio_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.portfolio_file, 'w') as f:
+                json.dump({
+                    "positions": [],
+                    "total_positions": 0,
+                    "portfolio_value": 1000.00,
+                    "cash_balance": 1000.00,
+                    "last_updated": ""
+                }, f, indent=2)
+
     # =====================================================================
     # ALPHA VANTAGE PRICE FETCHING
     # =====================================================================
