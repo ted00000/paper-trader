@@ -1374,6 +1374,7 @@ def main():
     
     print(f"\n{'='*60}")
     print(f"Paper Trading Lab Agent v5.0")
+    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S ET')}")
     print(f"{'='*60}")
     
     agent = TradingAgent()
