@@ -9,6 +9,6 @@ source venv/bin/activate
 source /root/.env
 
 # Run GO with logging
-python3 agent_v4.3.py go >> logs/go.log 2>&1
+python3 agent_v5.0.py go >> logs/go.log 2>&1
 
 exit 0

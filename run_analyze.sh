@@ -9,6 +9,6 @@ source venv/bin/activate
 source /root/.env
 
 # Run ANALYZE with logging
-python3 agent_v4.3.py analyze >> logs/analyze.log 2>&1
+python3 agent_v5.0.py analyze >> logs/analyze.log 2>&1
 
 exit 0
