@@ -6,6 +6,14 @@
 
 ## 📋 Quick Start
 
+**First Time Setup:**
+```bash
+git clone <repository-url>
+cd paper_trading_lab
+./init_data_files.sh
+source .env  # Set your API keys
+```
+
 **Start Date:** Monday, October 27, 2025 at 8:45 AM
 
 **Commands:**
