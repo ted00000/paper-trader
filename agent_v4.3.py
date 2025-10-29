@@ -147,20 +147,19 @@ At the END of your analysis, you MUST output a JSON block in this EXACT format:
   "positions": [
     {
       "ticker": "AAPL",
-      "entry_price": 175.50,
       "position_size": 100.00,
       "catalyst": "Earnings_Beat",
       "sector": "Technology",
       "confidence": "High",
-      "thesis": "Strong Q4 earnings with iPhone growth",
-      "stop_loss": 163.28,
-      "price_target": 193.05
+      "thesis": "Strong Q4 earnings with iPhone growth"
     }
   ],
   "total_positions": 10,
   "portfolio_value": 1000.00
 }
 ```
+
+DO NOT include entry_price, stop_loss, or price_target in the JSON - the system will fetch real prices and calculate these automatically.
 
 CRITICAL: position_size must ALWAYS be exactly 100.00 (dollars, not shares).
 DO NOT calculate shares in the JSON - the system will calculate shares later based on real market prices.
@@ -772,18 +771,17 @@ RECENT LESSONS LEARNED:
             tickers = [p['ticker'] for p in positions]
             real_prices = self.fetch_current_prices(tickers)
 
-            # Update positions with real prices and save pre-market price for gap analysis
+            # Add real prices to positions (Claude only provided tickers and catalysts)
             for pos in positions:
                 ticker = pos['ticker']
                 if ticker in real_prices:
-                    old_price = pos.get('entry_price', 0)
-                    # Save pre-market price for gap calculation later
-                    pos['premarket_price'] = round(old_price, 2)
-                    pos['entry_price'] = real_prices[ticker]
-                    # Recalculate stop_loss and price_target based on real price
+                    # Set pre-market price (8:45 AM)
+                    pos['premarket_price'] = round(real_prices[ticker], 2)
+                    pos['entry_price'] = real_prices[ticker]  # Will be overwritten by EXECUTE
+                    # Calculate stop_loss and price_target based on real price
                     pos['stop_loss'] = round(real_prices[ticker] * 0.90, 2)
                     pos['price_target'] = round(real_prices[ticker] * 1.10, 2)
-                    print(f"   ✓ {ticker}: Updated ${old_price:.2f} → ${real_prices[ticker]:.2f}")
+                    print(f"   ✓ {ticker}: ${real_prices[ticker]:.2f}")
             print()
 
             # Save to PENDING file with real prices
