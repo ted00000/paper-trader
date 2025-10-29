@@ -79,26 +79,55 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(0, 255, 65, 0.1);
             padding: 8px 16px;
             border-radius: 6px;
             font-size: 0.875rem;
             font-weight: 600;
-            border: 1px solid var(--neon-green);
             margin-bottom: 8px;
+            transition: all 0.3s ease;
         }
-        
+
+        /* Market status color variants */
+        .live-indicator.market-open {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+        }
+
+        .live-indicator.market-closed {
+            background: rgba(255, 68, 68, 0.1);
+            border: 1px solid #ff4444;
+            color: #ff4444;
+        }
+
+        .live-indicator.market-extended {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid #ffc107;
+            color: #ffc107;
+        }
+
         .live-dot {
             width: 8px;
             height: 8px;
-            background: var(--neon-green);
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
-        
+
+        .market-open .live-dot {
+            background: #00ff41;
+        }
+
+        .market-closed .live-dot {
+            background: #ff4444;
+        }
+
+        .market-extended .live-dot {
+            background: #ffc107;
+        }
+
         @keyframes pulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--neon-green); }
-            50% { opacity: 0.6; box-shadow: 0 0 4px var(--neon-green); }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
         
         .last-update {
@@ -624,11 +653,16 @@
             const minutes = etTime.getMinutes();
             const totalMinutes = hours * 60 + minutes;
 
-            const liveIndicator = document.querySelector('.live-indicator span:last-child');
+            const liveIndicator = document.querySelector('.live-indicator');
+            const liveText = document.querySelector('.live-indicator span:last-child');
+
+            // Remove all status classes
+            liveIndicator.classList.remove('market-open', 'market-closed', 'market-extended');
 
             // Check if weekend
             if (day === 0 || day === 6) {
-                liveIndicator.textContent = 'MARKET CLOSED';
+                liveText.textContent = 'MARKET CLOSED';
+                liveIndicator.classList.add('market-closed');
                 return;
             }
 
@@ -644,13 +678,17 @@
             const postMarketEnd = 20 * 60; // 8:00 PM = 1200 minutes
 
             if (totalMinutes >= preMarketStart && totalMinutes < marketOpen) {
-                liveIndicator.textContent = 'PRE-MARKET';
+                liveText.textContent = 'PRE-MARKET';
+                liveIndicator.classList.add('market-extended');
             } else if (totalMinutes >= marketOpen && totalMinutes < marketClose) {
-                liveIndicator.textContent = 'MARKET OPEN';
+                liveText.textContent = 'MARKET OPEN';
+                liveIndicator.classList.add('market-open');
             } else if (totalMinutes >= marketClose && totalMinutes < postMarketEnd) {
-                liveIndicator.textContent = 'POST-MARKET';
+                liveText.textContent = 'POST-MARKET';
+                liveIndicator.classList.add('market-extended');
             } else {
-                liveIndicator.textContent = 'MARKET CLOSED';
+                liveText.textContent = 'MARKET CLOSED';
+                liveIndicator.classList.add('market-closed');
             }
         }
 
