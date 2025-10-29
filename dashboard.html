@@ -509,7 +509,6 @@
                         <span class="live-dot"></span>
                         <span>SYSTEM LIVE</span>
                     </div>
-                    <div class="last-update" id="headerUpdateTime">Last update: --</div>
                 </div>
             </div>
         </header>
@@ -1077,16 +1076,13 @@
             });
 
             document.getElementById('updateTime').textContent = timeStr + ' ET';
-            document.getElementById('headerUpdateTime').textContent = 'Last update: ' + timeStr + ' ET';
         } else {
             // Invalid date format
             document.getElementById('updateTime').textContent = 'Awaiting first update';
-            document.getElementById('headerUpdateTime').textContent = 'Last update: Awaiting first update';
         }
     } else {
         // No timestamp or not initialized
         document.getElementById('updateTime').textContent = 'Awaiting first update';
-        document.getElementById('headerUpdateTime').textContent = 'Last update: Awaiting first update';
     }
 }
         
