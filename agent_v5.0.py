@@ -1373,8 +1373,7 @@ def main():
     command = sys.argv[1].lower()
     
     print(f"\n{'='*60}")
-    print(f"Paper Trading Lab Agent v4.3")
-    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S ET')}")
+    print(f"Paper Trading Lab Agent v5.0")
     print(f"{'='*60}")
     
     agent = TradingAgent()
