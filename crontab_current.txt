@@ -1,29 +1,29 @@
 # Paper Trading Lab - Complete Automated Schedule
 # Timezone: America/New_York (ET) - automatically handles DST
-# Updated: October 28, 2025
+# Updated: October 29, 2025
 
 # =============================================================================
 # DAILY TRADING OPERATIONS (Monday-Friday)
 # =============================================================================
 
 # Morning: GO command at 8:45 AM ET (select 10 stocks)
-45 8 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && python3 agent_v4.3.py go >> /root/paper_trading_lab/logs/go.log 2>&1
+45 8 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent_v4.3.py go >> /root/paper_trading_lab/logs/go.log 2>&1
 
 # Market Open: EXECUTE command at 9:30 AM ET (enter positions)
-30 9 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && python3 agent_v4.3.py execute >> /root/paper_trading_lab/logs/execute.log 2>&1
+30 9 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent_v4.3.py execute >> /root/paper_trading_lab/logs/execute.log 2>&1
 
 # Market Close: ANALYZE command at 4:30 PM ET (update prices, close positions)
-30 16 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && python3 agent_v4.3.py analyze >> /root/paper_trading_lab/logs/analyze.log 2>&1
+30 16 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 agent_v4.3.py analyze >> /root/paper_trading_lab/logs/analyze.log 2>&1
 
 # =============================================================================
 # LEARNING OPERATIONS
 # =============================================================================
 
 # Daily Learning at 5:00 PM ET (analyze closed trades, update catalyst performance)
-0 17 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && python3 learn_daily.py >> /root/paper_trading_lab/logs/learn_daily.log 2>&1
+0 17 * * 1-5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 learn_daily.py >> /root/paper_trading_lab/logs/learn_daily.log 2>&1
 
 # Weekly Learning at 5:30 PM ET on Fridays (analyze weekly patterns, refine rules)
-30 17 * * 5 cd /root/paper_trading_lab && source venv/bin/activate && python3 learn_weekly.py >> /root/paper_trading_lab/logs/learn_weekly.log 2>&1
+30 17 * * 5 cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 learn_weekly.py >> /root/paper_trading_lab/logs/learn_weekly.log 2>&1
 
 # Monthly Learning at 6:00 PM ET on last Sunday (macro analysis, strategy evolution)
-0 18 * * 0 [ $(date +\%d) -ge 22 ] && cd /root/paper_trading_lab && source venv/bin/activate && python3 learn_monthly.py >> /root/paper_trading_lab/logs/learn_monthly.log 2>&1
+0 18 * * 0 [ $(date +\%d) -ge 22 ] && cd /root/paper_trading_lab && source venv/bin/activate && source /root/.env && python3 learn_monthly.py >> /root/paper_trading_lab/logs/learn_monthly.log 2>&1
