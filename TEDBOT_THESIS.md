@@ -313,5 +313,3 @@ That's the thesis.
 ---
 
 *Tedbot 2.0 is an educational experiment in systematic trading and machine learning. All trading is simulated. Not financial advice. For educational purposes only.*
-
-*Built by someone tired of scams. For people who want the truth.*
