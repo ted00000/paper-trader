@@ -10,10 +10,334 @@ This guide outlines key research areas for improving entry quality in the Tedbot
 - **Exit rules:** -7% stop, +10-15% target (full exits)
 - **Entry method:** Tier 1 catalyst identification via AI
 - **Price checks:** 2x daily (9:30 AM execute, 4:30 PM analyze)
-- **Data:** Polygon.io 15-min delayed quotes (free tier)
+- **Data:** Polygon.io Stocks Starter tier ($29/month)
+  - Unlimited API calls
+  - 15-min delayed prices
+  - News endpoint (updated hourly)
+  - 5 years historical data
 
 ## Key Constraint
 Our advantage is NOT in execution speed or intraday timing. Our advantage is in **pattern recognition across catalysts and learning from historical trades**.
+
+---
+
+## 🔥 PRIORITY RESEARCH AREA: News-Based Catalyst Monitoring
+
+**Status:** Available NOW (already have paid Polygon.io tier)
+**Urgency:** HIGH - BA trade lost -4.4% due to undetected catalyst failure
+**Implementation Effort:** Moderate (2-3 hours)
+**Potential Impact:** Prevent 30-50% of catalyst-invalidation losses
+
+### The BA Case Study (2025-10-30)
+
+**What Happened:**
+- Entered BA position (likely on bullish catalyst)
+- Boeing reported Q3 earnings with **$4.9B charge on 777X delays**
+- News broke 24 hours ago (Oct 29, ~2:00 PM)
+- System held through negative catalyst event
+- Current loss: -4.4% (approaching -7% stop loss)
+
+**What SHOULD Have Happened (Per Strategy Rules):**
+```
+Strategy Rule: "Catalyst Invalidated - Exit same day regardless of P&L"
+- 777X delays = Binary event catalyst invalidated
+- Major earnings miss = Earnings catalyst invalidated
+- Should have exited at 4:30 PM ANALYZE on Oct 29
+```
+
+**What Actually Happened:**
+- ANALYZE command checked stops/targets only (mechanical rules)
+- Did NOT check news or catalyst status
+- Will not detect catalyst failure until next GO command (Oct 31, 8:45 AM)
+- Loss compounds from -4.4% → potentially worse
+
+**Cost of Delay:**
+- If exited Oct 29 at 4:30 PM: ~-3% loss
+- If exit Oct 31 at 9:30 AM: Potentially -5% to -8% loss
+- Difference: 2-5% additional loss = $2-5 on $100 position
+
+### Polygon.io News Endpoint
+
+**Available on Stocks Starter Tier:** ✅ Yes
+**Endpoint:** `GET /v2/reference/news`
+**Rate Limit:** Unlimited (paid tier)
+**Update Frequency:** Hourly
+**Data Included:**
+- Headlines, descriptions, full article URLs
+- Publication timestamps
+- Associated tickers
+- Publisher information
+- Sentiment insights (optional)
+
+**Example API Call:**
+```bash
+GET https://api.polygon.io/v2/reference/news?ticker=BA&limit=10&apiKey=YOUR_KEY
+```
+
+**Example Response:**
+```json
+{
+  "results": [
+    {
+      "title": "Boeing takes $4.9B charge on 777X delays",
+      "description": "Company reports Q3 loss due to program issues...",
+      "published_utc": "2025-10-29T14:30:00Z",
+      "article_url": "https://...",
+      "tickers": ["BA"],
+      "keywords": ["earnings", "loss", "delay", "charge"]
+    }
+  ]
+}
+```
+
+### Research Questions
+
+#### 1. Catalyst Invalidation Detection
+
+**Primary Question:** How do we programmatically detect when a catalyst has been invalidated?
+
+**Sub-Questions:**
+- **Keyword-Based Detection:**
+  - What keywords indicate catalyst failure?
+  - Negative: "miss", "loss", "charge", "delay", "downgrade", "cut guidance", "suspend", "investigation"
+  - Positive (ignore): "beat", "upgrade", "raise guidance", "accelerate", "approval"
+  - Context matters: "beat expectations despite loss" vs "miss on earnings"
+
+- **Catalyst-Specific Rules:**
+  - Earnings catalyst: "earnings miss", "revenue miss", "guidance lowered"
+  - Analyst upgrade catalyst: "downgrade", "lower price target"
+  - Binary event catalyst: "delay", "rejection", "suspend", "cancel"
+  - Sector momentum: Check if multiple stocks in sector turning negative
+
+- **Magnitude/Severity:**
+  - Small negative news: "slight miss" → Monitor, don't exit
+  - Major negative news: "$4.9B charge" → Exit immediately
+  - How to quantify severity? Dollar amounts? Analyst reactions?
+
+#### 2. Confidence Thresholds
+
+**Primary Question:** When should we auto-exit vs just flag for manual review?
+
+**Scenarios:**
+- **High Confidence Exit (auto-execute):**
+  - Multiple negative keywords in headline
+  - Large dollar loss mentioned ($1B+)
+  - Explicit downgrade from analyst
+  - Regulatory rejection/delay
+
+- **Medium Confidence (flag for review):**
+  - Mixed news (good revenue, bad guidance)
+  - Single negative keyword
+  - Unconfirmed reports
+
+- **Low Confidence (monitor only):**
+  - Opinion pieces without new data
+  - Analyst commentary (not rating change)
+  - Industry news (not company-specific)
+
+**Implementation Options:**
+1. **Conservative:** Only exit on explicit, unambiguous catalyst failures
+2. **Aggressive:** Exit on any significant negative news
+3. **Hybrid:** Use keyword scoring system (3+ negative keywords = exit)
+
+#### 3. Timing & Frequency
+
+**Primary Question:** When should we check news?
+
+**Options:**
+- **Current: 4:30 PM only** (1x per day during ANALYZE)
+  - Pros: Simple, catches end-of-day news
+  - Cons: Misses morning news until next ANALYZE
+
+- **Enhanced: 4:30 PM + morning check** (2x per day)
+  - 8:45 AM during GO: Check overnight news
+  - 4:30 PM during ANALYZE: Check intraday news
+  - Catches 99% of relevant news
+
+- **Aggressive: Hourly checks** (10 AM, 12 PM, 2 PM, 4 PM)
+  - Pros: Fastest response to breaking news
+  - Cons: More complexity, may overreact
+
+**Recommendation:** Start with 4:30 PM only, evaluate if morning check needed
+
+#### 4. False Positives vs False Negatives
+
+**Trade-offs:**
+
+**False Positive (exit when shouldn't):**
+- Exit on negative-sounding news that doesn't actually invalidate thesis
+- Example: "Company faces challenges" → Vague, not actionable
+- Cost: Exit good position prematurely, miss potential gains
+
+**False Negative (hold when should exit):**
+- Miss catalyst invalidation, hold losing position
+- Example: BA 777X news → Clear catalyst failure, didn't exit
+- Cost: Larger losses as position deteriorates
+
+**Risk Assessment:**
+- In swing trading with -7% stops, false negatives are MORE dangerous
+- Better to exit early (false positive) than hold through catalyst failure
+- Can always re-enter if news was overblown
+
+**Recommendation:** Err on side of false positives (exit on suspicious news)
+
+#### 5. Integration with AI Decision-Making
+
+**Primary Question:** Should news checking be automated or AI-assisted?
+
+**Option A: Fully Automated (Rule-Based)**
+```python
+def check_catalyst_invalidation(ticker, news_items):
+    negative_keywords = ["miss", "loss", "charge", "delay", "downgrade", "cut"]
+    score = sum(1 for item in news_items for keyword in negative_keywords if keyword in item['title'].lower())
+    return score >= 3  # Exit if 3+ negative signals
+```
+- Pros: Fast, consistent, no API costs
+- Cons: Misses nuance, may trigger false positives
+
+**Option B: AI-Assisted (Claude Reviews)**
+```python
+# Fetch news, send to Claude with prompt:
+"Review this news for {ticker}. Does it invalidate our {catalyst} thesis? Recommend EXIT or HOLD."
+```
+- Pros: Understands context, nuance, thesis-specific
+- Cons: Slower, costs $0.01-0.05 per review, needs API call
+
+**Option C: Hybrid (Rules + AI Confirmation)**
+```python
+# Step 1: Rule-based filter (score >= 2)
+# Step 2: If triggered, ask Claude to confirm
+# Step 3: Execute Claude's recommendation
+```
+- Pros: Balance of speed and accuracy
+- Cons: More complex implementation
+
+**Recommendation:** Start with Option A (rules), upgrade to Option C after testing
+
+#### 6. Entry Quality Enhancement
+
+**Primary Question:** Can news also IMPROVE entry quality?
+
+**Use Cases:**
+
+**During GO Command (8:45 AM):**
+- Verify catalyst is recent (<3 days old via news timestamps)
+- Check if positive news is accelerating (multiple articles)
+- Detect if "stale" catalyst is re-confirmed by new news
+- Avoid entries on old catalysts with no recent confirmation
+
+**Example:**
+```
+Claude suggests: "Buy NVDA on earnings beat catalyst"
+News check shows:
+- Earnings report: 3 days ago
+- Follow-up articles: 1 day ago still bullish ("momentum continuing")
+- Analyst upgrades: Multiple today
+→ CONFIRMED: Fresh, accelerating catalyst ✅
+
+vs
+
+Claude suggests: "Buy STOCK on earnings beat catalyst"
+News check shows:
+- Earnings report: 7 days ago
+- No recent follow-up coverage
+- Sector turning negative (recent articles about sector headwinds)
+→ REJECTED: Stale catalyst, momentum fading ❌
+```
+
+**Actionable Rules:**
+1. Require catalyst confirmation via news within last 3 days
+2. Check for "momentum continuing" signals (analyst upgrades, follow-up coverage)
+3. Scan for contradicting sector/macro news
+
+### Actionable Output
+
+After research, deliver:
+
+1. **Keyword Dictionary** for catalyst invalidation detection
+   ```python
+   CATALYST_INVALIDATION_KEYWORDS = {
+       'earnings': ['miss', 'below', 'disappointing', 'cut guidance', 'lowered'],
+       'analyst': ['downgrade', 'lower target', 'cut rating', 'reduce'],
+       'binary_event': ['delay', 'reject', 'suspend', 'cancel', 'postpone'],
+       'sector': ['selloff', 'downturn', 'weakness', 'concerns'],
+       'severe': ['charge', 'loss', 'writedown', 'impairment', 'investigation']
+   }
+   ```
+
+2. **Scoring Framework** for exit decisions
+   ```
+   Severity Score (0-10):
+   - 0-2: Minor news, monitor only
+   - 3-5: Significant news, flag for review
+   - 6-8: Major news, consider exit
+   - 9-10: Critical news, auto-exit
+
+   Calculated from:
+   - Number of negative keywords
+   - Dollar amounts mentioned
+   - Source credibility (Bloomberg > random blog)
+   - Recency (breaking news > 24hrs old)
+   ```
+
+3. **Implementation Spec** for ANALYZE command enhancement
+   ```python
+   def analyze_with_news():
+       for position in portfolio:
+           # Existing: Check stops/targets
+           should_exit_mechanical = check_stops_targets(position)
+
+           # NEW: Check news for catalyst failure
+           news = fetch_polygon_news(position.ticker, limit=5)
+           should_exit_catalyst = check_catalyst_invalidation(news, position.catalyst_type)
+
+           if should_exit_mechanical or should_exit_catalyst:
+               exit_position(position)
+   ```
+
+4. **Testing Plan** with BA case study
+   - Backtest: Would news check have caught BA on Oct 29?
+   - Simulate: Run news check on current portfolio daily for 1 week
+   - Measure: False positive rate, false negative rate
+   - Tune: Adjust keyword weights based on results
+
+5. **Monitoring Dashboard** (optional)
+   - Show recent news headlines for each position
+   - Display catalyst invalidation score
+   - Flag positions with suspicious news
+
+### Implementation Priority
+
+**Phase 1 (Immediate):** News monitoring in ANALYZE
+- Add Polygon news API fetch
+- Simple keyword-based detection
+- Auto-exit on high-confidence invalidations
+- **Estimated time:** 2-3 hours
+- **Impact:** Prevent 30-50% of catalyst-invalidation losses
+
+**Phase 2 (After testing):** Entry quality enhancement
+- Add news verification to GO command
+- Confirm catalyst freshness
+- Detect momentum acceleration/deceleration
+- **Estimated time:** 1-2 hours
+- **Impact:** Improve entry win rate by 5-10%
+
+**Phase 3 (Future):** AI-assisted review
+- Claude reviews ambiguous news
+- Context-aware catalyst validation
+- Sector correlation analysis
+- **Estimated time:** 3-4 hours
+- **Impact:** Reduce false positives, improve precision
+
+### Success Metrics
+
+We'll know news monitoring is working when:
+- **Catalyst failures detected:** Catch 80%+ of invalidated catalysts within 24 hours
+- **Loss reduction:** Average loss on catalyst failures decreases from -6% to -3%
+- **False positive rate:** <20% (exit on news, position continues up)
+- **Avoided losses:** Save $5-10 per month in prevented drawdowns
+
+The goal: **Never hold through another BA-style catalyst failure.**
 
 ---
 
