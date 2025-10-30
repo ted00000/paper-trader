@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.0.1
+Paper Trading Lab - Agent v5.0.3
 SWING TRADING SYSTEM - PROPER POSITION MANAGEMENT
 
 MAJOR IMPROVEMENTS FROM v4.3:
@@ -14,6 +14,17 @@ v5.0.1 FIX (2025-10-30):
 - Fixed cash tracking bug: System now properly calculates cash_available
 - Cash = Starting capital - Invested positions + Realized P&L
 - Account value = Positions + Cash (previously was missing returned capital)
+
+v5.0.2 ALIGNMENT (2025-10-30):
+- Aligned code with simplified exit strategy (full exits only, no partials)
+- Updated strategy_rules.md and code documentation
+- Fixed dashboard return calculation (removed double-counting)
+
+v5.0.3 STANDARDIZATION (2025-10-30):
+- Standardized exit reasons to simple, consistent format
+- Examples: "Target reached (+11.6%)", "Stop loss (-8.2%)", "Time stop (21 days)"
+- Converts Claude's freeform exit text to structured reasons
+- Consistent display across dashboard and CSV logs
 
 WORKFLOW:
   8:45 AM - GO command:
@@ -753,6 +764,44 @@ RECENT LESSONS LEARNED:
     # POSITION MANAGEMENT
     # =====================================================================
     
+    def standardize_exit_reason(self, position, exit_price, claude_reason=None):
+        """
+        Standardize exit reasons to simple, consistent format
+
+        Returns standardized reason string with actual percentage
+        Examples:
+        - "Target reached (+11.6%)"
+        - "Stop loss (-8.2%)"
+        - "Time stop (21 days)"
+        - "Catalyst failed (+2.1%)"
+        """
+        entry_price = position.get('entry_price', exit_price)
+        return_pct = ((exit_price - entry_price) / entry_price) * 100 if entry_price > 0 else 0
+
+        # Determine exit type from Claude's reason or actual performance
+        reason_lower = (claude_reason or '').lower()
+
+        # Check for target hit
+        if 'target' in reason_lower or return_pct >= 10:
+            return f"Target reached ({return_pct:+.1f}%)"
+
+        # Check for stop loss
+        elif 'stop' in reason_lower or return_pct <= -7:
+            return f"Stop loss ({return_pct:+.1f}%)"
+
+        # Check for time stop
+        elif 'time' in reason_lower or 'days' in reason_lower:
+            days_held = position.get('days_held', 0)
+            return f"Time stop ({days_held} days)"
+
+        # Check for catalyst failure
+        elif 'catalyst' in reason_lower or 'thesis' in reason_lower or 'invalid' in reason_lower:
+            return f"Catalyst failed ({return_pct:+.1f}%)"
+
+        # Default: Portfolio management
+        else:
+            return f"Portfolio decision ({return_pct:+.1f}%)"
+
     def check_position_exits(self, position, current_price):
         """
         Check if position should be closed based on stops/targets (FULL EXIT only)
@@ -773,18 +822,21 @@ RECENT LESSONS LEARNED:
 
         # Check stop loss (-7%)
         if current_price <= stop_loss:
-            return True, 'Stop Loss Hit (-7%)', return_pct
+            standardized_reason = self.standardize_exit_reason(position, current_price, 'stop loss')
+            return True, standardized_reason, return_pct
 
         # Check profit target (+10%)
         if current_price >= price_target:
-            return True, 'Price Target Reached (+10%)', return_pct
+            standardized_reason = self.standardize_exit_reason(position, current_price, 'target')
+            return True, standardized_reason, return_pct
 
         # Check time stop (21 days)
         entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
         days_held = (datetime.now() - entry_date).days
 
         if days_held >= 21:
-            return True, 'Time Stop (21 days)', return_pct
+            standardized_reason = self.standardize_exit_reason(position, current_price, 'time stop')
+            return True, standardized_reason, return_pct
 
         return False, 'Hold', return_pct
     
@@ -1157,15 +1209,19 @@ RECENT LESSONS LEARNED:
 
             for exit_decision in exit_decisions:
                 ticker = exit_decision['ticker']
-                reason = exit_decision.get('reason', 'Portfolio management decision')
+                claude_reason = exit_decision.get('reason', 'Portfolio management decision')
 
                 # Find position in current portfolio
                 position = next((p for p in current_positions if p['ticker'] == ticker), None)
                 if position:
                     exit_price = market_prices.get(ticker, position.get('current_price', 0))
-                    closed_trade = self._close_position(position, exit_price, reason)
+
+                    # Standardize the exit reason (converts Claude's freeform text to consistent format)
+                    standardized_reason = self.standardize_exit_reason(position, exit_price, claude_reason)
+
+                    closed_trade = self._close_position(position, exit_price, standardized_reason)
                     closed_trades.append(closed_trade)
-                    print(f"   ✓ CLOSED {ticker}: {reason}")
+                    print(f"   ✓ CLOSED {ticker}: {standardized_reason}")
                 else:
                     print(f"   ⚠️ {ticker} not found in portfolio")
         else:
