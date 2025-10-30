@@ -754,29 +754,38 @@ RECENT LESSONS LEARNED:
     # =====================================================================
     
     def check_position_exits(self, position, current_price):
-        """Check if position should be closed based on stops/targets"""
-        
+        """
+        Check if position should be closed based on stops/targets (FULL EXIT only)
+
+        Exit Rules (Simplified Strategy):
+        1. Stop Loss: -7% from entry (exit 100%)
+        2. Price Target: +10% from entry (exit 100%)
+        3. Time Stop: 21 days held (exit 100%)
+
+        No partial exits - simplicity over complexity
+        """
+
         entry_price = position['entry_price']
-        stop_loss = position.get('stop_loss', entry_price * 0.93)
-        price_target = position.get('price_target', entry_price * 1.10)
-        
+        stop_loss = position.get('stop_loss', entry_price * 0.93)  # -7%
+        price_target = position.get('price_target', entry_price * 1.10)  # +10%
+
         return_pct = ((current_price - entry_price) / entry_price) * 100
-        
-        # Check stop loss
+
+        # Check stop loss (-7%)
         if current_price <= stop_loss:
-            return True, 'Stop Loss Hit', return_pct
-        
-        # Check profit target
+            return True, 'Stop Loss Hit (-7%)', return_pct
+
+        # Check profit target (+10%)
         if current_price >= price_target:
-            return True, 'Price Target Reached', return_pct
-        
+            return True, 'Price Target Reached (+10%)', return_pct
+
         # Check time stop (21 days)
         entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
         days_held = (datetime.now() - entry_date).days
-        
+
         if days_held >= 21:
             return True, 'Time Stop (21 days)', return_pct
-        
+
         return False, 'Hold', return_pct
     
     def close_position(self, position, exit_price, exit_reason):

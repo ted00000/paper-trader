@@ -747,8 +747,9 @@
     `;
     
     // Calculate total return from account_value
+    // account_value already includes all P&L (positions + cash with realized gains)
     const startingCapital = 1000.00;
-    const returnDollars = data.account_value - startingCapital + data.realized_pl;
+    const returnDollars = data.account_value - startingCapital;
     const returnPercent = (returnDollars / startingCapital) * 100;
 
     const returnElement = document.getElementById('totalReturn');

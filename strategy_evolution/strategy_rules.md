@@ -64,8 +64,8 @@
 
 ### Profit Targets:
 - **Initial Target:** +10-15% depending on catalyst strength
-- **Execution:** Sell 50% at target, trail remaining 50% with 5% trailing stop
-- **Alternative:** May hold full position if momentum exceptionally strong
+- **Execution:** Sell 100% of position at target (full exit)
+- **Rationale:** Simplicity and consistency over complexity
 
 ---
 
@@ -74,14 +74,14 @@
 ### Mandatory Exits:
 
 1. **Stop Loss Hit (-7%):**
-   - Exit immediately at market
+   - Exit 100% immediately at market
    - No hesitation, no "waiting for bounce"
    - Document why stop was hit
 
-2. **Price Target Reached:**
-   - Sell 50% of position
-   - Move stop to breakeven on remaining 50%
-   - Trail with 5% trailing stop
+2. **Price Target Reached (+10-15%):**
+   - Sell 100% of position (full exit)
+   - Lock in profits and redeploy capital
+   - Focus is on quality entries, not exit optimization
 
 3. **Catalyst Invalidated:**
    - Earnings guidance lowered
