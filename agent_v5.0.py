@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.0
+Paper Trading Lab - Agent v5.0.1
 SWING TRADING SYSTEM - PROPER POSITION MANAGEMENT
 
 MAJOR IMPROVEMENTS FROM v4.3:
@@ -9,6 +9,11 @@ MAJOR IMPROVEMENTS FROM v4.3:
 3. HOLD/EXIT/BUY decision logic instead of daily portfolio rebuild
 4. Leverages Polygon.io 15-min delayed data for premarket gap analysis
 5. True swing trading: positions held 3-7 days unless stops/targets hit
+
+v5.0.1 FIX (2025-10-30):
+- Fixed cash tracking bug: System now properly calculates cash_available
+- Cash = Starting capital - Invested positions + Realized P&L
+- Account value = Positions + Cash (previously was missing returned capital)
 
 WORKFLOW:
   8:45 AM - GO command:
@@ -635,24 +640,27 @@ RECENT LESSONS LEARNED:
     def update_account_status(self):
         """
         Update account_status.json with current portfolio value
-        CRITICAL FIX: Now includes realized P&L from CSV
+        FIXED v5.0.1: Properly tracks cash from closed positions
         """
-        
-        # Calculate current portfolio value
+
+        # Starting capital (constant)
+        STARTING_CAPITAL = 1000.00
+
+        # Calculate current portfolio value (sum of all position sizes)
         portfolio_value = 0.00
         if self.portfolio_file.exists():
             with open(self.portfolio_file, 'r') as f:
                 portfolio = json.load(f)
                 for pos in portfolio.get('positions', []):
                     portfolio_value += pos.get('position_size', 0)
-        
-        # Calculate realized P&L from CSV
+
+        # Calculate realized P&L from CSV (total profit/loss)
         realized_pl = 0.00
         total_trades = 0
         winners = []
         losers = []
         hold_times = []
-        
+
         if self.trades_csv.exists():
             with open(self.trades_csv, 'r') as f:
                 reader = csv.DictReader(f)
@@ -662,29 +670,33 @@ RECENT LESSONS LEARNED:
                         return_dollars = float(row.get('Return_Dollars', 0))
                         return_pct = float(row.get('Return_Percent', 0))
                         hold_days = int(row.get('Hold_Days', 0))
-                        
+
                         realized_pl += return_dollars
                         hold_times.append(hold_days)
-                        
+
                         if return_pct > 0:
                             winners.append(return_pct)
                         else:
                             losers.append(return_pct)
-        
-        # CRITICAL: Account value = current positions + realized P&L
-        # Starting capital is implicit (if we started with $1000 and have
-        # $1050 in positions + $50 realized, account_value = $1100)
-        account_value = portfolio_value + realized_pl
-        
+
+        # FIXED: Calculate cash properly
+        # Cash = Starting capital - Currently invested + All P&L
+        # Example: Start $1000, invest $900 (9 pos), +$11.63 profit = $111.63 cash
+        cash_available = STARTING_CAPITAL - portfolio_value + realized_pl
+
+        # Account value = positions + cash
+        # OR equivalently: STARTING_CAPITAL + realized_pl
+        account_value = portfolio_value + cash_available
+
         # Calculate statistics
         win_rate = (len(winners) / total_trades * 100) if total_trades > 0 else 0.0
         avg_hold_time = sum(hold_times) / len(hold_times) if hold_times else 0.0
         avg_winner = sum(winners) / len(winners) if winners else 0.0
         avg_loser = sum(losers) / len(losers) if losers else 0.0
-        
+
         account = {
             'account_value': round(account_value, 2),
-            'cash_available': 0.00,  # Always fully invested
+            'cash_available': round(cash_available, 2),
             'positions_value': round(portfolio_value, 2),
             'realized_pl': round(realized_pl, 2),
             'total_trades': total_trades,
@@ -694,11 +706,11 @@ RECENT LESSONS LEARNED:
             'average_loser_percent': round(avg_loser, 2),
             'last_updated': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         }
-        
+
         with open(self.account_file, 'w') as f:
             json.dump(account, f, indent=2)
-        
-        print(f"   ✓ Updated account status: ${account_value:.2f} (Positions: ${portfolio_value:.2f} + Realized: ${realized_pl:.2f})")
+
+        print(f"   ✓ Updated account status: ${account_value:.2f} (Positions: ${portfolio_value:.2f} + Cash: ${cash_available:.2f}, Realized P&L: ${realized_pl:+.2f})")
     
     # =====================================================================
     # VALIDATION AND LOGGING
