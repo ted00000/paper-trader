@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.0.3
+Paper Trading Lab - Agent v5.0.4
 SWING TRADING SYSTEM - PROPER POSITION MANAGEMENT
 
 MAJOR IMPROVEMENTS FROM v4.3:
@@ -25,6 +25,11 @@ v5.0.3 STANDARDIZATION (2025-10-30):
 - Examples: "Target reached (+11.6%)", "Stop loss (-8.2%)", "Time stop (21 days)"
 - Converts Claude's freeform exit text to structured reasons
 - Consistent display across dashboard and CSV logs
+
+v5.0.4 FIX (2025-10-30):
+- Fixed hold_days calculation in _close_position()
+- Now calculates actual days from entry_date to exit, not stored field
+- Fixes issue where exits bypassed days_held increment (showed 0 days)
 
 WORKFLOW:
   8:45 AM - GO command:
@@ -170,14 +175,22 @@ POSITION {i}: {ticker}
         pnl_dollars = (exit_price - entry_price) * shares
         pnl_percent = ((exit_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
 
+        # Calculate actual hold days from entry date to now
+        entry_date_str = position.get('entry_date', '')
+        if entry_date_str:
+            entry_date = datetime.strptime(entry_date_str, '%Y-%m-%d')
+            days_held = (datetime.now() - entry_date).days
+        else:
+            days_held = position.get('days_held', 0)
+
         trade = {
             'ticker': position['ticker'],
-            'entry_date': position.get('entry_date', ''),
+            'entry_date': entry_date_str,
             'entry_price': entry_price,
             'exit_price': exit_price,
             'shares': shares,
             'position_size': position_size,
-            'days_held': position.get('days_held', 0),
+            'days_held': days_held,
             'pnl_percent': round(pnl_percent, 2),
             'pnl_dollars': round(pnl_dollars, 2),
             'exit_reason': reason,
