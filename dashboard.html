@@ -1035,7 +1035,7 @@
             section.style.display = 'block';
             countBadge.textContent = `${trades.length} Trade${trades.length !== 1 ? 's' : ''}`;
 
-            let html = '<table><thead><tr><th>Date</th><th>Ticker</th><th>Entry</th><th>Exit</th><th>Hold Days</th><th>Return</th><th>Exit Reason</th><th>Catalyst</th></tr></thead><tbody>';
+            let html = '<table><thead><tr><th>Date</th><th>Ticker</th><th>Entry</th><th>Exit</th><th>Hold Days</th><th>Return</th><th>Exit Reason</th></tr></thead><tbody>';
 
             trades.slice(0, 10).forEach(trade => { // Limit to 10 most recent
                 const returnPct = parseFloat(trade.Return_Percent);
@@ -1052,7 +1052,6 @@
                         <td>${trade.Hold_Days}</td>
                         <td class="${returnClass}">${returnSign}${returnPct.toFixed(2)}% (${returnSign}$${returnDollars.toFixed(2)})</td>
                         <td>${trade.Exit_Reason}</td>
-                        <td>${trade.Catalyst_Type}</td>
                     </tr>
                 `;
             });
