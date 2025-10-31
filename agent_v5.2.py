@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.1.0 - PHASE 1: NEWS MONITORING
-SWING TRADING SYSTEM WITH AUTOMATED NEWS VALIDATION/INVALIDATION
+Paper Trading Lab - Agent v5.2.0 - PHASE 1 & 2: NEWS + CATALYST TIERS
+SWING TRADING SYSTEM WITH AUTOMATED VALIDATION & TIERED CATALYSTS
 
 MAJOR IMPROVEMENTS FROM v4.3:
 1. GO command reviews EXISTING portfolio with 15-min delayed premarket data
@@ -9,6 +9,23 @@ MAJOR IMPROVEMENTS FROM v4.3:
 3. HOLD/EXIT/BUY decision logic instead of daily portfolio rebuild
 4. Leverages Polygon.io 15-min delayed data for premarket gap analysis
 5. True swing trading: positions held 3-7 days unless stops/targets hit
+
+v5.2.0 - PHASE 2: CATALYST TIER SYSTEM (2025-10-31):
+** MAJOR FEATURE RELEASE **
+- Implemented 3-tier catalyst classification system (Tier 1/2/3)
+  - classify_catalyst_tier(): Classifies catalysts by quality and conviction
+  - Tier 1: High conviction (Earnings +guidance, multi-catalyst, FDA, etc.)
+  - Tier 2: Medium conviction (conditional entry)
+  - Tier 3: Skip (meme stocks, stale catalysts, small caps)
+- Automatic position sizing based on catalyst tier (8-15%)
+- Catalyst age validation with type-specific limits:
+  - Earnings: ≤5 days, Upgrades: ≤2 days, Binary events: ≤1 day
+- Auto-rejects Tier 3 catalysts (pre-market gaps >15%, meme stocks, <$1B cap)
+- Enhanced CSV tracking with new columns:
+  - Catalyst_Tier, Catalyst_Age_Days, Position_Size_Percent
+  - News_Validation_Score, News_Exit_Triggered
+- GO command now validates using BOTH Phase 1 (news) AND Phase 2 (tiers)
+- Designed per MASTER_STRATEGY_BLUEPRINT Phase 2 specifications
 
 v5.1.0 - PHASE 1: NEWS MONITORING (2025-10-31):
 ** MAJOR FEATURE RELEASE **
@@ -872,6 +889,268 @@ POSITION {i}: {ticker}
             ])
 
     # =====================================================================
+    # CATALYST TIER SYSTEM (Phase 2)
+    # =====================================================================
+
+    def classify_catalyst_tier(self, catalyst_type, catalyst_details=None):
+        """
+        Classify catalyst into Tier 1 (HIGH), Tier 2 (CONDITIONAL), or Tier 3 (SKIP)
+
+        Args:
+            catalyst_type: Type of catalyst (e.g., 'Earnings_Beat', 'Analyst_Upgrade', etc.)
+            catalyst_details: Optional dict with additional context:
+                - earnings_beat_pct: How much earnings beat consensus (%)
+                - guidance_raised: Boolean, was guidance raised?
+                - analyst_firm: Name of analyst firm
+                - price_target_increase: Price target increase (%)
+                - sector_stock_count: Number of stocks moving in sector
+                - volume_multiple: Volume vs average (e.g., 2.5 = 2.5x average)
+                - multi_catalyst: Boolean, are there multiple catalysts?
+                - market_cap: Company market cap
+
+        Returns:
+            {
+                'tier': 'Tier1' | 'Tier2' | 'Tier3',
+                'tier_name': str (e.g., 'High Conviction'),
+                'reasoning': str (why this tier was assigned),
+                'position_size_pct': float (8-15%),
+                'expected_hold_days': str (e.g., '3-5 days'),
+                'target_pct': float (e.g., 12%)
+            }
+        """
+
+        details = catalyst_details or {}
+
+        # TIER 1: HIGH CONVICTION CATALYSTS
+
+        # A. Earnings Beat + Guidance Raise
+        if catalyst_type in ['Earnings_Beat', 'Earnings']:
+            earnings_beat = details.get('earnings_beat_pct', 0)
+            guidance_raised = details.get('guidance_raised', False)
+
+            if earnings_beat >= 10 and guidance_raised:
+                return {
+                    'tier': 'Tier1',
+                    'tier_name': 'High Conviction - Earnings Beat + Guidance',
+                    'reasoning': f'EPS beat {earnings_beat}% with guidance raise',
+                    'position_size_pct': 12.0,
+                    'expected_hold_days': '3-5 days',
+                    'target_pct': 13.0
+                }
+            elif earnings_beat >= 5:
+                return {
+                    'tier': 'Tier2',
+                    'tier_name': 'Medium Conviction - Small Earnings Beat',
+                    'reasoning': f'EPS beat {earnings_beat}% but no guidance raise',
+                    'position_size_pct': 8.0,
+                    'expected_hold_days': '2-4 days',
+                    'target_pct': 10.0
+                }
+            else:
+                return {
+                    'tier': 'Tier3',
+                    'tier_name': 'Skip - Weak Earnings',
+                    'reasoning': f'EPS beat <5% ({earnings_beat}%)',
+                    'position_size_pct': 0.0,
+                    'expected_hold_days': 'N/A',
+                    'target_pct': 0.0
+                }
+
+        # B. Multi-Catalyst Synergy
+        elif catalyst_type == 'Multi_Catalyst':
+            return {
+                'tier': 'Tier1',
+                'tier_name': 'High Conviction - Multi-Catalyst Synergy',
+                'reasoning': '2+ catalysts present simultaneously (+15-25% win rate boost)',
+                'position_size_pct': 13.0,
+                'expected_hold_days': '3-7 days',
+                'target_pct': 14.0
+            }
+
+        # C. Major Analyst Upgrade
+        elif catalyst_type in ['Analyst_Upgrade', 'Upgrade']:
+            analyst_firm = details.get('analyst_firm', '').lower()
+            price_target_increase = details.get('price_target_increase', 0)
+
+            # Top-tier firms
+            top_tier_firms = ['goldman', 'morgan stanley', 'jpmorgan', 'jpm', 'bofa', 'citi']
+
+            if any(firm in analyst_firm for firm in top_tier_firms) and price_target_increase >= 15:
+                return {
+                    'tier': 'Tier1',
+                    'tier_name': 'High Conviction - Major Analyst Upgrade',
+                    'reasoning': f'Top-tier firm upgrade with {price_target_increase}% PT increase',
+                    'position_size_pct': 11.0,
+                    'expected_hold_days': '2-4 days',
+                    'target_pct': 10.0
+                }
+            else:
+                return {
+                    'tier': 'Tier2',
+                    'tier_name': 'Medium Conviction - Smaller Firm Upgrade',
+                    'reasoning': f'Upgrade from {analyst_firm or "smaller firm"}',
+                    'position_size_pct': 8.0,
+                    'expected_hold_days': '2-3 days',
+                    'target_pct': 8.0
+                }
+
+        # D. Strong Sector Momentum
+        elif catalyst_type in ['Sector_Momentum', 'Sector']:
+            sector_stock_count = details.get('sector_stock_count', 1)
+            volume_multiple = details.get('volume_multiple', 1.0)
+
+            if sector_stock_count >= 3 and volume_multiple >= 2.0:
+                return {
+                    'tier': 'Tier1',
+                    'tier_name': 'High Conviction - Strong Sector Momentum',
+                    'reasoning': f'{sector_stock_count} stocks moving, {volume_multiple}x volume',
+                    'position_size_pct': 10.0,
+                    'expected_hold_days': '5-10 days',
+                    'target_pct': 11.0
+                }
+            else:
+                return {
+                    'tier': 'Tier2',
+                    'tier_name': 'Medium Conviction - Weak Sector Momentum',
+                    'reasoning': f'Only {sector_stock_count} stocks, {volume_multiple}x volume',
+                    'position_size_pct': 8.0,
+                    'expected_hold_days': '3-5 days',
+                    'target_pct': 9.0
+                }
+
+        # E. Confirmed Technical Breakout
+        elif catalyst_type in ['Technical_Breakout', 'Breakout']:
+            volume_multiple = details.get('volume_multiple', 1.0)
+
+            if volume_multiple >= 2.0:
+                return {
+                    'tier': 'Tier1',
+                    'tier_name': 'High Conviction - Confirmed Breakout',
+                    'reasoning': f'Breakout with {volume_multiple}x volume (institutional buying)',
+                    'position_size_pct': 9.0,
+                    'expected_hold_days': '2-5 days',
+                    'target_pct': 10.0
+                }
+            else:
+                return {
+                    'tier': 'Tier2',
+                    'tier_name': 'Medium Conviction - Low-Volume Breakout',
+                    'reasoning': f'Breakout with only {volume_multiple}x volume',
+                    'position_size_pct': 8.0,
+                    'expected_hold_days': '2-3 days',
+                    'target_pct': 8.0
+                }
+
+        # F. FDA Approval / Binary Event
+        elif catalyst_type in ['FDA_Approval', 'FDA', 'Binary_Event']:
+            return {
+                'tier': 'Tier1',
+                'tier_name': 'High Conviction - Binary Event',
+                'reasoning': 'FDA approval (must enter within 24h - inverted-J pattern)',
+                'position_size_pct': 10.0,
+                'expected_hold_days': '1-3 days',
+                'target_pct': 12.0
+            }
+
+        # G. Contract Win / M&A
+        elif catalyst_type in ['Contract_Win', 'M&A', 'Merger']:
+            return {
+                'tier': 'Tier1',
+                'tier_name': 'High Conviction - Contract/M&A',
+                'reasoning': 'Major contract win or M&A announcement',
+                'position_size_pct': 10.0,
+                'expected_hold_days': '2-5 days',
+                'target_pct': 11.0
+            }
+
+        # TIER 3: AUTO-EXCLUDE CATALYSTS
+
+        # Meme stocks
+        elif catalyst_type == 'Meme_Stock':
+            return {
+                'tier': 'Tier3',
+                'tier_name': 'Skip - Meme Stock',
+                'reasoning': 'Sentiment-driven, no fundamental edge',
+                'position_size_pct': 0.0,
+                'expected_hold_days': 'N/A',
+                'target_pct': 0.0
+            }
+
+        # Pre-market gap >15%
+        elif catalyst_type == 'Large_Gap':
+            gap_pct = details.get('gap_percent', 0)
+            if gap_pct > 15:
+                return {
+                    'tier': 'Tier3',
+                    'tier_name': 'Skip - Large Gap',
+                    'reasoning': f'Gap {gap_pct}% >15% (80%+ fade probability)',
+                    'position_size_pct': 0.0,
+                    'expected_hold_days': 'N/A',
+                    'target_pct': 0.0
+                }
+
+        # Small cap (<$1B)
+        market_cap = details.get('market_cap_billions', 999)
+        if market_cap < 1.0:
+            return {
+                'tier': 'Tier3',
+                'tier_name': 'Skip - Small Cap',
+                'reasoning': f'Market cap ${market_cap}B <$1B (illiquid)',
+                'position_size_pct': 0.0,
+                'expected_hold_days': 'N/A',
+                'target_pct': 0.0
+            }
+
+        # Default: Unknown catalyst type -> Tier 2 (conditional)
+        return {
+            'tier': 'Tier2',
+            'tier_name': 'Medium Conviction - Unknown Catalyst',
+            'reasoning': f'Catalyst type: {catalyst_type}',
+            'position_size_pct': 8.0,
+            'expected_hold_days': '2-5 days',
+            'target_pct': 9.0
+        }
+
+    def check_catalyst_age_validity(self, catalyst_type, catalyst_age_days):
+        """
+        Check if catalyst is too stale to trade
+
+        Returns:
+            {
+                'is_valid': bool,
+                'reason': str
+            }
+        """
+
+        # Earnings: Must be ≤5 days old
+        if catalyst_type in ['Earnings_Beat', 'Earnings']:
+            if catalyst_age_days <= 5:
+                return {'is_valid': True, 'reason': f'Fresh earnings ({catalyst_age_days} days)'}
+            else:
+                return {'is_valid': False, 'reason': f'Stale earnings ({catalyst_age_days} days >5 day limit)'}
+
+        # Analyst Upgrades: Must be ≤2 days old
+        elif catalyst_type in ['Analyst_Upgrade', 'Upgrade']:
+            if catalyst_age_days <= 2:
+                return {'is_valid': True, 'reason': f'Fresh upgrade ({catalyst_age_days} days)'}
+            else:
+                return {'is_valid': False, 'reason': f'Stale upgrade ({catalyst_age_days} days >2 day limit)'}
+
+        # Binary Events (FDA, M&A): Must be ≤1 day old
+        elif catalyst_type in ['FDA_Approval', 'FDA', 'Binary_Event', 'Contract_Win', 'M&A']:
+            if catalyst_age_days <= 1:
+                return {'is_valid': True, 'reason': f'Fresh binary event ({catalyst_age_days} days)'}
+            else:
+                return {'is_valid': False, 'reason': f'Stale binary event ({catalyst_age_days} days >1 day limit)'}
+
+        # Other catalysts: 3-day general limit
+        else:
+            if catalyst_age_days <= 3:
+                return {'is_valid': True, 'reason': f'Fresh catalyst ({catalyst_age_days} days)'}
+            else:
+                return {'is_valid': False, 'reason': f'Stale catalyst ({catalyst_age_days} days >3 day limit)'}
+
+    # =====================================================================
     # CLAUDE API INTEGRATION
     # =====================================================================
     
@@ -1493,12 +1772,13 @@ RECENT LESSONS LEARNED:
                 writer.writerow([
                     'Trade_ID', 'Entry_Date', 'Exit_Date', 'Ticker',
                     'Premarket_Price', 'Entry_Price', 'Exit_Price', 'Gap_Percent',
-                    'Shares', 'Position_Size', 'Hold_Days', 'Return_Percent', 'Return_Dollars',
-                    'Exit_Reason', 'Catalyst_Type', 'Sector',
-                    'Confidence_Level', 'Stop_Loss', 'Price_Target',
+                    'Shares', 'Position_Size', 'Position_Size_Percent', 'Hold_Days', 'Return_Percent', 'Return_Dollars',
+                    'Exit_Reason', 'Catalyst_Type', 'Catalyst_Tier', 'Catalyst_Age_Days',
+                    'News_Validation_Score', 'News_Exit_Triggered',
+                    'Sector', 'Confidence_Level', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After'
                 ])
-        
+
         with open(self.trades_csv, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([
@@ -1512,11 +1792,16 @@ RECENT LESSONS LEARNED:
                 trade_data.get('gap_percent', 0),
                 trade_data.get('shares', 0),
                 trade_data.get('position_size', 0),
+                trade_data.get('position_size_percent', 0),
                 trade_data.get('hold_days', 0),
                 trade_data.get('return_percent', 0),
                 trade_data.get('return_dollars', 0),
                 trade_data.get('exit_reason', ''),
                 trade_data.get('catalyst_type', ''),
+                trade_data.get('catalyst_tier', 'Unknown'),
+                trade_data.get('catalyst_age_days', 0),
+                trade_data.get('news_validation_score', 0),
+                trade_data.get('news_exit_triggered', False),
                 trade_data.get('sector', ''),
                 trade_data.get('confidence_level', ''),
                 trade_data.get('stop_loss', 0),
@@ -1723,18 +2008,36 @@ RECENT LESSONS LEARNED:
         print(f"   ✓ EXIT: {len(exit_positions)} positions")
         print(f"   ✓ BUY:  {len(buy_positions)} new positions\n")
 
-        # Step 5.5: PHASE 1 - Validate BUY recommendations with news monitoring
+        # Step 5.5: PHASE 1 & 2 - Validate BUY recommendations with news + catalyst tiers
         if buy_positions:
-            print("5.5 Validating BUY recommendations with news monitoring...")
+            print("5.5 Validating BUY recommendations (Phase 1: News + Phase 2: Catalyst Tiers)...")
             validated_buys = []
 
             for buy_pos in buy_positions:
                 ticker = buy_pos.get('ticker', 'UNKNOWN')
                 catalyst_type = buy_pos.get('catalyst', 'Unknown')
                 catalyst_age = buy_pos.get('catalyst_age_days', 0)
+                catalyst_details = buy_pos.get('catalyst_details', {})
+
+                validation_passed = True
+                rejection_reasons = []
 
                 try:
-                    # Calculate news validation score
+                    # PHASE 2: Check catalyst tier
+                    tier_result = self.classify_catalyst_tier(catalyst_type, catalyst_details)
+
+                    # Auto-reject Tier 3 catalysts
+                    if tier_result['tier'] == 'Tier3':
+                        validation_passed = False
+                        rejection_reasons.append(f"Tier 3 catalyst: {tier_result['reasoning']}")
+
+                    # Check catalyst age validity
+                    age_check = self.check_catalyst_age_validity(catalyst_type, catalyst_age)
+                    if not age_check['is_valid']:
+                        validation_passed = False
+                        rejection_reasons.append(age_check['reason'])
+
+                    # PHASE 1: Check news validation
                     news_result = self.calculate_news_validation_score(
                         ticker=ticker,
                         catalyst_type=catalyst_type,
@@ -1748,26 +2051,44 @@ RECENT LESSONS LEARNED:
                         result=news_result
                     )
 
-                    # Decision based on news score
-                    if news_result['score'] >= 5:  # Minimum acceptable score
+                    # News score must be ≥5
+                    if news_result['score'] < 5:
+                        validation_passed = False
+                        rejection_reasons.append(f"News score too low ({news_result['score']}/20)")
+
+                    # If all validations pass, accept the position
+                    if validation_passed:
+                        # Enrich position with tier data
+                        buy_pos['catalyst_tier'] = tier_result['tier']
+                        buy_pos['tier_name'] = tier_result['tier_name']
+                        buy_pos['tier_reasoning'] = tier_result['reasoning']
+                        buy_pos['position_size_pct'] = tier_result['position_size_pct']
+                        buy_pos['target_pct'] = tier_result['target_pct']
+                        buy_pos['news_score'] = news_result['score']
+
                         validated_buys.append(buy_pos)
-                        print(f"   ✓ {ticker}: {news_result['decision']} (score: {news_result['score']}/20)")
-                        if news_result['key_findings'][:2]:
-                            for finding in news_result['key_findings'][:2]:
-                                print(f"      - {finding}")
+
+                        print(f"   ✓ {ticker}: {tier_result['tier']} - {news_result['decision']}")
+                        print(f"      Catalyst: {tier_result['tier_name']}")
+                        print(f"      News Score: {news_result['score']}/20")
+                        print(f"      Position Size: {tier_result['position_size_pct']}%")
+                        if news_result['key_findings'][:1]:
+                            print(f"      Key Finding: {news_result['key_findings'][0]}")
                     else:
-                        print(f"   ✗ {ticker}: REJECTED (score: {news_result['score']}/20) - Stale/weak catalyst")
-                        if news_result['key_findings']:
-                            print(f"      Reason: {news_result['key_findings'][0]}")
+                        print(f"   ✗ {ticker}: REJECTED")
+                        for reason in rejection_reasons:
+                            print(f"      - {reason}")
 
                 except Exception as e:
-                    # If news validation fails, keep the position (don't block on API errors)
-                    print(f"   ⚠️ {ticker}: News validation failed ({e}) - keeping position")
+                    # If validation fails due to error, keep position (don't block on API errors)
+                    print(f"   ⚠️ {ticker}: Validation error ({e}) - keeping position with default tier")
+                    buy_pos['catalyst_tier'] = 'Tier2'
+                    buy_pos['position_size_pct'] = 10.0
                     validated_buys.append(buy_pos)
 
             # Replace buy_positions with validated list
             buy_positions = validated_buys
-            print(f"   ✓ Validated: {len(validated_buys)} BUY positions passed news check\n")
+            print(f"   ✓ Validated: {len(validated_buys)} BUY positions passed checks\n")
 
         # Step 6: Build pending_positions.json
         print("6. Building pending positions file...")
