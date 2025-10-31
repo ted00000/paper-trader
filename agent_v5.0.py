@@ -1382,9 +1382,9 @@ RECENT LESSONS LEARNED:
         today = datetime.now().strftime('%Y-%m-%d')
         all_trades_today = []
 
-        if self.csv_file.exists():
+        if self.trades_csv.exists():
             import csv
-            with open(self.csv_file, 'r') as f:
+            with open(self.trades_csv, 'r') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get('Exit_Date') == today:
