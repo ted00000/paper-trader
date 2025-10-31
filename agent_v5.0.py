@@ -82,6 +82,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 import traceback
+import pytz
 
 # Configuration
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
@@ -1379,7 +1380,9 @@ RECENT LESSONS LEARNED:
                 open_positions = portfolio.get('positions', [])
 
         # Read ALL trades from CSV and filter by today's exit date
-        today = datetime.now().strftime('%Y-%m-%d')
+        # Use Eastern Time for consistency with trading hours
+        et_tz = pytz.timezone('America/New_York')
+        today = datetime.now(et_tz).strftime('%Y-%m-%d')
         all_trades_today = []
 
         if self.trades_csv.exists():
@@ -1413,7 +1416,7 @@ RECENT LESSONS LEARNED:
         # Create activity summary
         activity = {
             'date': today,
-            'time': datetime.now().strftime('%H:%M:%S'),
+            'time': datetime.now(et_tz).strftime('%H:%M:%S ET'),
             'summary': {
                 'positions_closed': total_closed,
                 'winners': len(winners),
@@ -1518,7 +1521,8 @@ def main():
     
     print(f"\n{'='*60}")
     print(f"Paper Trading Lab Agent v5.0")
-    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S ET')}")
+    et_tz = pytz.timezone('America/New_York')
+    print(f"Time: {datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S ET')}")
     print(f"{'='*60}")
     
     agent = TradingAgent()
