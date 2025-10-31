@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.0.6
-SWING TRADING SYSTEM - PROPER POSITION MANAGEMENT
+Paper Trading Lab - Agent v5.1.0 - PHASE 1: NEWS MONITORING
+SWING TRADING SYSTEM WITH AUTOMATED NEWS VALIDATION/INVALIDATION
 
 MAJOR IMPROVEMENTS FROM v4.3:
 1. GO command reviews EXISTING portfolio with 15-min delayed premarket data
@@ -10,42 +10,62 @@ MAJOR IMPROVEMENTS FROM v4.3:
 4. Leverages Polygon.io 15-min delayed data for premarket gap analysis
 5. True swing trading: positions held 3-7 days unless stops/targets hit
 
-v5.0.1 FIX (2025-10-30):
-- Fixed cash tracking bug: System now properly calculates cash_available
-- Cash = Starting capital - Invested positions + Realized P&L
-- Account value = Positions + Cash (previously was missing returned capital)
-
-v5.0.2 ALIGNMENT (2025-10-30):
-- Aligned code with simplified exit strategy (full exits only, no partials)
-- Updated strategy_rules.md and code documentation
-- Fixed dashboard return calculation (removed double-counting)
-
-v5.0.3 STANDARDIZATION (2025-10-30):
-- Standardized exit reasons to simple, consistent format
-- Examples: "Target reached (+11.6%)", "Stop loss (-8.2%)", "Time stop (21 days)"
-
-v5.0.4 HOLD DAYS FIX (2025-10-30):
-- Fixed hold days calculation to use actual date difference
-- Previously showed 0 days when should show 1+ (wasn't incrementing on exit)
-
-v5.0.5 CRITICAL TIMING FIX (2025-10-30):
-- Fixed 15-minute delay pricing logic in fetch_current_prices()
-- Now checks day.c (today's close) BEFORE prevDay.c (yesterday's close)
-- Updated cron schedule: EXECUTE 9:45 AM, ANALYZE 4:50 PM (accounting for delay)
-- Prevents stale price data causing missed stop losses (BA case: -10.4% undetected)
+v5.1.0 - PHASE 1: NEWS MONITORING (2025-10-31):
+** MAJOR FEATURE RELEASE **
+- Added Polygon.io News API integration for real-time news monitoring
+- GO command: News validation scores (0-20 pts) for entry decisions
+  - Catalyst freshness scoring (0-5 pts)
+  - Momentum acceleration scoring (0-5 pts)
+  - Multi-catalyst detection (0-10 pts)
+  - Contradicting news penalty (negative pts)
+  - Auto-reject stale/weak catalysts (score <5)
+- ANALYZE command: News invalidation scores (0-100 pts) for exit decisions
+  - Negative keyword scoring (critical/severe/moderate/mild)
+  - Context amplifiers (quantified dollar amounts, percentages)
+  - Source credibility weighting (Bloomberg 1.0x, retail 0.25x)
+  - Recency bonus (breaking news <1h gets +10 pts)
+  - Auto-exit on score ≥70 (BEFORE stop loss hit)
+- Created learning_data/news_monitoring_log.csv for tracking
+- News checks integrated into portfolio management workflow
+- Designed per MASTER_STRATEGY_BLUEPRINT Phase 1 specifications
 
 v5.0.6 DAILY ACTIVITY FIX (2025-10-30):
 - Fixed "Today's Activity" to show ALL trades closed today (by exit_date from CSV)
 - Previously only showed trades closed in current ANALYZE execution
 - Now includes trades closed in both EXECUTE and ANALYZE commands
 
-WORKFLOW (Adjusted for 15-minute Polygon delay):
+v5.0.5 CRITICAL TIMING FIX (2025-10-30):
+- Fixed 15-minute delay pricing logic in fetch_current_prices()
+- Now checks day.c (today's close) BEFORE prevDay.c (yesterday's close)
+- Updated cron schedule: EXECUTE 9:45 AM, ANALYZE 4:30 PM (accounting for delay)
+- Prevents stale price data causing missed stop losses (BA case: -10.4% undetected)
+
+v5.0.4 HOLD DAYS FIX (2025-10-30):
+- Fixed hold days calculation to use actual date difference
+- Previously showed 0 days when should show 1+ (wasn't incrementing on exit)
+
+v5.0.3 STANDARDIZATION (2025-10-30):
+- Standardized exit reasons to simple, consistent format
+- Examples: "Target reached (+11.6%)", "Stop loss (-8.2%)", "Time stop (21 days)"
+
+v5.0.2 ALIGNMENT (2025-10-30):
+- Aligned code with simplified exit strategy (full exits only, no partials)
+- Updated strategy_rules.md and code documentation
+- Fixed dashboard return calculation (removed double-counting)
+
+v5.0.1 FIX (2025-10-30):
+- Fixed cash tracking bug: System now properly calculates cash_available
+- Cash = Starting capital - Invested positions + Realized P&L
+- Account value = Positions + Cash (previously was missing returned capital)
+
+WORKFLOW (Phase 1 - News Monitoring Integrated):
   8:45 AM - GO command:
     - Load current portfolio (yesterday's positions)
     - Fetch premarket prices (~8:30 AM via Polygon.io)
     - Calculate gaps and P&L
     - Decide: HOLD (keep positions) / EXIT (stop/target/catalyst fail) / BUY (fill vacancies)
-    - Save decisions to pending_positions.json
+    - ** NEW: Validate BUY recommendations with news (score 0-20) **
+    - Save validated decisions to pending_positions.json
 
   9:45 AM - EXECUTE command (CHANGED from 9:30 AM):
     - Load pending decisions
@@ -53,8 +73,10 @@ WORKFLOW (Adjusted for 15-minute Polygon delay):
     - Enter new positions marked BUY
     - Update portfolio with 9:30 AM market open prices (available at 9:45 AM with 15-min delay)
 
-  4:50 PM - ANALYZE command (CHANGED from 4:30 PM):
-    - Update all prices to 4:00 PM closing prices (available at 4:50 PM with 15-min delay + buffer)
+  4:30 PM - ANALYZE command:
+    - ** NEW: Check news invalidation (score 0-100) BEFORE price checks **
+    - Auto-exit if news score ≥70 (catalyst invalidated)
+    - Update all prices to 4:00 PM closing prices (available at 4:30 PM with 15-min delay)
     - Check stops/targets, close if hit
     - Log completed trades to CSV
 
@@ -350,7 +372,505 @@ POSITION {i}: {ticker}
         print(f"   ✓ Fetched {len(prices)}/{len(tickers)} prices")
 
         return prices
-    
+
+    # =====================================================================
+    # NEWS MONITORING SYSTEM (Phase 1)
+    # =====================================================================
+
+    def fetch_polygon_news(self, ticker, limit=10, days_back=5):
+        """
+        Fetch recent news articles for a ticker from Polygon.io News API
+
+        Args:
+            ticker: Stock ticker symbol
+            limit: Number of articles to fetch (default 10, max 1000)
+            days_back: How many days back to search (default 5)
+
+        Returns:
+            List of article dictionaries with structure:
+            {
+                'id': str,
+                'title': str,
+                'article_url': str,
+                'author': str,
+                'description': str,
+                'published_utc': str (RFC3339),
+                'keywords': [str],
+                'tickers': [str],
+                'insights': [{'ticker': str, 'sentiment': str, 'sentiment_reasoning': str}],
+                'publisher': {'name': str, ...},
+                'age_hours': float  # Calculated age in hours
+            }
+        """
+        if not POLYGON_API_KEY:
+            print(f"   ⚠️ POLYGON_API_KEY not set - skipping news fetch")
+            return []
+
+        try:
+            # Calculate date range
+            from datetime import timedelta
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days_back)
+
+            # Format as YYYY-MM-DD
+            published_utc_gte = start_date.strftime('%Y-%m-%d')
+
+            # Build URL
+            url = f'https://api.polygon.io/v2/reference/news'
+            params = {
+                'ticker': ticker,
+                'published_utc.gte': published_utc_gte,
+                'order': 'desc',  # Most recent first
+                'limit': limit,
+                'apiKey': POLYGON_API_KEY
+            }
+
+            response = requests.get(url, params=params, timeout=15)
+            data = response.json()
+
+            if data.get('status') == 'OK' and 'results' in data:
+                articles = data['results']
+
+                # Calculate age for each article
+                for article in articles:
+                    pub_time = datetime.fromisoformat(article['published_utc'].replace('Z', '+00:00'))
+                    age = datetime.now(pytz.UTC) - pub_time
+                    article['age_hours'] = age.total_seconds() / 3600
+
+                print(f"   ✓ Fetched {len(articles)} news articles for {ticker}")
+                return articles
+            else:
+                print(f"   ⚠️ No news articles found for {ticker}")
+                return []
+
+        except Exception as e:
+            print(f"   ⚠️ Error fetching news for {ticker}: {e}")
+            return []
+
+    def calculate_news_validation_score(self, ticker, catalyst_type, catalyst_age_days):
+        """
+        Calculate news validation score (0-20 points) for ENTRY decisions (GO command)
+
+        Scoring breakdown:
+        1. Catalyst Freshness (0-5 pts)
+        2. Momentum Acceleration (0-5 pts)
+        3. Multi-Catalyst Detection (0-10 pts)
+        4. Contradicting News Penalty (negative pts)
+
+        Returns:
+            {
+                'score': int (0-20),
+                'freshness_score': int (0-5),
+                'momentum_score': int (0-5),
+                'multi_catalyst_score': int (0-10),
+                'contradiction_penalty': int (negative),
+                'decision': str ('VALIDATED-HIGH' | 'VALIDATED-MEDIUM' | 'VALIDATED-LOW' | 'REJECTED'),
+                'articles_analyzed': int,
+                'key_findings': [str]
+            }
+        """
+
+        # Fetch recent news (last 5 days)
+        articles = self.fetch_polygon_news(ticker, limit=20, days_back=5)
+
+        if not articles:
+            # No news = neutral score (doesn't boost or hurt)
+            return {
+                'score': 5,
+                'freshness_score': 0,
+                'momentum_score': 0,
+                'multi_catalyst_score': 0,
+                'contradiction_penalty': 0,
+                'decision': 'VALIDATED-LOW',
+                'articles_analyzed': 0,
+                'key_findings': ['No recent news articles found']
+            }
+
+        freshness_score = 0
+        momentum_score = 0
+        multi_catalyst_score = 0
+        contradiction_penalty = 0
+        key_findings = []
+
+        # 1. CATALYST FRESHNESS SCORE (0-5 pts)
+        if catalyst_type in ['Earnings_Beat', 'Earnings']:
+            if catalyst_age_days <= 2:
+                freshness_score = 5
+                key_findings.append('FRESH earnings (0-2 days)')
+            elif catalyst_age_days <= 5:
+                freshness_score = 3
+                key_findings.append('Moderate earnings (3-5 days)')
+            elif catalyst_age_days <= 10:
+                freshness_score = 1
+                key_findings.append('STALE earnings (6-10 days)')
+            else:
+                freshness_score = 0
+                key_findings.append('REJECTED - earnings >10 days old')
+
+        elif catalyst_type in ['Analyst_Upgrade', 'Upgrade']:
+            if catalyst_age_days <= 1:
+                freshness_score = 5
+                key_findings.append('FRESH upgrade (0-1 days)')
+            elif catalyst_age_days <= 3:
+                freshness_score = 2
+                key_findings.append('Moderate upgrade (2-3 days)')
+            else:
+                freshness_score = 0
+                key_findings.append('REJECTED - upgrade >3 days old')
+
+        elif catalyst_type in ['FDA_Approval', 'Binary_Event', 'FDA', 'Contract_Win']:
+            if catalyst_age_days <= 1:
+                freshness_score = 5
+                key_findings.append('FRESH binary event (0-1 days)')
+            else:
+                freshness_score = 0
+                key_findings.append('REJECTED - binary event >1 day old')
+
+        else:
+            # Other catalyst types: moderate freshness scoring
+            if catalyst_age_days <= 3:
+                freshness_score = 3
+            elif catalyst_age_days <= 7:
+                freshness_score = 1
+
+        # 2. MOMENTUM ACCELERATION SCORE (0-5 pts)
+        # Count articles in last 24 hours
+        recent_articles = [a for a in articles if a['age_hours'] <= 24]
+
+        if len(recent_articles) >= 5:
+            momentum_score = 5
+            key_findings.append(f'STRONG momentum ({len(recent_articles)} articles in 24h)')
+        elif len(recent_articles) >= 3:
+            momentum_score = 3
+            key_findings.append(f'MODERATE momentum ({len(recent_articles)} articles in 24h)')
+        elif len(recent_articles) >= 1:
+            momentum_score = 1
+            key_findings.append(f'WEAK momentum ({len(recent_articles)} articles in 24h)')
+        else:
+            momentum_score = 0
+            key_findings.append('FADING momentum (no articles in 24h)')
+
+        # Check for analyst pile-on (multiple upgrades)
+        upgrade_keywords = ['upgrade', 'initiates', 'raises target', 'raises price target']
+        upgrades_48h = 0
+        for article in [a for a in articles if a['age_hours'] <= 48]:
+            title_lower = article.get('title', '').lower()
+            if any(kw in title_lower for kw in upgrade_keywords):
+                upgrades_48h += 1
+
+        if upgrades_48h >= 3:
+            momentum_score += 5
+            key_findings.append(f'Analyst PILE-ON detected ({upgrades_48h} upgrades in 48h)')
+        elif upgrades_48h >= 2:
+            momentum_score += 3
+        elif upgrades_48h >= 1:
+            momentum_score += 1
+
+        momentum_score = min(momentum_score, 5)  # Cap at 5
+
+        # 3. MULTI-CATALYST DETECTION (0-10 pts)
+        catalyst_keywords = {
+            'earnings': ['earnings', 'eps beat', 'revenue beat', 'quarterly results'],
+            'upgrade': ['upgrade', 'initiates', 'raises target', 'price target'],
+            'contract': ['contract', 'deal', 'partnership', 'acquisition'],
+            'fda': ['fda', 'approval', 'cleared', 'authorized'],
+            'breakout': ['breakout', 'all-time high', 'new high']
+        }
+
+        detected_catalysts = set()
+        for article in recent_articles[:10]:  # Check 10 most recent
+            title_lower = article.get('title', '').lower()
+            desc_lower = article.get('description', '').lower()
+            combined = f"{title_lower} {desc_lower}"
+
+            for cat_type, keywords in catalyst_keywords.items():
+                if any(kw in combined for kw in keywords):
+                    detected_catalysts.add(cat_type)
+
+        if len(detected_catalysts) >= 2:
+            multi_catalyst_score = 5
+            key_findings.append(f'MULTI-CATALYST: {", ".join(detected_catalysts)}')
+
+        # 4. CONTRADICTING NEWS CHECK (Penalty)
+        negative_keywords = {
+            'mild': ['concerns', 'weakness', 'below', 'disappointing', 'challenges', 'headwinds'],
+            'moderate': ['miss', 'downgrade', 'cut', 'suspend', 'delay'],
+            'severe': ['charge', 'writedown', 'impairment', 'investigation', 'lawsuit', 'fraud']
+        }
+
+        for article in recent_articles[:5]:  # Check 5 most recent
+            title_lower = article.get('title', '').lower()
+            desc_lower = article.get('description', '').lower()
+            combined = f"{title_lower} {desc_lower}"
+
+            # Check negative keywords
+            for severity, keywords in negative_keywords.items():
+                for kw in keywords:
+                    if kw in combined:
+                        if severity == 'severe':
+                            contradiction_penalty -= 5
+                            key_findings.append(f'⚠️ SEVERE negative: {kw}')
+                        elif severity == 'moderate':
+                            contradiction_penalty -= 3
+                            key_findings.append(f'⚠️ Negative keyword: {kw}')
+                        elif severity == 'mild':
+                            contradiction_penalty -= 1
+
+        # CALCULATE TOTAL SCORE
+        total_score = freshness_score + momentum_score + multi_catalyst_score + contradiction_penalty
+
+        # DECISION MATRIX
+        if total_score >= 15:
+            decision = 'VALIDATED-HIGH'
+        elif total_score >= 10:
+            decision = 'VALIDATED-MEDIUM'
+        elif total_score >= 5:
+            decision = 'VALIDATED-LOW'
+        else:
+            decision = 'REJECTED'
+
+        return {
+            'score': total_score,
+            'freshness_score': freshness_score,
+            'momentum_score': momentum_score,
+            'multi_catalyst_score': multi_catalyst_score,
+            'contradiction_penalty': contradiction_penalty,
+            'decision': decision,
+            'articles_analyzed': len(articles),
+            'key_findings': key_findings
+        }
+
+    def calculate_news_invalidation_score(self, ticker):
+        """
+        Calculate news invalidation score (0-100 points) for EXIT decisions (ANALYZE command)
+
+        Scoring breakdown:
+        1. Negative Keyword Scoring (base points)
+        2. Context Amplifiers (quantified damage)
+        3. Source Credibility Multiplier
+        4. Recency Bonus
+
+        Returns:
+            {
+                'score': int (0-100+),
+                'decision': str ('CRITICAL' | 'STRONG' | 'MODERATE' | 'MILD' | 'NORMAL'),
+                'should_exit': bool,
+                'articles_analyzed': int,
+                'triggering_articles': [
+                    {
+                        'title': str,
+                        'published': str,
+                        'score': int,
+                        'keywords_found': [str],
+                        'source': str
+                    }
+                ]
+            }
+        """
+
+        # Fetch very recent news (last 2 days)
+        articles = self.fetch_polygon_news(ticker, limit=15, days_back=2)
+
+        if not articles:
+            return {
+                'score': 0,
+                'decision': 'NORMAL',
+                'should_exit': False,
+                'articles_analyzed': 0,
+                'triggering_articles': []
+            }
+
+        # NEGATIVE KEYWORDS (Base Scoring)
+        NEGATIVE_KEYWORDS = {
+            'critical': ['charge', 'writedown', 'impairment', 'investigation', 'fraud', 'bankruptcy'],  # 50 pts each
+            'severe': ['delay', 'downgrade', 'cut guidance', 'miss', 'suspend', 'lawsuit', 'warning'],  # 40 pts each
+            'moderate': ['concerns', 'weakness', 'below', 'disappointing', 'decline', 'fall'],         # 25 pts each
+            'mild': ['challenges', 'headwinds', 'competitive', 'pressure']                              # 10 pts each
+        }
+
+        # SOURCE CREDIBILITY WEIGHTS
+        SOURCE_WEIGHTS = {
+            'bloomberg': 1.0,
+            'reuters': 1.0,
+            'wsj': 1.0,
+            'wall street journal': 1.0,
+            'marketwatch': 0.75,
+            'cnbc': 0.75,
+            'seeking alpha': 0.5,
+            'seeking_alpha': 0.5,
+            'benzinga': 0.5,
+            'yahoo': 0.5
+        }
+
+        triggering_articles = []
+        max_score = 0
+
+        for article in articles:
+            article_score = 0
+            keywords_found = []
+
+            title = article.get('title', '').lower()
+            desc = article.get('description', '').lower()
+            combined = f"{title} {desc}"
+
+            # 1. NEGATIVE KEYWORD SCORING
+            for severity, keywords in NEGATIVE_KEYWORDS.items():
+                for kw in keywords:
+                    if kw in combined:
+                        if severity == 'critical':
+                            article_score += 50
+                        elif severity == 'severe':
+                            article_score += 40
+                        elif severity == 'moderate':
+                            article_score += 25
+                        elif severity == 'mild':
+                            article_score += 10
+                        keywords_found.append(f"{kw} ({severity})")
+
+            # 2. CONTEXT AMPLIFIERS
+            # Quantified dollar amounts: "$4.9B charge", "$500M loss"
+            import re
+            dollar_matches = re.findall(r'\$[\d.]+[BMK]', combined)
+            if dollar_matches:
+                article_score += 15
+                keywords_found.append(f"quantified: {', '.join(dollar_matches)}")
+
+            # Quantified percentages: "-12%", "down 20%"
+            percent_matches = re.findall(r'[-−]?\d+\.?\d*%', combined)
+            if percent_matches:
+                article_score += 10
+                keywords_found.append(f"quantified: {', '.join(percent_matches)}")
+
+            # Strong negative modifiers
+            strong_negatives = ['significantly', 'sharply', 'plunge', 'collapse', 'crash']
+            if any(sn in combined for sn in strong_negatives):
+                article_score += 5
+                keywords_found.append("strong negative modifier")
+
+            # Multiple keywords in single article
+            if len(keywords_found) >= 3:
+                article_score += 10
+                keywords_found.append("multiple keywords detected")
+
+            # 3. SOURCE CREDIBILITY MULTIPLIER
+            publisher_name = article.get('publisher', {}).get('name', '').lower()
+            source_weight = 0.5  # Default for unknown sources
+
+            for source, weight in SOURCE_WEIGHTS.items():
+                if source in publisher_name:
+                    source_weight = weight
+                    break
+
+            article_score = int(article_score * source_weight)
+
+            # 4. RECENCY BONUS
+            age_hours = article.get('age_hours', 999)
+            if age_hours < 1:
+                article_score += 10
+                keywords_found.append("BREAKING NEWS (<1h)")
+            elif age_hours < 4:
+                article_score += 5
+                keywords_found.append("recent news (<4h)")
+
+            # Track this article if it has any negative content
+            if article_score > 0:
+                triggering_articles.append({
+                    'title': article.get('title', 'Unknown'),
+                    'published': article.get('published_utc', 'Unknown'),
+                    'age_hours': round(age_hours, 1),
+                    'score': article_score,
+                    'keywords_found': keywords_found,
+                    'source': publisher_name
+                })
+
+                max_score = max(max_score, article_score)
+
+        # DECISION MATRIX
+        if max_score >= 85:
+            decision = 'CRITICAL'
+            should_exit = True
+        elif max_score >= 70:
+            decision = 'STRONG'
+            should_exit = True
+        elif max_score >= 50:
+            decision = 'MODERATE'
+            should_exit = False
+        elif max_score >= 30:
+            decision = 'MILD'
+            should_exit = False
+        else:
+            decision = 'NORMAL'
+            should_exit = False
+
+        # Sort triggering articles by score (highest first)
+        triggering_articles.sort(key=lambda x: x['score'], reverse=True)
+
+        return {
+            'score': max_score,
+            'decision': decision,
+            'should_exit': should_exit,
+            'articles_analyzed': len(articles),
+            'triggering_articles': triggering_articles[:3]  # Top 3 worst articles
+        }
+
+    def log_news_monitoring(self, ticker, event_type, result, entry_price=None, exit_price=None):
+        """
+        Log news monitoring events to learning_data/news_monitoring_log.csv
+
+        Args:
+            ticker: Stock ticker
+            event_type: 'VALIDATION' or 'INVALIDATION'
+            result: Result dictionary from calculate_news_validation_score() or calculate_news_invalidation_score()
+            entry_price: Entry price (optional)
+            exit_price: Exit price (optional)
+        """
+        log_dir = self.project_dir / 'learning_data'
+        log_dir.mkdir(exist_ok=True)
+
+        log_file = log_dir / 'news_monitoring_log.csv'
+
+        # Create header if file doesn't exist
+        if not log_file.exists():
+            with open(log_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    'Date', 'Time', 'Ticker', 'Event_Type', 'Score', 'Decision',
+                    'Articles_Analyzed', 'Key_Findings', 'Entry_Price', 'Exit_Price', 'Outcome_Pct'
+                ])
+
+        # Append log entry
+        with open(log_file, 'a', newline='') as f:
+            writer = csv.writer(f)
+
+            now = datetime.now()
+            date = now.strftime('%Y-%m-%d')
+            time_str = now.strftime('%H:%M:%S')
+
+            # Extract key info
+            score = result.get('score', 0)
+            decision = result.get('decision', 'UNKNOWN')
+            articles = result.get('articles_analyzed', 0)
+
+            # Format key findings
+            if event_type == 'VALIDATION':
+                findings = '; '.join(result.get('key_findings', [])[:3])
+            else:  # INVALIDATION
+                triggering = result.get('triggering_articles', [])
+                if triggering:
+                    findings = triggering[0].get('title', 'No details')[:100]
+                else:
+                    findings = 'No negative news'
+
+            # Calculate outcome
+            outcome_pct = None
+            if entry_price and exit_price:
+                outcome_pct = round(((exit_price - entry_price) / entry_price) * 100, 2)
+
+            writer.writerow([
+                date, time_str, ticker, event_type, score, decision,
+                articles, findings, entry_price, exit_price, outcome_pct
+            ])
+
     # =====================================================================
     # CLAUDE API INTEGRATION
     # =====================================================================
@@ -844,33 +1364,67 @@ RECENT LESSONS LEARNED:
 
     def check_position_exits(self, position, current_price):
         """
-        Check if position should be closed based on stops/targets (FULL EXIT only)
+        Check if position should be closed based on stops/targets/news (FULL EXIT only)
 
-        Exit Rules (Simplified Strategy):
-        1. Stop Loss: -7% from entry (exit 100%)
-        2. Price Target: +10% from entry (exit 100%)
-        3. Time Stop: 21 days held (exit 100%)
+        Exit Rules (Phase 1 - News Monitoring Integrated):
+        1. News Invalidation: Score ≥70 (PRIORITY - check first)
+        2. Stop Loss: -7% from entry (exit 100%)
+        3. Price Target: +10% from entry (exit 100%)
+        4. Time Stop: 21 days held (exit 100%)
 
         No partial exits - simplicity over complexity
         """
 
+        ticker = position['ticker']
         entry_price = position['entry_price']
         stop_loss = position.get('stop_loss', entry_price * 0.93)  # -7%
         price_target = position.get('price_target', entry_price * 1.10)  # +10%
 
         return_pct = ((current_price - entry_price) / entry_price) * 100
 
-        # Check stop loss (-7%)
+        # PRIORITY 1: Check news invalidation (Phase 1)
+        # This catches thesis-breaking news BEFORE it becomes a big loss
+        try:
+            news_result = self.calculate_news_invalidation_score(ticker)
+
+            if news_result['should_exit']:
+                # Log news invalidation event
+                self.log_news_monitoring(
+                    ticker=ticker,
+                    event_type='INVALIDATION',
+                    result=news_result,
+                    entry_price=entry_price,
+                    exit_price=current_price
+                )
+
+                # Format exit reason with news details
+                if news_result['triggering_articles']:
+                    top_article = news_result['triggering_articles'][0]
+                    exit_reason = f"Catalyst invalidated - {top_article['title'][:50]}"
+                else:
+                    exit_reason = "Catalyst invalidated - negative news"
+
+                print(f"      ⚠️ NEWS INVALIDATION: {ticker} (score: {news_result['score']})")
+                if news_result['triggering_articles']:
+                    print(f"         Article: {news_result['triggering_articles'][0]['title'][:80]}")
+
+                return True, exit_reason, return_pct
+
+        except Exception as e:
+            print(f"      ⚠️ News check failed for {ticker}: {e}")
+            # Continue to other exit checks if news check fails
+
+        # PRIORITY 2: Check stop loss (-7%)
         if current_price <= stop_loss:
             standardized_reason = self.standardize_exit_reason(position, current_price, 'stop loss')
             return True, standardized_reason, return_pct
 
-        # Check profit target (+10%)
+        # PRIORITY 3: Check profit target (+10%)
         if current_price >= price_target:
             standardized_reason = self.standardize_exit_reason(position, current_price, 'target')
             return True, standardized_reason, return_pct
 
-        # Check time stop (21 days)
+        # PRIORITY 4: Check time stop (21 days)
         entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
         days_held = (datetime.now() - entry_date).days
 
@@ -1168,6 +1722,52 @@ RECENT LESSONS LEARNED:
         print(f"   ✓ HOLD: {len(hold_positions)} positions")
         print(f"   ✓ EXIT: {len(exit_positions)} positions")
         print(f"   ✓ BUY:  {len(buy_positions)} new positions\n")
+
+        # Step 5.5: PHASE 1 - Validate BUY recommendations with news monitoring
+        if buy_positions:
+            print("5.5 Validating BUY recommendations with news monitoring...")
+            validated_buys = []
+
+            for buy_pos in buy_positions:
+                ticker = buy_pos.get('ticker', 'UNKNOWN')
+                catalyst_type = buy_pos.get('catalyst', 'Unknown')
+                catalyst_age = buy_pos.get('catalyst_age_days', 0)
+
+                try:
+                    # Calculate news validation score
+                    news_result = self.calculate_news_validation_score(
+                        ticker=ticker,
+                        catalyst_type=catalyst_type,
+                        catalyst_age_days=catalyst_age
+                    )
+
+                    # Log validation event
+                    self.log_news_monitoring(
+                        ticker=ticker,
+                        event_type='VALIDATION',
+                        result=news_result
+                    )
+
+                    # Decision based on news score
+                    if news_result['score'] >= 5:  # Minimum acceptable score
+                        validated_buys.append(buy_pos)
+                        print(f"   ✓ {ticker}: {news_result['decision']} (score: {news_result['score']}/20)")
+                        if news_result['key_findings'][:2]:
+                            for finding in news_result['key_findings'][:2]:
+                                print(f"      - {finding}")
+                    else:
+                        print(f"   ✗ {ticker}: REJECTED (score: {news_result['score']}/20) - Stale/weak catalyst")
+                        if news_result['key_findings']:
+                            print(f"      Reason: {news_result['key_findings'][0]}")
+
+                except Exception as e:
+                    # If news validation fails, keep the position (don't block on API errors)
+                    print(f"   ⚠️ {ticker}: News validation failed ({e}) - keeping position")
+                    validated_buys.append(buy_pos)
+
+            # Replace buy_positions with validated list
+            buy_positions = validated_buys
+            print(f"   ✓ Validated: {len(validated_buys)} BUY positions passed news check\n")
 
         # Step 6: Build pending_positions.json
         print("6. Building pending positions file...")
