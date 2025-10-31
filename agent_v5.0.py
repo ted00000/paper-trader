@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.0.5
+Paper Trading Lab - Agent v5.0.6
 SWING TRADING SYSTEM - PROPER POSITION MANAGEMENT
 
 MAJOR IMPROVEMENTS FROM v4.3:
@@ -33,6 +33,11 @@ v5.0.5 CRITICAL TIMING FIX (2025-10-30):
 - Now checks day.c (today's close) BEFORE prevDay.c (yesterday's close)
 - Updated cron schedule: EXECUTE 9:45 AM, ANALYZE 4:50 PM (accounting for delay)
 - Prevents stale price data causing missed stop losses (BA case: -10.4% undetected)
+
+v5.0.6 DAILY ACTIVITY FIX (2025-10-30):
+- Fixed "Today's Activity" to show ALL trades closed today (by exit_date from CSV)
+- Previously only showed trades closed in current ANALYZE execution
+- Now includes trades closed in both EXECUTE and ANALYZE commands
 
 WORKFLOW (Adjusted for 15-minute Polygon delay):
   8:45 AM - GO command:
@@ -1359,7 +1364,11 @@ RECENT LESSONS LEARNED:
     def create_daily_activity_summary(self, closed_trades):
         """
         Create daily activity summary for dashboard
-        Shows what happened today: positions closed, P&L summary
+        Shows ALL trades closed today (by exit_date), not just from this execution
+
+        This ensures "Today's Activity" shows complete picture:
+        - Trades closed in morning EXECUTE command
+        - Trades closed in evening ANALYZE command
         """
 
         # Get current portfolio to see what's still open
@@ -1369,16 +1378,41 @@ RECENT LESSONS LEARNED:
                 portfolio = json.load(f)
                 open_positions = portfolio.get('positions', [])
 
-        # Calculate summary stats
-        total_closed = len(closed_trades)
-        winners = [t for t in closed_trades if t['return_percent'] > 0]
-        losers = [t for t in closed_trades if t['return_percent'] <= 0]
+        # Read ALL trades from CSV and filter by today's exit date
+        today = datetime.now().strftime('%Y-%m-%d')
+        all_trades_today = []
 
-        total_pl_dollars = sum(t['return_dollars'] for t in closed_trades)
+        if self.csv_file.exists():
+            import csv
+            with open(self.csv_file, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('Exit_Date') == today:
+                        # Convert CSV row to trade dict format
+                        all_trades_today.append({
+                            'ticker': row['Ticker'],
+                            'entry_date': row['Entry_Date'],
+                            'exit_date': row['Exit_Date'],
+                            'entry_price': float(row['Entry_Price']),
+                            'exit_price': float(row['Exit_Price']),
+                            'shares': float(row['Shares']),
+                            'hold_days': int(row['Hold_Days']),
+                            'return_percent': float(row['Return_Percent']),
+                            'return_dollars': float(row['Return_Dollars']),
+                            'exit_reason': row['Exit_Reason'],
+                            'catalyst_type': row['Catalyst_Type'],
+                            'thesis': row['Thesis']
+                        })
+
+        # Calculate summary stats from ALL today's trades
+        total_closed = len(all_trades_today)
+        winners = [t for t in all_trades_today if t['return_percent'] > 0]
+        losers = [t for t in all_trades_today if t['return_percent'] <= 0]
+        total_pl_dollars = sum(t['return_dollars'] for t in all_trades_today)
 
         # Create activity summary
         activity = {
-            'date': datetime.now().strftime('%Y-%m-%d'),
+            'date': today,
             'time': datetime.now().strftime('%H:%M:%S'),
             'summary': {
                 'positions_closed': total_closed,
@@ -1402,7 +1436,7 @@ RECENT LESSONS LEARNED:
                     'catalyst': t['catalyst_type'],
                     'thesis': t['thesis']
                 }
-                for t in closed_trades
+                for t in all_trades_today
             ]
         }
 
@@ -1434,11 +1468,10 @@ RECENT LESSONS LEARNED:
         # Update prices and check exits
         closed_trades = self.update_portfolio_prices_and_check_exits()
 
-        # Create daily activity summary for dashboard
-        if closed_trades:
-            print("\n4. Creating daily activity summary...")
-            self.create_daily_activity_summary(closed_trades)
-            print()
+        # ALWAYS create daily activity summary (picks up ALL trades closed today from CSV)
+        print("\n4. Creating daily activity summary...")
+        self.create_daily_activity_summary(closed_trades)
+        print()
 
         # Call Claude for analysis
         print("\n" + "="*60)
