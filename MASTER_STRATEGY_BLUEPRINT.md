@@ -580,14 +580,14 @@ elif article_age_hours < 4:
     score += 5   # Recent news
 ```
 
-#### **Invalidation Decision Matrix**
+#### **Invalidation Decision Matrix (Fully Automated)**
 
 | Severity Score | Decision | Action |
 |----------------|----------|--------|
-| **85-100** | CRITICAL - Auto-exit | Exit immediately, no questions |
-| **70-84** | STRONG sell signal | Flag for manual review → Likely exit |
-| **50-69** | MODERATE concern | Monitor closely, check next cycle |
-| **30-49** | MILD concern | Note in position log |
+| **85-100** | CRITICAL - Auto-exit | Exit immediately at market close (4:50 PM ANALYZE) |
+| **70-84** | STRONG invalidation - Auto-exit | Exit immediately at market close (4:50 PM ANALYZE) |
+| **50-69** | MODERATE concern | Continue holding, re-check next ANALYZE (24 hours) |
+| **30-49** | MILD concern | Note in position log, continue monitoring |
 | **<30** | Normal noise | Ignore |
 
 **Example - Boeing Case:**
