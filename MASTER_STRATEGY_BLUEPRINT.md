@@ -322,20 +322,18 @@ Decision: UPGRADE to Tier 1, increase size from 8% → 12%
 |-----------|---------------|--------|-----------|
 | **<20** | Normal/Low volatility | Full operations | Catalyst effectiveness high |
 | **20-30** | Elevated volatility | Normal operations | Acceptable conditions |
-| **30-35** | High volatility | Reduce to highest conviction only | 50% catalyst effectiveness |
-| **35-40** | Extreme volatility | PAUSE new entries | Very low success probability |
-| **>40** | Crisis mode | SYSTEM SHUTDOWN | Focus on capital preservation |
+| **30-35** | High volatility | HIGHEST CONVICTION ONLY | 50% catalyst effectiveness (research validated) |
+| **35-40** | Extreme volatility | SYSTEM SHUTDOWN | Crisis mode - capital preservation |
+| **>40** | Crisis mode | SYSTEM SHUTDOWN | Extended crisis - no operations |
 
 **Implementation:**
 ```python
 vix = fetch_vix_level()
 
-if vix > 40:
-    return "SYSTEM PAUSE - Crisis volatility, no new entries"
-elif vix > 35:
-    return "PAUSE NEW ENTRIES - Extreme volatility"
+if vix > 35:
+    return "SYSTEM SHUTDOWN - Crisis volatility, no new entries"
 elif vix > 30:
-    return "HIGHEST CONVICTION ONLY - High volatility regime"
+    return "HIGHEST CONVICTION ONLY - High volatility regime (50% effectiveness)"
 elif vix > 20:
     return "NORMAL OPERATIONS - Elevated but acceptable"
 else:
@@ -343,9 +341,10 @@ else:
 ```
 
 **Research Validation:**
-- VIX >30 reduces catalyst effectiveness by 50%
+- VIX >30 reduces catalyst effectiveness by 50% (research: Claude_Deep_Research.md line 25)
 - VIX >40 appears only during major crises (2008, 2020 COVID)
 - VIX-based filtering improves Sharpe ratio by 20-30%
+- **CRITICAL:** System pauses at VIX 30 per research (not 35), implementing conservative threshold
 
 ### Supporting Factors Requirement
 
@@ -359,15 +358,18 @@ else:
 3. **Sector Strength**
    - Sector ETF outperforming SPY (last 1 month)
    - Sector in top 3 momentum rankings
-4. **Relative Strength**
-   - Stock outperforming its sector (last 3 months)
-   - Making new highs vs peers
+4. **Relative Strength** ⭐ **REQUIRED - Research Validated**
+   - Stock outperforming its sector by **≥3%** over last 3 months
+   - Research shows: 20.1% annualized for leaders vs 11.0% for sector average
+   - Filters genuine leaders from sector coattail riders
 5. **Market Regime**
    - SPY above 50-day and 200-day MA (bull market)
    - VIX <30 (normal volatility)
 6. **News Validation**
    - Freshness score ≥3 points
    - Momentum acceleration score ≥3 points
+
+**IMPORTANT:** Relative Strength (≥3% sector outperformance) is REQUIRED, not optional. Research demonstrates this single filter adds substantial alpha.
 
 **Example - Valid Entry:**
 ```
@@ -393,9 +395,109 @@ Conviction: HIGH (12-15% position)
 | **Market cap <$1B** | Illiquid, volatile | None |
 | **No Tier 1 catalyst** | Core requirement | None |
 | **Unclear thesis** | Can't articulate in 2 sentences | None |
-| **VIX >35** | Hostile environment | None |
+| **VIX >30** | 50% catalyst effectiveness reduction | Highest conviction Tier 1 only |
 | **Excluded catalyst** | Proven loser (<35% win rate) | None |
 | **Stale catalyst** | >5 days old (earnings) | None |
+| **FOMC window** | 2 days before through 1 day after | None |
+| **CPI/NFP release** | Day before and day of | None |
+| **Relative strength <3%** | Sector coattail rider, not leader | None |
+
+### Macro Event Calendar (Risk Management)
+
+**Purpose:** Avoid unpredictable volatility during major macro events
+
+#### **Blackout Windows (No New Entries)**
+
+**FOMC Meetings:**
+- 2 days before meeting → 1 day after decision
+- Rationale: 100-200% volatility spike on FOMC days (Fleming & Remolona 1999)
+- Example: If FOMC is Wed 2:00 PM, blackout Mon-Thu
+
+**CPI Releases:**
+- Day before release → Day of release
+- Rationale: 50-150% volatility spike on CPI days
+- Example: If CPI is Thu 8:30 AM, blackout Wed-Thu
+
+**NFP (Non-Farm Payroll) Releases:**
+- Day before release → Day of release
+- Rationale: Major market-moving data
+- Example: If NFP is Fri 8:30 AM, blackout Thu-Fri
+
+**Existing Positions During Blackouts:**
+- Continue holding (don't exit solely due to calendar)
+- Monitor more closely for news invalidation
+- May exit if stop/target/news trigger hit
+
+**Implementation:**
+```python
+def check_macro_blackout(date):
+    """
+    Check if date falls within macro event blackout window
+    Returns: (is_blackout, event_name) tuple
+    """
+    # Fetch FOMC calendar (Fed website or API)
+    # Fetch economic calendar (CPI, NFP dates)
+    # Check if date within blackout windows
+
+    if in_fomc_window(date):
+        return (True, "FOMC blackout window")
+    elif in_cpi_window(date):
+        return (True, "CPI blackout window")
+    elif in_nfp_window(date):
+        return (True, "NFP blackout window")
+    else:
+        return (False, None)
+```
+
+### AI Decision Guardrails (Safety Limits)
+
+**Purpose:** Prevent catastrophic losses from AI decision errors
+
+#### **Position Limits**
+- Maximum 15% per position (even high conviction)
+- Maximum 10 positions total
+- Maximum 3 positions per sector
+- Maximum 40% allocation per sector
+
+#### **Loss Limits (Auto-Pause Triggers)**
+
+**Daily Loss Limit:** -2% of account value
+- If daily losses exceed -2%, pause new entries for 24 hours
+- Review all positions, check for systemic issues
+- Example: $1,000 account → -$20 in one day = pause
+
+**Monthly Loss Limit:** -8% of account value
+- If monthly losses exceed -8%, pause system for strategic review
+- Conduct comprehensive analysis of what's not working
+- Example: $1,000 account → -$80 in one month = full pause
+
+**Consecutive Loss Protocol:**
+- After 3 consecutive losses: Mandatory review of strategy assumptions
+- After 5 consecutive losses: Reduce position sizes by 50% until next winner
+- Not automated initially, but tracked in learning system
+
+#### **Override Authority**
+- Human (you) has final override authority on all decisions
+- Can manually exit positions flagged by AI
+- Can reject AI entry recommendations
+- Can pause system at any time
+
+**Weekly Calibration:**
+```python
+def calibrate_ai_accuracy():
+    """
+    Track AI prediction accuracy vs actual outcomes
+    """
+    for trade in last_week_trades:
+        ai_confidence = trade.confidence_level
+        actual_outcome = trade.return_percent > 0
+
+        # Compare AI confidence to win rate
+        if ai_confidence == "HIGH" and win_rate < 65%:
+            print("⚠️ AI overconfident on HIGH conviction trades")
+        elif ai_confidence == "MEDIUM" and win_rate > 75%:
+            print("⚠️ AI underconfident on MEDIUM conviction trades")
+```
 
 ### Conviction Assessment & Sizing
 
@@ -404,6 +506,8 @@ Conviction: HIGH (12-15% position)
 2. News validation score
 3. Number of supporting factors
 4. VIX regime
+5. Relative strength (≥3% sector outperformance)
+6. Macro event calendar (not in blackout window)
 
 #### **Conviction Matrix**
 
@@ -634,6 +738,12 @@ Reason: "Catalyst invalidated - $4.9B charge announced"
 - Volume dries up (<1x average for 2 days) → Exit
 - Breaks back below breakout level → Exit
 - Fails to make higher high within 3 days → Monitor
+
+**FDA Approval / Biotech Catalyst:**
+- Inverted-J pattern: Peak effectiveness Day 0-1, then 29% average decline over 86 days
+- Entry timing critical: Must enter within 24 hours of approval
+- Catalyst age >1 day: Reject entry (peak momentum passed)
+- Monitor for safety issues, trial failures, or regulatory reversals
 
 ### Exit Trigger 5: Better Opportunity (Portfolio Full)
 
@@ -873,47 +983,53 @@ def check_sector_limits(portfolio, new_position):
 cash_available = starting_capital - sum(position.position_size for position in portfolio) + realized_pl
 ```
 
-### No Complex Adjustments
+### No Complex Adjustments (For Now)
 
-**What we DON'T use (to keep it simple):**
+**What we DON'T use initially (to keep it simple):**
 
-❌ **Kelly Criterion**
+❌ **Kelly Criterion** (Revisit after 100+ trades)
 - Requires extensive historical data (100+ trades)
 - Suggests 28% positions with 55% win rate (too aggressive)
 - Half-Kelly (14%) better but still complex
+- **Review after:** 100 completed trades with stable win rate
 
-❌ **ATR (Average True Range) Volatility Sizing**
+❌ **ATR (Average True Range) Volatility Sizing** (Revisit after 50+ trades)
 - Requires 14-day ATR calculation
 - Position size = (Account Risk / ATR × Multiplier) × Share Price
-- Adds complexity without proven edge for our 3-7 day holds
+- Research shows: 20-30% Sharpe improvement with volatility management
+- **Review after:** 50 trades to assess if complexity justified
 
-❌ **Beta Adjustments**
+❌ **Beta Adjustments** (Revisit after 50+ trades)
 - High-beta stocks (β>1.5) get -20-40% size reduction
 - Requires fetching beta data
 - Most momentum stocks are high-beta anyway
+- **Review after:** 50 trades, if high-volatility trades underperform
 
-❌ **Drawdown Protocols**
+❌ **Drawdown Protocols** (Revisit after 50+ trades)
 - After 2 losses: Reduce size 25%
 - After 3 losses: Reduce size 50%
 - After 5 losses: Pause system
 - Sounds good but adds psychological complexity
+- **Review after:** 50 trades, if losing streaks >3 occur
 
-❌ **VIX-Based Cash Allocation**
+❌ **VIX-Based Cash Allocation** (Current approach is VIX filter instead)
 - VIX <15: 100% invested
 - VIX 15-20: 80% invested
 - VIX 20-30: 60% invested
 - We use VIX as entry filter instead (simpler)
 
-**Why Skip These:**
+**Why Skip These Initially:**
 - Add 5-10% edge at most
 - Increase system complexity significantly
 - Harder to track, learn, and optimize
 - Violates Pareto principle (80/20 rule)
+- **BUT:** Can add after validating core system (50-100 trades)
 
-**Can Add Later:**
-- Document in "Optional Future Enhancements"
-- Implement if data shows clear benefit
-- Only after 100+ trades to validate
+**Review Triggers:**
+- **After 50 trades:** Consider ATR/Beta adjustments if volatility causing issues
+- **After 100 trades:** Consider Kelly Criterion baseline with stable win rate data
+- **If max drawdown >15%:** Implement drawdown protocols
+- **If Sharpe ratio <1.0:** Reevaluate volatility management
 
 ### Position Sizing Learning Loop
 
@@ -1314,23 +1430,30 @@ Shares, Position_Size, Position_Size_Percent,
 Hold_Days, Return_Percent, Return_Dollars,
 Exit_Reason, Catalyst_Type, Catalyst_Tier, Catalyst_Age_Days,
 Multi_Catalyst, News_Validation_Score, News_Exit_Triggered,
-Sector, Confidence_Level, Conviction_Level,
-VIX_At_Entry, Market_Regime,
+Sector, Relative_Strength_Pct, Confidence_Level, Conviction_Level,
+VIX_At_Entry, Market_Regime, Macro_Event_Near,
 Stop_Loss, Price_Target,
 Thesis, What_Worked, What_Failed,
 Account_Value_After
 ```
 
-**New Fields:**
+**New Fields (Phase 1-4):**
 - `Position_Size_Percent`: Actual % of account (8-15%)
 - `Catalyst_Tier`: "Tier1" or "Tier2"
 - `Catalyst_Age_Days`: Days between catalyst event and entry
 - `Multi_Catalyst`: Boolean ("True" or "False")
 - `News_Validation_Score`: 0-20 points from GO command validation
 - `News_Exit_Triggered`: Boolean ("True" if exited due to news invalidation)
+- `Relative_Strength_Pct`: Stock outperformance vs sector (e.g., 5.2%)
 - `Conviction_Level`: "HIGH", "MEDIUM-HIGH", "MEDIUM"
 - `VIX_At_Entry`: VIX level when entered
 - `Market_Regime`: "Bull", "Bear", "Choppy"
+- `Macro_Event_Near`: "FOMC", "CPI", "NFP", or "None"
+
+**Fields to Add After 50+ Trades:**
+- `ATR_At_Entry`: 14-day Average True Range
+- `Beta`: Stock beta coefficient
+- `Volatility_Adjustment`: Size adjustment factor (if implemented)
 
 ### New Learning Output Files
 
@@ -1592,9 +1715,9 @@ class NewsMonitor:
 
 ---
 
-### Phase 3: VIX Filter (MEDIUM PRIORITY)
+### Phase 3: VIX Filter + Macro Calendar (HIGH PRIORITY)
 
-**Goal:** Avoid trading in hostile market regimes
+**Goal:** Avoid trading in hostile market regimes and during volatile macro events
 
 **Implementation Steps:**
 
@@ -1610,55 +1733,110 @@ def fetch_vix_level():
 
 **3.2 Integrate into GO Command** (30 mins)
 - Fetch VIX at 8:45 AM
-- Check thresholds (35, 30, 20)
+- Check thresholds: **UPDATED to 30 (not 35)**
 - Adjust decision logic:
-  - VIX >35: "SYSTEM PAUSE"
-  - VIX 30-35: "HIGHEST CONVICTION ONLY"
+  - VIX >35: "SYSTEM SHUTDOWN"
+  - VIX 30-35: "HIGHEST CONVICTION ONLY" (50% effectiveness)
   - VIX <30: "NORMAL OPERATIONS"
 
-**3.3 Log VIX at Entry** (15 mins)
+**3.3 Add Macro Event Calendar** (1 hour)
+- Create economic calendar fetcher (FOMC, CPI, NFP dates)
+- Check blackout windows before entries:
+  - FOMC: 2 days before → 1 day after
+  - CPI/NFP: Day before → Day of
+- Flag prohibited entry dates
+
+**3.4 Log VIX and Macro Events** (15 mins)
 - Add `VIX_At_Entry` column to CSV
 - Add `Market_Regime` column (Bull/Bear/Choppy)
+- Add `Macro_Event_Near` column (FOMC/CPI/NFP/None)
 
-**3.4 Enhance Monthly Learning** (1 hour)
+**3.5 Enhance Monthly Learning** (1 hour)
 - Add VIX regime performance analysis
 - Track win rate by VIX bucket
+- Track performance around macro events
 - Recommend threshold adjustments
 
 **Validation:**
-- Backtest: What % of trades occurred in each VIX regime?
-- Calculate hypothetical impact of filter
-- Verify win rate >10% higher in VIX <30
+- Verify VIX 30-35 triggers "highest conviction only" mode
+- Confirm FOMC/CPI/NFP blackouts block entries
+- Backtest: Would macro calendar have prevented any bad trades?
 
 **Deliverables:**
-- [ ] VIX fetcher implemented
-- [ ] GO command checks VIX filter
+- [ ] VIX fetcher implemented with 30 threshold (not 35)
+- [ ] Macro event calendar integrated
+- [ ] GO command checks both VIX and calendar
 - [ ] CSV columns added
-- [ ] Monthly learning tracks VIX performance
+- [ ] Monthly learning tracks regime + event performance
 - [ ] vix_regime_performance.json created
 
-**Expected Impact:** 5-10% win rate improvement (by avoiding bad regimes)
+**Expected Impact:** 5-10% win rate improvement + volatility reduction
 
 ---
 
-### Phase 4: Conviction-Based Sizing (MEDIUM PRIORITY)
+### Phase 4: Conviction-Based Sizing + Relative Strength (HIGH PRIORITY)
 
-**Goal:** Allocate more capital to best opportunities
+**Goal:** Allocate more capital to best opportunities and filter for sector leaders
 
 **Implementation Steps:**
 
-**4.1 Create Conviction Scorer** (1 hour)
+**4.1 Add Relative Strength Calculator** (1 hour)
 ```python
-def calculate_conviction_level(catalyst_tier, news_score, supporting_factors, vix):
+def calculate_relative_strength(ticker, sector_etf):
+    """
+    Calculate stock performance vs sector ETF over 3 months
+    Returns: relative_strength_percent (positive = outperforming)
+    """
+    stock_return_3m = get_3month_return(ticker)
+    sector_return_3m = get_3month_return(sector_etf)
+
+    relative_strength = stock_return_3m - sector_return_3m
+    return relative_strength
+
+def check_relative_strength_filter(ticker, sector):
+    """
+    REQUIRED FILTER: Stock must outperform sector by ≥3%
+    Returns: (passed, relative_strength)
+    """
+    sector_etf_map = {
+        'Technology': 'XLK',
+        'Healthcare': 'XLV',
+        'Financials': 'XLF',
+        # ... etc for all 11 sectors
+    }
+
+    sector_etf = sector_etf_map.get(sector)
+    rs = calculate_relative_strength(ticker, sector_etf)
+
+    if rs >= 3.0:
+        return (True, rs)
+    else:
+        return (False, rs)
+```
+
+**4.2 Create Conviction Scorer** (1 hour)
+```python
+def calculate_conviction_level(catalyst_tier, news_score, supporting_factors, vix, relative_strength):
     """
     Determine conviction level based on multiple factors
-    Returns: "HIGH", "MEDIUM-HIGH", "MEDIUM"
+    Returns: "HIGH", "MEDIUM-HIGH", "MEDIUM", "SKIP"
+
+    IMPORTANT: relative_strength ≥3% is REQUIRED
     """
-    if catalyst_tier == "Tier1" and news_score >= 15 and supporting_factors >= 5 and vix < 25:
+    # First check: Relative strength filter
+    if relative_strength < 3.0:
+        return "SKIP"  # Fails required filter
+
+    # Second check: Catalyst tier must be Tier 1
+    if catalyst_tier != "Tier1":
+        return "SKIP"
+
+    # Third check: Conviction based on multiple factors
+    if news_score >= 15 and supporting_factors >= 5 and vix < 25:
         return "HIGH"
-    elif catalyst_tier == "Tier1" and news_score >= 10 and supporting_factors >= 4 and vix < 30:
+    elif news_score >= 10 and supporting_factors >= 4 and vix < 30:
         return "MEDIUM-HIGH"
-    elif catalyst_tier == "Tier1" and news_score >= 5 and supporting_factors >= 3 and vix < 30:
+    elif news_score >= 5 and supporting_factors >= 3 and vix < 30:
         return "MEDIUM"
     else:
         return "SKIP"
@@ -1737,16 +1915,24 @@ def calculate_position_size(account_value, conviction):
 
 ---
 
-### Implementation Timeline
+### Implementation Timeline (Updated with Quick Fixes)
 
 | Phase | Priority | Effort | Timeline |
 |-------|----------|--------|----------|
 | **Phase 1: News Monitoring** | CRITICAL | 5-6 hours | Week 1 |
 | **Phase 2: Catalyst Tiers** | HIGH | 3 hours | Week 1-2 |
-| **Phase 3: VIX Filter** | MEDIUM | 2 hours | Week 2 |
-| **Phase 4: Conviction Sizing** | MEDIUM | 2.5 hours | Week 2-3 |
+| **Phase 3: VIX (30) + Macro Calendar** | HIGH | 3.5 hours | Week 2 |
+| **Phase 4: Conviction + Rel Strength** | HIGH | 3.5 hours | Week 2-3 |
 | **Phase 5: Learning Enhancements** | ONGOING | 3.5 hours | Week 3 |
-| **TOTAL** | - | **16 hours** | **3 weeks** |
+| **TOTAL** | - | **19 hours** | **3 weeks** |
+
+**Key Changes from Original Plan:**
+- VIX threshold changed to 30 (research validated)
+- Macro event calendar added (FOMC/CPI/NFP blackouts)
+- Relative strength filter (≥3%) added as required
+- FDA/biotech inverted-J decay pattern added
+- AI guardrails added (daily -2%, monthly -8% loss limits)
+- Total effort increased from 16 → 19 hours (+3 hours for enhancements)
 
 ### Validation Plan
 
