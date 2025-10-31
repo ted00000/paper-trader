@@ -1,19 +1,21 @@
 # Paper Trading Lab - Complete Automated Schedule
 # Timezone: America/New_York (ET) - automatically handles DST
-# Updated: October 29, 2025 - Using wrapper scripts
+# Updated: October 30, 2025 - Adjusted for 15-minute Polygon delay
 
 # =============================================================================
 # DAILY TRADING OPERATIONS (Monday-Friday)
 # =============================================================================
 
-# Morning: GO command at 8:45 AM ET (select 10 stocks)
+# Morning: GO command at 8:45 AM ET (premarket review - delay doesn't affect this)
 45 8 * * 1-5 /root/paper_trading_lab/run_go.sh
 
-# Market Open: EXECUTE command at 9:30 AM ET (enter positions)
-30 9 * * 1-5 /root/paper_trading_lab/run_execute.sh
+# Market Open: EXECUTE command at 9:45 AM ET (gets 9:30 AM open prices with 15-min delay)
+# NOTE: 9:30 AM market open + 15 min delay = 9:45 AM reliable data
+45 9 * * 1-5 /root/paper_trading_lab/run_execute.sh
 
-# Market Close: ANALYZE command at 4:30 PM ET (update prices, close positions)
-30 16 * * 1-5 /root/paper_trading_lab/run_analyze.sh
+# Market Close: ANALYZE command at 4:50 PM ET (gets 4:00 PM close prices with 15-min delay)
+# NOTE: 4:00 PM market close + 15 min delay + 35 min buffer = 4:50 PM safe window
+50 16 * * 1-5 /root/paper_trading_lab/run_analyze.sh
 
 # =============================================================================
 # LEARNING OPERATIONS

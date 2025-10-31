@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.0.4
+Paper Trading Lab - Agent v5.0.5
 SWING TRADING SYSTEM - PROPER POSITION MANAGEMENT
 
 MAJOR IMPROVEMENTS FROM v4.3:
@@ -23,15 +23,18 @@ v5.0.2 ALIGNMENT (2025-10-30):
 v5.0.3 STANDARDIZATION (2025-10-30):
 - Standardized exit reasons to simple, consistent format
 - Examples: "Target reached (+11.6%)", "Stop loss (-8.2%)", "Time stop (21 days)"
-- Converts Claude's freeform exit text to structured reasons
-- Consistent display across dashboard and CSV logs
 
-v5.0.4 FIX (2025-10-30):
-- Fixed hold_days calculation in _close_position()
-- Now calculates actual days from entry_date to exit, not stored field
-- Fixes issue where exits bypassed days_held increment (showed 0 days)
+v5.0.4 HOLD DAYS FIX (2025-10-30):
+- Fixed hold days calculation to use actual date difference
+- Previously showed 0 days when should show 1+ (wasn't incrementing on exit)
 
-WORKFLOW:
+v5.0.5 CRITICAL TIMING FIX (2025-10-30):
+- Fixed 15-minute delay pricing logic in fetch_current_prices()
+- Now checks day.c (today's close) BEFORE prevDay.c (yesterday's close)
+- Updated cron schedule: EXECUTE 9:45 AM, ANALYZE 4:50 PM (accounting for delay)
+- Prevents stale price data causing missed stop losses (BA case: -10.4% undetected)
+
+WORKFLOW (Adjusted for 15-minute Polygon delay):
   8:45 AM - GO command:
     - Load current portfolio (yesterday's positions)
     - Fetch premarket prices (~8:30 AM via Polygon.io)
@@ -39,14 +42,14 @@ WORKFLOW:
     - Decide: HOLD (keep positions) / EXIT (stop/target/catalyst fail) / BUY (fill vacancies)
     - Save decisions to pending_positions.json
 
-  9:30 AM - EXECUTE command:
+  9:45 AM - EXECUTE command (CHANGED from 9:30 AM):
     - Load pending decisions
     - Execute exits for positions marked EXIT
     - Enter new positions marked BUY
-    - Update portfolio with market open prices
+    - Update portfolio with 9:30 AM market open prices (available at 9:45 AM with 15-min delay)
 
-  4:30 PM - ANALYZE command:
-    - Update all prices to closing prices
+  4:50 PM - ANALYZE command (CHANGED from 4:30 PM):
+    - Update all prices to 4:00 PM closing prices (available at 4:50 PM with 15-min delay + buffer)
     - Check stops/targets, close if hit
     - Log completed trades to CSV
 
@@ -60,8 +63,8 @@ SWING TRADING RULES ENFORCED:
 
 Usage:
   python3 agent_v5.0.py go       # 8:45 AM - Review & decide
-  python3 agent_v5.0.py execute  # 9:30 AM - Execute trades
-  python3 agent_v5.0.py analyze  # 4:30 PM - Update & close
+  python3 agent_v5.0.py execute  # 9:45 AM - Execute trades (was 9:30 AM)
+  python3 agent_v5.0.py analyze  # 4:50 PM - Update & close (was 4:30 PM)
 """
 
 import os
@@ -267,13 +270,19 @@ POSITION {i}: {ticker}
         """
         Fetch current prices using Polygon.io API
 
-        STARTER PLAN ($29/mo):
-        - 15-minute delayed data (perfect for swing trading)
+        STARTER PLAN ($29/mo) - 15-MINUTE DELAYED DATA:
         - Unlimited API calls (no daily/minute rate limits)
-        - At 9:30 AM EXECUTE: Gets ~9:15 AM prices
-        - At 4:30 PM ANALYZE: Gets ~4:15 PM prices (essentially closing prices)
 
-        This is ideal for swing trading with multi-day holds.
+        TIMING LOGIC (accounting for 15-min delay):
+        - At 9:45 AM EXECUTE: Gets 9:30 AM market open prices (9:30 + 15min = 9:45)
+        - At 4:50 PM ANALYZE: Gets 4:00 PM market close prices (4:00 + 15min + buffer = 4:50)
+
+        FIELD PRIORITY:
+        1. day.c - Today's official closing price (best after 4:15 PM)
+        2. lastTrade.p - Most recent trade (for intraday)
+        3. prevDay.c - Yesterday's close (emergency fallback only)
+
+        This ensures we get TODAY's closing prices, not yesterday's stale data.
         """
 
         if not POLYGON_API_KEY:
@@ -281,6 +290,8 @@ POSITION {i}: {ticker}
             return {}
 
         prices = {}
+        current_hour = datetime.now().hour
+        is_after_market = current_hour >= 16  # After 4:00 PM
 
         print(f"   Fetching prices for {len(tickers)} tickers via Polygon.io...")
 
@@ -293,17 +304,27 @@ POSITION {i}: {ticker}
 
                 if data.get('status') == 'OK' and 'ticker' in data:
                     ticker_data = data['ticker']
+                    price = None
+                    source = None
 
-                    # Try to get last trade price (most recent)
-                    if 'lastTrade' in ticker_data and ticker_data['lastTrade']:
+                    # PRIORITY 1: After market close (4:00 PM+), use today's closing price
+                    if is_after_market and 'day' in ticker_data and ticker_data['day'] and 'c' in ticker_data['day']:
+                        price = float(ticker_data['day']['c'])
+                        source = "today's close"
+
+                    # PRIORITY 2: Use most recent trade (for intraday or if day.c not available)
+                    elif 'lastTrade' in ticker_data and ticker_data['lastTrade'] and 'p' in ticker_data['lastTrade']:
                         price = float(ticker_data['lastTrade']['p'])
-                        prices[ticker] = price
-                        print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f}")
-                    # Fallback to previous day close if no recent trade
-                    elif 'prevDay' in ticker_data and ticker_data['prevDay']:
+                        source = "last trade"
+
+                    # PRIORITY 3: Emergency fallback to yesterday's close (should rarely happen)
+                    elif 'prevDay' in ticker_data and ticker_data['prevDay'] and 'c' in ticker_data['prevDay']:
                         price = float(ticker_data['prevDay']['c'])
+                        source = "prev close ⚠️"
+
+                    if price:
                         prices[ticker] = price
-                        print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f} (prev close)")
+                        print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f} ({source})")
                     else:
                         print(f"   [{i}/{len(tickers)}] {ticker}: No price data available")
                 else:
