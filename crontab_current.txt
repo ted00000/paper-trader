@@ -13,9 +13,9 @@
 # NOTE: 9:30 AM market open + 15 min delay = 9:45 AM reliable data
 45 9 * * 1-5 /root/paper_trading_lab/run_execute.sh
 
-# Market Close: ANALYZE command at 4:50 PM ET (gets 4:00 PM close prices with 15-min delay)
-# NOTE: 4:00 PM market close + 15 min delay + 35 min buffer = 4:50 PM safe window
-50 16 * * 1-5 /root/paper_trading_lab/run_analyze.sh
+# Market Close: ANALYZE command at 4:30 PM ET (gets 4:00 PM close prices with 15-min delay)
+# NOTE: 4:00 PM market close + 15 min delay = 4:15 PM data available, 4:30 PM = 15 min buffer
+30 16 * * 1-5 /root/paper_trading_lab/run_analyze.sh
 
 # =============================================================================
 # LEARNING OPERATIONS

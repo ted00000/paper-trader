@@ -536,7 +536,7 @@ Exit discipline determines long-term survival. We use **five exit triggers** che
 
 ### Exit Trigger 1: Stop Loss (-7%)
 
-**Checked:** 4:50 PM ANALYZE command
+**Checked:** 4:30 PM ANALYZE command
 
 **Trigger Condition:**
 ```python
@@ -563,7 +563,7 @@ if current_price <= entry_price * 0.93:
 
 ### Exit Trigger 2: Profit Target (+10-15%)
 
-**Checked:** 4:50 PM ANALYZE command
+**Checked:** 4:30 PM ANALYZE command
 
 **Trigger Condition:**
 ```python
@@ -599,7 +599,7 @@ if catalyst == "Earnings_Beat_with_Guidance" and current_price >= entry_price * 
 
 ### Exit Trigger 3: Time Stop (21 Days)
 
-**Checked:** 4:50 PM ANALYZE command
+**Checked:** 4:30 PM ANALYZE command
 
 **Trigger Condition:**
 ```python
@@ -631,7 +631,7 @@ if days_held >= 21:
 
 ### Exit Trigger 4: Catalyst Invalidated (News-Based)
 
-**Checked:** 4:50 PM ANALYZE command
+**Checked:** 4:30 PM ANALYZE command
 
 **Purpose:** Detect when thesis is broken, exit BEFORE stop loss hit
 
@@ -688,8 +688,8 @@ elif article_age_hours < 4:
 
 | Severity Score | Decision | Action |
 |----------------|----------|--------|
-| **85-100** | CRITICAL - Auto-exit | Exit immediately at market close (4:50 PM ANALYZE) |
-| **70-84** | STRONG invalidation - Auto-exit | Exit immediately at market close (4:50 PM ANALYZE) |
+| **85-100** | CRITICAL - Auto-exit | Exit immediately at market close (4:30 PM ANALYZE) |
+| **70-84** | STRONG invalidation - Auto-exit | Exit immediately at market close (4:30 PM ANALYZE) |
 | **50-69** | MODERATE concern | Continue holding, re-check next ANALYZE (24 hours) |
 | **30-49** | MILD concern | Note in position log, continue monitoring |
 | **<30** | Normal noise | Ignore |
@@ -799,7 +799,7 @@ if portfolio_count == 10 and new_tier1_opportunity_found:
 
 ### Exit Execution Flow
 
-**At 4:50 PM ANALYZE command:**
+**At 4:30 PM ANALYZE command:**
 ```
 For each of 10 positions:
 1. Fetch current closing price
