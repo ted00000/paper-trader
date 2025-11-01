@@ -465,11 +465,14 @@
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             display: block;
+            width: 100%;
+            max-width: 100%;
         }
 
         .mobile-table-wrapper table {
             min-width: 700px;
             display: table;
+            width: 100%;
         }
 
         /* Responsive */
@@ -524,20 +527,13 @@
                 -webkit-overflow-scrolling: touch !important;
             }
 
-            .mobile-table-wrapper {
-                overflow-x: auto !important;
-                -webkit-overflow-scrolling: touch !important;
-                display: block !important;
-                width: 100% !important;
-                max-width: 100% !important;
-            }
-
-            .table-scroll table,
             .mobile-table-wrapper table {
                 font-size: 0.813rem;
-                width: 800px !important;
-                max-width: none !important;
-                display: table !important;
+                min-width: 600px;
+            }
+
+            .table-scroll table {
+                font-size: 0.813rem;
             }
 
             th, td {
