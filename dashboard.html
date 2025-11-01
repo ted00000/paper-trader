@@ -477,15 +477,8 @@
         /* Scroll indicator arrow */
         .scroll-indicator {
             position: absolute;
-            bottom: 8px;
-            right: 8px;
-            width: 24px;
-            height: 24px;
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            bottom: -32px;
+            right: 16px;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.3s ease;
@@ -499,8 +492,9 @@
         .scroll-indicator::after {
             content: '→';
             color: var(--neon-green);
-            font-size: 16px;
-            font-weight: bold;
+            font-size: 24px;
+            font-weight: 900;
+            text-shadow: 0 0 8px var(--neon-green);
         }
 
         /* Responsive */
