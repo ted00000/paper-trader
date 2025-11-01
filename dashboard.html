@@ -466,11 +466,41 @@
             -webkit-overflow-scrolling: touch;
             display: block !important;
             max-width: 100% !important;
+            position: relative;
         }
 
         .mobile-table-wrapper table {
             width: 700px;
             display: table;
+        }
+
+        /* Scroll indicator arrow */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+        }
+
+        .scroll-indicator.visible {
+            opacity: 1;
+        }
+
+        .scroll-indicator::after {
+            content: '→';
+            color: var(--neon-green);
+            font-size: 16px;
+            font-weight: bold;
         }
 
         /* Responsive */
@@ -976,6 +1006,12 @@
 
             html += '</tbody></table></div>';
             container.innerHTML = html;
+
+            // Add scroll indicator to the table wrapper
+            const wrapper = container.querySelector('.mobile-table-wrapper');
+            if (wrapper) {
+                addScrollIndicator(wrapper);
+            }
         }
         
         function updateCatalystBreakdown(data) {
@@ -1131,6 +1167,12 @@
 
             html += '</tbody></table></div>';
             content.innerHTML = html;
+
+            // Add scroll indicator to the table wrapper
+            const wrapper = content.querySelector('.mobile-table-wrapper');
+            if (wrapper) {
+                addScrollIndicator(wrapper);
+            }
         }
 
         function updateRecentlyClosed(csvText) {
@@ -1205,6 +1247,12 @@
 
             html += '</tbody></table></div>';
             content.innerHTML = html;
+
+            // Add scroll indicator to the table wrapper
+            const wrapper = content.querySelector('.mobile-table-wrapper');
+            if (wrapper) {
+                addScrollIndicator(wrapper);
+            }
         }
 
         function updateLastUpdated(timestamp) {
@@ -1232,6 +1280,35 @@
         document.getElementById('updateTime').textContent = 'Awaiting first update';
     }
 }
+
+        // Scroll indicator utility - adds arrow when content can scroll
+        function addScrollIndicator(wrapper) {
+            // Create indicator element
+            const indicator = document.createElement('div');
+            indicator.className = 'scroll-indicator';
+            wrapper.appendChild(indicator);
+
+            // Function to check if scrollable and update indicator
+            function updateScrollIndicator() {
+                const canScroll = wrapper.scrollWidth > wrapper.clientWidth;
+                const isAtEnd = wrapper.scrollLeft >= (wrapper.scrollWidth - wrapper.clientWidth - 5); // 5px threshold
+
+                if (canScroll && !isAtEnd) {
+                    indicator.classList.add('visible');
+                } else {
+                    indicator.classList.remove('visible');
+                }
+            }
+
+            // Check on scroll
+            wrapper.addEventListener('scroll', updateScrollIndicator);
+
+            // Check on window resize
+            window.addEventListener('resize', updateScrollIndicator);
+
+            // Initial check
+            setTimeout(updateScrollIndicator, 100); // Delay to ensure content is rendered
+        }
         
         // Initialize
         updateMarketStatus();
