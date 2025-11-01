@@ -947,7 +947,7 @@
             document.getElementById('positionCount').textContent = data.positions.length + ' Positions';
 
             // MOBILE FIX: Wrap table in scroll wrapper
-            let html = '<div class="mobile-table-wrapper" style="overflow-x: auto; display: block; max-width: 100%;"><table style="width: 600px;"><thead><tr>';
+            let html = '<div class="mobile-table-wrapper"><table><thead><tr>';
             html += '<th>Symbol</th>';
             html += '<th>Entry</th>';
             html += '<th>Current</th>';
@@ -1111,7 +1111,7 @@
                 </div>
             `;
 
-            html += '<div class="mobile-table-wrapper" style="overflow-x: auto; display: block; max-width: 100%;"><table style="width: 600px;"><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th><th>Hold Days</th><th>Return</th><th>Exit Reason</th></tr></thead><tbody>';
+            html += '<div class="mobile-table-wrapper"><table><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th><th>Hold Days</th><th>Return</th><th>Exit Reason</th></tr></thead><tbody>';
 
             data.closed_today.forEach(trade => {
                 const returnClass = trade.return_percent >= 0 ? 'positive' : 'negative';
