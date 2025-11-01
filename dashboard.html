@@ -537,6 +537,21 @@
             .performance-bar {
                 margin: 0 12px;
             }
+
+            /* FIXED: System Status Bar mobile optimization */
+            .system-status-bar {
+                padding: 16px 20px !important;
+            }
+
+            .system-badges {
+                gap: 8px !important;
+                font-size: 0.75rem !important;
+            }
+
+            .system-badges span {
+                font-size: 0.688rem !important;
+                padding: 3px 8px !important;
+            }
         }
     </style>
 </head>
@@ -594,9 +609,9 @@
         </div>
 
         <!-- System Status Bar (NEW) -->
-        <div class="section" style="padding: 20px 32px; margin-bottom: 24px;">
+        <div class="section system-status-bar" style="padding: 20px 32px; margin-bottom: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="system-badges" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                     <span style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;">System:</span>
                     <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">v5.6 COMPOUND GROWTH</span>
                     <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">NEWS</span>
