@@ -514,7 +514,6 @@
                 padding: 20px;
                 background: var(--bg-dark-gray); /* FIXED: Explicit background for mobile */
                 border: 1px solid var(--border-color); /* FIXED: Explicit border */
-                overflow: visible; /* Allow inner elements to scroll */
             }
 
             /* FIXED: Table scroll container for mobile */
@@ -526,17 +525,19 @@
             }
 
             .mobile-table-wrapper {
-                overflow-x: scroll !important;
+                overflow-x: auto !important;
                 -webkit-overflow-scrolling: touch !important;
                 display: block !important;
+                width: 100% !important;
+                max-width: 100% !important;
             }
 
             .table-scroll table,
             .mobile-table-wrapper table {
                 font-size: 0.813rem;
-                min-width: 700px !important; /* Increased from 600px to ensure overflow */
+                width: 800px !important;
+                max-width: none !important;
                 display: table !important;
-                table-layout: auto !important;
             }
 
             th, td {
