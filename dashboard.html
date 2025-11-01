@@ -526,11 +526,18 @@
                 -webkit-overflow-scrolling: touch !important;
             }
 
+            .mobile-table-wrapper {
+                overflow-x: scroll !important;
+                -webkit-overflow-scrolling: touch !important;
+                display: block !important;
+            }
+
             .table-scroll table,
             .mobile-table-wrapper table {
                 font-size: 0.813rem;
-                min-width: 600px !important; /* Force horizontal scroll if needed */
+                min-width: 700px !important; /* Increased from 600px to ensure overflow */
                 display: table !important;
+                table-layout: auto !important;
             }
 
             th, td {
