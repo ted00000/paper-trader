@@ -66,15 +66,15 @@ class MonthlyLearning:
         return regime
     
     def calculate_monthly_statistics(self, trades):
-        """Calculate comprehensive monthly statistics"""
-        
+        """Calculate comprehensive monthly statistics (PHASE 5 ENHANCED)"""
+
         if not trades:
             return None
-        
+
         # Filter to last 30 days
         cutoff = datetime.now() - timedelta(days=30)
         recent_trades = []
-        
+
         for trade in trades:
             try:
                 exit_date = datetime.strptime(trade.get('Exit_Date', ''), '%Y-%m-%d')
@@ -82,37 +82,37 @@ class MonthlyLearning:
                     recent_trades.append(trade)
             except:
                 pass
-        
+
         if not recent_trades:
             recent_trades = trades  # Use all if none in last 30 days
-        
+
         # Calculate metrics
         returns = [float(t.get('Return_Percent', 0)) for t in recent_trades]
-        
+
         total_trades = len(recent_trades)
         winners = len([r for r in returns if r > 0])
         losers = len([r for r in returns if r < 0])
         win_rate = (winners / total_trades * 100) if total_trades > 0 else 0
-        
+
         avg_return = statistics.mean(returns) if returns else 0
         median_return = statistics.median(returns) if returns else 0
-        
+
         best_trade = max(returns) if returns else 0
         worst_trade = min(returns) if returns else 0
-        
+
         # Volatility (standard deviation of returns)
         volatility = statistics.stdev(returns) if len(returns) > 1 else 0
-        
+
         # Sharpe-like metric (avg return / volatility)
         sharpe = (avg_return / volatility) if volatility > 0 else 0
-        
+
         # Calculate max drawdown
         cumulative_returns = []
         cumulative = 0
         for r in returns:
             cumulative += r
             cumulative_returns.append(cumulative)
-        
+
         max_drawdown = 0
         peak = cumulative_returns[0] if cumulative_returns else 0
         for ret in cumulative_returns:
@@ -121,7 +121,142 @@ class MonthlyLearning:
             drawdown = peak - ret
             if drawdown > max_drawdown:
                 max_drawdown = drawdown
-        
+
+        # PHASE 5: Track new dimensions
+        tier_stats = defaultdict(lambda: {'total': 0, 'winners': 0, 'returns': []})
+        conviction_stats = defaultdict(lambda: {'total': 0, 'winners': 0, 'returns': []})
+        vix_regime_stats = defaultdict(lambda: {'total': 0, 'winners': 0, 'returns': []})
+        news_stats = {
+            'high_score': {'total': 0, 'winners': 0, 'returns': []},
+            'low_score': {'total': 0, 'winners': 0, 'returns': []},
+            'exits_triggered': 0
+        }
+        rs_stats = {
+            'strong_rs': {'total': 0, 'winners': 0, 'returns': []},
+            'weak_rs': {'total': 0, 'winners': 0, 'returns': []}
+        }
+
+        for trade in recent_trades:
+            return_pct = float(trade.get('Return_Percent', 0))
+            is_winner = return_pct > 0
+
+            # Tier tracking
+            tier = trade.get('Catalyst_Tier', 'Unknown')
+            tier_stats[tier]['total'] += 1
+            tier_stats[tier]['returns'].append(return_pct)
+            if is_winner:
+                tier_stats[tier]['winners'] += 1
+
+            # Conviction tracking
+            conviction = trade.get('Conviction_Level', 'MEDIUM')
+            conviction_stats[conviction]['total'] += 1
+            conviction_stats[conviction]['returns'].append(return_pct)
+            if is_winner:
+                conviction_stats[conviction]['winners'] += 1
+
+            # VIX regime tracking
+            vix_regime = trade.get('Market_Regime', 'UNKNOWN')
+            vix_regime_stats[vix_regime]['total'] += 1
+            vix_regime_stats[vix_regime]['returns'].append(return_pct)
+            if is_winner:
+                vix_regime_stats[vix_regime]['winners'] += 1
+
+            # News validation tracking
+            news_score = float(trade.get('News_Validation_Score', 0))
+            if news_score >= 10:
+                news_stats['high_score']['total'] += 1
+                news_stats['high_score']['returns'].append(return_pct)
+                if is_winner:
+                    news_stats['high_score']['winners'] += 1
+            else:
+                news_stats['low_score']['total'] += 1
+                news_stats['low_score']['returns'].append(return_pct)
+                if is_winner:
+                    news_stats['low_score']['winners'] += 1
+
+            if trade.get('News_Exit_Triggered', '').lower() in ['true', '1', 'yes']:
+                news_stats['exits_triggered'] += 1
+
+            # Relative strength tracking
+            rs_value = float(trade.get('Relative_Strength', 0))
+            if rs_value >= 3.0:
+                rs_stats['strong_rs']['total'] += 1
+                rs_stats['strong_rs']['returns'].append(return_pct)
+                if is_winner:
+                    rs_stats['strong_rs']['winners'] += 1
+            else:
+                rs_stats['weak_rs']['total'] += 1
+                rs_stats['weak_rs']['returns'].append(return_pct)
+                if is_winner:
+                    rs_stats['weak_rs']['winners'] += 1
+
+        # Build phase metrics
+        phase_metrics = {
+            'tier_performance': {},
+            'conviction_performance': {},
+            'vix_regime_performance': {},
+            'news_validation_performance': {},
+            'relative_strength_performance': {}
+        }
+
+        # Tier performance
+        for tier, stats in tier_stats.items():
+            if stats['total'] > 0:
+                phase_metrics['tier_performance'][tier] = {
+                    'win_rate': (stats['winners'] / stats['total'] * 100),
+                    'avg_return': statistics.mean(stats['returns']),
+                    'count': stats['total']
+                }
+
+        # Conviction performance
+        for conv, stats in conviction_stats.items():
+            if stats['total'] > 0:
+                phase_metrics['conviction_performance'][conv] = {
+                    'win_rate': (stats['winners'] / stats['total'] * 100),
+                    'avg_return': statistics.mean(stats['returns']),
+                    'count': stats['total']
+                }
+
+        # VIX regime performance
+        for regime, stats in vix_regime_stats.items():
+            if stats['total'] > 0:
+                phase_metrics['vix_regime_performance'][regime] = {
+                    'win_rate': (stats['winners'] / stats['total'] * 100),
+                    'avg_return': statistics.mean(stats['returns']),
+                    'count': stats['total']
+                }
+
+        # News validation performance
+        if news_stats['high_score']['total'] > 0:
+            phase_metrics['news_validation_performance']['high_score'] = {
+                'win_rate': (news_stats['high_score']['winners'] / news_stats['high_score']['total'] * 100),
+                'avg_return': statistics.mean(news_stats['high_score']['returns']),
+                'count': news_stats['high_score']['total']
+            }
+        if news_stats['low_score']['total'] > 0:
+            phase_metrics['news_validation_performance']['low_score'] = {
+                'win_rate': (news_stats['low_score']['winners'] / news_stats['low_score']['total'] * 100),
+                'avg_return': statistics.mean(news_stats['low_score']['returns']),
+                'count': news_stats['low_score']['total']
+            }
+        phase_metrics['news_validation_performance']['exit_rate'] = (
+            (news_stats['exits_triggered'] / total_trades * 100) if total_trades > 0 else 0
+        )
+
+        # Relative strength performance
+        if rs_stats['strong_rs']['total'] > 0:
+            phase_metrics['relative_strength_performance']['strong_rs'] = {
+                'win_rate': (rs_stats['strong_rs']['winners'] / rs_stats['strong_rs']['total'] * 100),
+                'avg_return': statistics.mean(rs_stats['strong_rs']['returns']),
+                'count': rs_stats['strong_rs']['total']
+            }
+        if rs_stats['weak_rs']['total'] > 0:
+            phase_metrics['relative_strength_performance']['weak_rs'] = {
+                'win_rate': (rs_stats['weak_rs']['winners'] / rs_stats['weak_rs']['total'] * 100),
+                'avg_return': statistics.mean(rs_stats['weak_rs']['returns']),
+                'count': rs_stats['weak_rs']['total']
+            }
+
         return {
             'total_trades': total_trades,
             'winners': winners,
@@ -134,7 +269,8 @@ class MonthlyLearning:
             'volatility': volatility,
             'sharpe_ratio': sharpe,
             'max_drawdown': max_drawdown,
-            'period': 'Last 30 days' if len(recent_trades) < len(trades) else 'All time'
+            'period': 'Last 30 days' if len(recent_trades) < len(trades) else 'All time',
+            '_phase_metrics': phase_metrics
         }
     
     def analyze_strategy_effectiveness(self, trades):
@@ -220,12 +356,12 @@ class MonthlyLearning:
         return best_practices
     
     def generate_monthly_report(self, monthly_stats, regime, strategy_eval, best_practices):
-        """Generate comprehensive monthly report"""
-        
+        """Generate comprehensive monthly report (PHASE 5 ENHANCED)"""
+
         report = []
         report.append(f"\n\n{'='*80}\n")
         report.append(f"# MONTHLY LEARNING REPORT - {datetime.now().strftime('%B %Y')}\n\n")
-        
+
         # Executive Summary
         report.append("## 📊 EXECUTIVE SUMMARY\n\n")
         if monthly_stats:
@@ -237,22 +373,90 @@ class MonthlyLearning:
             report.append(f"- **Volatility**: {monthly_stats['volatility']:.2f}%\n")
             report.append(f"- **Max Drawdown**: -{monthly_stats['max_drawdown']:.1f}%\n")
             report.append(f"- **Sharpe Ratio**: {monthly_stats['sharpe_ratio']:.2f}\n")
-        
+
         # Market Regime
         report.append("\n## 🌍 MARKET REGIME DETECTION\n\n")
         report.append(f"- **Current Regime**: {regime['regime_type']}\n")
         report.append(f"- **Confidence**: {regime['confidence']}\n")
         report.append(f"- **Recommendation**: {regime['recommendation']}\n")
-        
+
+        # PHASE 5: Add new performance dimensions
+        if monthly_stats and '_phase_metrics' in monthly_stats:
+            phase_metrics = monthly_stats['_phase_metrics']
+
+            report.append("\n## 📈 PHASE 1-4 PERFORMANCE (Last 30 Days)\n\n")
+
+            # Tier performance
+            if phase_metrics['tier_performance']:
+                report.append("**Catalyst Tier Performance:**\n")
+                for tier, stats in sorted(phase_metrics['tier_performance'].items()):
+                    report.append(
+                        f"- {tier}: {stats['win_rate']:.1f}% win rate, "
+                        f"{stats['avg_return']:.2f}% avg ({stats['count']} trades)\n"
+                    )
+                report.append("\n")
+
+            # Conviction performance
+            if phase_metrics['conviction_performance']:
+                report.append("**Conviction Performance:**\n")
+                for conv, stats in sorted(phase_metrics['conviction_performance'].items(), reverse=True):
+                    report.append(
+                        f"- {conv}: {stats['win_rate']:.1f}% win rate, "
+                        f"{stats['avg_return']:.2f}% avg ({stats['count']} trades)\n"
+                    )
+                report.append("\n")
+
+            # VIX regime performance
+            if phase_metrics['vix_regime_performance']:
+                report.append("**VIX Regime Performance:**\n")
+                for regime_type, stats in sorted(phase_metrics['vix_regime_performance'].items()):
+                    report.append(
+                        f"- {regime_type}: {stats['win_rate']:.1f}% win rate, "
+                        f"{stats['avg_return']:.2f}% avg ({stats['count']} trades)\n"
+                    )
+                report.append("\n")
+
+            # News validation performance
+            if phase_metrics['news_validation_performance']:
+                report.append("**News Validation Performance:**\n")
+                news_perf = phase_metrics['news_validation_performance']
+                if 'high_score' in news_perf:
+                    report.append(
+                        f"- High Score (≥10): {news_perf['high_score']['win_rate']:.1f}% win rate, "
+                        f"{news_perf['high_score']['avg_return']:.2f}% avg ({news_perf['high_score']['count']} trades)\n"
+                    )
+                if 'low_score' in news_perf:
+                    report.append(
+                        f"- Low Score (<10): {news_perf['low_score']['win_rate']:.1f}% win rate, "
+                        f"{news_perf['low_score']['avg_return']:.2f}% avg ({news_perf['low_score']['count']} trades)\n"
+                    )
+                report.append(f"- News Exit Rate: {news_perf['exit_rate']:.1f}%\n\n")
+
+            # Relative strength performance
+            if phase_metrics['relative_strength_performance']:
+                report.append("**Relative Strength Performance:**\n")
+                rs_perf = phase_metrics['relative_strength_performance']
+                if 'strong_rs' in rs_perf:
+                    report.append(
+                        f"- Strong RS (≥3%): {rs_perf['strong_rs']['win_rate']:.1f}% win rate, "
+                        f"{rs_perf['strong_rs']['avg_return']:.2f}% avg ({rs_perf['strong_rs']['count']} trades)\n"
+                    )
+                if 'weak_rs' in rs_perf:
+                    report.append(
+                        f"- Weak RS (<3%): {rs_perf['weak_rs']['win_rate']:.1f}% win rate, "
+                        f"{rs_perf['weak_rs']['avg_return']:.2f}% avg ({rs_perf['weak_rs']['count']} trades)\n"
+                    )
+                report.append("\n")
+
         # Strategy Effectiveness
-        report.append("\n## 🎯 STRATEGY EFFECTIVENESS\n\n")
+        report.append("## 🎯 STRATEGY EFFECTIVENESS\n\n")
         report.append(f"- **Status**: {strategy_eval.get('status', 'Unknown')}\n")
         if 'trend' in strategy_eval:
             report.append(f"- **Trend**: {strategy_eval['trend']}\n")
             report.append(f"- **First Half Avg Win Rate**: {strategy_eval['first_half_avg']:.1f}%\n")
             report.append(f"- **Second Half Avg Win Rate**: {strategy_eval['second_half_avg']:.1f}%\n")
         report.append(f"- **Recommendation**: {strategy_eval.get('recommendation', 'Continue')}\n")
-        
+
         # Best Practices
         if best_practices:
             report.append("\n## ✅ IDENTIFIED BEST PRACTICES\n\n")
@@ -260,7 +464,7 @@ class MonthlyLearning:
                 report.append(f"- **{practice['pattern']}**\n")
                 report.append(f"  - Evidence: {practice['evidence']}\n")
                 report.append(f"  - Action: {practice['action']}\n")
-        
+
         # Action Items
         report.append("\n## 📋 ACTION ITEMS FOR NEXT MONTH\n\n")
         report.append("1. Continue monitoring catalyst performance\n")
@@ -268,9 +472,9 @@ class MonthlyLearning:
         report.append("3. Implement any identified best practices\n")
         if strategy_eval.get('recommendation'):
             report.append(f"4. {strategy_eval['recommendation']}\n")
-        
-        report.append(f"\n*Auto-generated by Monthly Learning Engine*\n")
-        
+
+        report.append(f"\n*Auto-generated by Monthly Learning Engine (Phase 5 Enhanced)*\n")
+
         return ''.join(report)
     
     def append_to_lessons_learned(self, report):

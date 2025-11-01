@@ -39,8 +39,8 @@ class WeeklyLearning:
         return trades
     
     def analyze_catalyst_performance(self, trades):
-        """Deep analysis by catalyst type"""
-        
+        """Deep analysis by catalyst type (PHASE 5 ENHANCED)"""
+
         catalyst_stats = defaultdict(lambda: {
             'total': 0,
             'winners': 0,
@@ -50,42 +50,118 @@ class WeeklyLearning:
             'winner_hold_times': [],
             'loser_hold_times': []
         })
-        
+
+        # PHASE 5: Track new dimensions
+        tier_stats = defaultdict(lambda: {
+            'total': 0, 'winners': 0, 'returns': [], 'hold_times': []
+        })
+        conviction_stats = defaultdict(lambda: {
+            'total': 0, 'winners': 0, 'returns': [], 'hold_times': []
+        })
+        vix_regime_stats = defaultdict(lambda: {
+            'total': 0, 'winners': 0, 'returns': []
+        })
+        news_validation_stats = {
+            'high_score': {'total': 0, 'winners': 0, 'returns': []},  # >=10
+            'low_score': {'total': 0, 'winners': 0, 'returns': []},   # <10
+            'exits_triggered': 0,
+            'total_trades': 0
+        }
+        rs_stats = {
+            'strong_rs': {'total': 0, 'winners': 0, 'returns': []},  # >=3%
+            'weak_rs': {'total': 0, 'winners': 0, 'returns': []}     # <3%
+        }
+
         for trade in trades:
             catalyst = trade.get('Catalyst_Type', 'Unknown')
             return_pct = float(trade.get('Return_Percent', 0))
             hold_days = int(trade.get('Hold_Days', 0))
-            
+
             stats = catalyst_stats[catalyst]
             stats['total'] += 1
             stats['returns'].append(return_pct)
             stats['hold_times'].append(hold_days)
-            
-            if return_pct > 0:
+
+            is_winner = return_pct > 0
+
+            if is_winner:
                 stats['winners'] += 1
                 stats['winner_hold_times'].append(hold_days)
             else:
                 stats['losers'] += 1
                 stats['loser_hold_times'].append(hold_days)
+
+            # PHASE 5: Track tier performance
+            tier = trade.get('Catalyst_Tier', 'Unknown')
+            tier_stats[tier]['total'] += 1
+            tier_stats[tier]['returns'].append(return_pct)
+            tier_stats[tier]['hold_times'].append(hold_days)
+            if is_winner:
+                tier_stats[tier]['winners'] += 1
+
+            # PHASE 5: Track conviction performance
+            conviction = trade.get('Conviction_Level', 'MEDIUM')
+            conviction_stats[conviction]['total'] += 1
+            conviction_stats[conviction]['returns'].append(return_pct)
+            conviction_stats[conviction]['hold_times'].append(hold_days)
+            if is_winner:
+                conviction_stats[conviction]['winners'] += 1
+
+            # PHASE 5: Track VIX regime performance
+            vix_regime = trade.get('Market_Regime', 'UNKNOWN')
+            vix_regime_stats[vix_regime]['total'] += 1
+            vix_regime_stats[vix_regime]['returns'].append(return_pct)
+            if is_winner:
+                vix_regime_stats[vix_regime]['winners'] += 1
+
+            # PHASE 5: Track news validation effectiveness
+            news_validation_stats['total_trades'] += 1
+            news_score = float(trade.get('News_Validation_Score', 0))
+            if news_score >= 10:
+                news_validation_stats['high_score']['total'] += 1
+                news_validation_stats['high_score']['returns'].append(return_pct)
+                if is_winner:
+                    news_validation_stats['high_score']['winners'] += 1
+            else:
+                news_validation_stats['low_score']['total'] += 1
+                news_validation_stats['low_score']['returns'].append(return_pct)
+                if is_winner:
+                    news_validation_stats['low_score']['winners'] += 1
+
+            if trade.get('News_Exit_Triggered', '').lower() in ['true', '1', 'yes']:
+                news_validation_stats['exits_triggered'] += 1
+
+            # PHASE 5: Track relative strength effectiveness
+            rs_value = float(trade.get('Relative_Strength', 0))
+            if rs_value >= 3.0:
+                rs_stats['strong_rs']['total'] += 1
+                rs_stats['strong_rs']['returns'].append(return_pct)
+                if is_winner:
+                    rs_stats['strong_rs']['winners'] += 1
+            else:
+                rs_stats['weak_rs']['total'] += 1
+                rs_stats['weak_rs']['returns'].append(return_pct)
+                if is_winner:
+                    rs_stats['weak_rs']['winners'] += 1
         
         # Calculate metrics
         results = {}
         for catalyst, stats in catalyst_stats.items():
             if stats['total'] == 0:
                 continue
-            
+
             win_rate = (stats['winners'] / stats['total']) * 100
             avg_return = statistics.mean(stats['returns'])
             median_return = statistics.median(stats['returns'])
             avg_hold = statistics.mean(stats['hold_times']) if stats['hold_times'] else 0
-            
+
             avg_winner_hold = statistics.mean(stats['winner_hold_times']) if stats['winner_hold_times'] else 0
             avg_loser_hold = statistics.mean(stats['loser_hold_times']) if stats['loser_hold_times'] else 0
-            
+
             # Best and worst trades
             best_trade = max(stats['returns']) if stats['returns'] else 0
             worst_trade = min(stats['returns']) if stats['returns'] else 0
-            
+
             results[catalyst] = {
                 'total_trades': stats['total'],
                 'winners': stats['winners'],
@@ -100,7 +176,77 @@ class WeeklyLearning:
                 'avg_loser_hold': avg_loser_hold,
                 'optimal_exit_day': round(avg_winner_hold) if avg_winner_hold > 0 else 0
             }
-        
+
+        # PHASE 5: Add new dimensions to results
+        results['_phase_metrics'] = {
+            'tier_performance': {},
+            'conviction_performance': {},
+            'vix_regime_performance': {},
+            'news_validation_performance': {},
+            'relative_strength_performance': {}
+        }
+
+        # Tier performance
+        for tier, stats in tier_stats.items():
+            if stats['total'] > 0:
+                results['_phase_metrics']['tier_performance'][tier] = {
+                    'win_rate': (stats['winners'] / stats['total'] * 100),
+                    'avg_return': statistics.mean(stats['returns']),
+                    'avg_hold': statistics.mean(stats['hold_times']) if stats['hold_times'] else 0,
+                    'count': stats['total']
+                }
+
+        # Conviction performance
+        for conv, stats in conviction_stats.items():
+            if stats['total'] > 0:
+                results['_phase_metrics']['conviction_performance'][conv] = {
+                    'win_rate': (stats['winners'] / stats['total'] * 100),
+                    'avg_return': statistics.mean(stats['returns']),
+                    'avg_hold': statistics.mean(stats['hold_times']) if stats['hold_times'] else 0,
+                    'count': stats['total']
+                }
+
+        # VIX regime performance
+        for regime, stats in vix_regime_stats.items():
+            if stats['total'] > 0:
+                results['_phase_metrics']['vix_regime_performance'][regime] = {
+                    'win_rate': (stats['winners'] / stats['total'] * 100),
+                    'avg_return': statistics.mean(stats['returns']),
+                    'count': stats['total']
+                }
+
+        # News validation performance
+        if news_validation_stats['high_score']['total'] > 0:
+            results['_phase_metrics']['news_validation_performance']['high_score'] = {
+                'win_rate': (news_validation_stats['high_score']['winners'] / news_validation_stats['high_score']['total'] * 100),
+                'avg_return': statistics.mean(news_validation_stats['high_score']['returns']),
+                'count': news_validation_stats['high_score']['total']
+            }
+        if news_validation_stats['low_score']['total'] > 0:
+            results['_phase_metrics']['news_validation_performance']['low_score'] = {
+                'win_rate': (news_validation_stats['low_score']['winners'] / news_validation_stats['low_score']['total'] * 100),
+                'avg_return': statistics.mean(news_validation_stats['low_score']['returns']),
+                'count': news_validation_stats['low_score']['total']
+            }
+        results['_phase_metrics']['news_validation_performance']['exit_rate'] = (
+            (news_validation_stats['exits_triggered'] / news_validation_stats['total_trades'] * 100)
+            if news_validation_stats['total_trades'] > 0 else 0
+        )
+
+        # Relative strength performance
+        if rs_stats['strong_rs']['total'] > 0:
+            results['_phase_metrics']['relative_strength_performance']['strong_rs'] = {
+                'win_rate': (rs_stats['strong_rs']['winners'] / rs_stats['strong_rs']['total'] * 100),
+                'avg_return': statistics.mean(rs_stats['strong_rs']['returns']),
+                'count': rs_stats['strong_rs']['total']
+            }
+        if rs_stats['weak_rs']['total'] > 0:
+            results['_phase_metrics']['relative_strength_performance']['weak_rs'] = {
+                'win_rate': (rs_stats['weak_rs']['winners'] / rs_stats['weak_rs']['total'] * 100),
+                'avg_return': statistics.mean(rs_stats['weak_rs']['returns']),
+                'count': rs_stats['weak_rs']['total']
+            }
+
         return results
     
     def calculate_optimal_parameters(self, trades):
@@ -216,38 +362,114 @@ class WeeklyLearning:
         print(f"   ✓ Updated catalyst_performance.csv")
     
     def generate_weekly_insights(self, catalyst_perf, optimal_params, day_analysis):
-        """Generate comprehensive weekly insights"""
-        
+        """Generate comprehensive weekly insights (PHASE 5 ENHANCED)"""
+
         insights = []
         insights.append(f"\n\n{'='*80}\n")
         insights.append(f"# WEEKLY LEARNING UPDATE - {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
-        
+
         # Top performers
         insights.append("## 🏆 TOP PERFORMING CATALYSTS\n\n")
-        sorted_catalysts = sorted(catalyst_perf.items(), key=lambda x: x[1]['win_rate'], reverse=True)
-        
+        sorted_catalysts = sorted(
+            [(k, v) for k, v in catalyst_perf.items() if k != '_phase_metrics'],
+            key=lambda x: x[1]['win_rate'],
+            reverse=True
+        )
+
         for catalyst, stats in sorted_catalysts[:3]:
             if stats['total_trades'] >= 5:
                 insights.append(f"- **{catalyst}**: {stats['win_rate']:.1f}% win rate over {stats['total_trades']} trades\n")
                 insights.append(f"  - Avg hold: {stats['avg_hold_days']:.1f} days (optimal exit: day {stats['optimal_exit_day']})\n")
                 insights.append(f"  - Best trade: +{stats['best_trade']:.1f}%, Worst: {stats['worst_trade']:.1f}%\n")
-        
+
         # Worst performers
         insights.append("\n## ⚠️ UNDERPERFORMING CATALYSTS\n\n")
         for catalyst, stats in reversed(sorted_catalysts[-3:]):
             if stats['total_trades'] >= 5:
                 insights.append(f"- **{catalyst}**: {stats['win_rate']:.1f}% win rate over {stats['total_trades']} trades\n")
-        
+
+        # PHASE 5: Add new performance dimensions
+        if '_phase_metrics' in catalyst_perf:
+            phase_metrics = catalyst_perf['_phase_metrics']
+
+            insights.append("\n## 📈 PHASE 1-4 PERFORMANCE (All-Time)\n\n")
+
+            # Tier performance
+            if phase_metrics['tier_performance']:
+                insights.append("**Catalyst Tier Performance:**\n")
+                for tier, stats in sorted(phase_metrics['tier_performance'].items()):
+                    insights.append(
+                        f"- {tier}: {stats['win_rate']:.1f}% win rate, "
+                        f"{stats['avg_return']:.2f}% avg, "
+                        f"{stats['avg_hold']:.1f} day hold "
+                        f"({stats['count']} trades)\n"
+                    )
+                insights.append("\n")
+
+            # Conviction performance
+            if phase_metrics['conviction_performance']:
+                insights.append("**Conviction Performance:**\n")
+                for conv, stats in sorted(phase_metrics['conviction_performance'].items(), reverse=True):
+                    insights.append(
+                        f"- {conv}: {stats['win_rate']:.1f}% win rate, "
+                        f"{stats['avg_return']:.2f}% avg, "
+                        f"{stats['avg_hold']:.1f} day hold "
+                        f"({stats['count']} trades)\n"
+                    )
+                insights.append("\n")
+
+            # VIX regime performance
+            if phase_metrics['vix_regime_performance']:
+                insights.append("**VIX Regime Performance:**\n")
+                for regime, stats in sorted(phase_metrics['vix_regime_performance'].items()):
+                    insights.append(
+                        f"- {regime}: {stats['win_rate']:.1f}% win rate, "
+                        f"{stats['avg_return']:.2f}% avg ({stats['count']} trades)\n"
+                    )
+                insights.append("\n")
+
+            # News validation performance
+            if phase_metrics['news_validation_performance']:
+                insights.append("**News Validation Performance:**\n")
+                news_perf = phase_metrics['news_validation_performance']
+                if 'high_score' in news_perf:
+                    insights.append(
+                        f"- High Score (≥10): {news_perf['high_score']['win_rate']:.1f}% win rate, "
+                        f"{news_perf['high_score']['avg_return']:.2f}% avg ({news_perf['high_score']['count']} trades)\n"
+                    )
+                if 'low_score' in news_perf:
+                    insights.append(
+                        f"- Low Score (<10): {news_perf['low_score']['win_rate']:.1f}% win rate, "
+                        f"{news_perf['low_score']['avg_return']:.2f}% avg ({news_perf['low_score']['count']} trades)\n"
+                    )
+                insights.append(f"- News Exit Rate: {news_perf['exit_rate']:.1f}%\n\n")
+
+            # Relative strength performance
+            if phase_metrics['relative_strength_performance']:
+                insights.append("**Relative Strength Performance:**\n")
+                rs_perf = phase_metrics['relative_strength_performance']
+                if 'strong_rs' in rs_perf:
+                    insights.append(
+                        f"- Strong RS (≥3%): {rs_perf['strong_rs']['win_rate']:.1f}% win rate, "
+                        f"{rs_perf['strong_rs']['avg_return']:.2f}% avg ({rs_perf['strong_rs']['count']} trades)\n"
+                    )
+                if 'weak_rs' in rs_perf:
+                    insights.append(
+                        f"- Weak RS (<3%): {rs_perf['weak_rs']['win_rate']:.1f}% win rate, "
+                        f"{rs_perf['weak_rs']['avg_return']:.2f}% avg ({rs_perf['weak_rs']['count']} trades)\n"
+                    )
+                insights.append("\n")
+
         # Optimal parameters
         if optimal_params:
-            insights.append("\n## 📊 OPTIMAL PARAMETERS (DATA-DRIVEN)\n\n")
+            insights.append("## 📊 OPTIMAL PARAMETERS (DATA-DRIVEN)\n\n")
             insights.append(f"- **Optimal Stop Loss**: -{optimal_params['optimal_stop_loss']:.1f}%\n")
             insights.append(f"- **Optimal Profit Target**: +{optimal_params['optimal_profit_target']:.1f}%\n")
             insights.append(f"- **Risk/Reward Ratio**: {optimal_params['risk_reward_ratio']:.2f}:1\n")
             insights.append(f"- **Median Winner**: +{optimal_params['median_winner']:.1f}%\n")
             insights.append(f"- **Median Loser**: {optimal_params['median_loser']:.1f}%\n")
             insights.append(f"- **Recommendation**: {optimal_params['recommendation']}\n")
-        
+
         # Entry timing
         if day_analysis:
             insights.append("\n## 📅 ENTRY TIMING ANALYSIS\n\n")
@@ -255,9 +477,9 @@ class WeeklyLearning:
             for day, stats in sorted_days:
                 if stats['total_trades'] >= 3:
                     insights.append(f"- **{day}**: {stats['win_rate']:.1f}% win rate ({stats['total_trades']} trades)\n")
-        
-        insights.append(f"\n*Auto-generated by Weekly Learning Engine*\n")
-        
+
+        insights.append(f"\n*Auto-generated by Weekly Learning Engine (Phase 5 Enhanced)*\n")
+
         return ''.join(insights)
     
     def append_to_lessons_learned(self, insights):

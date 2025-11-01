@@ -39,15 +39,15 @@ class DailyLearning:
         return trades
     
     def analyze_recent_performance(self, trades, days=7):
-        """Analyze last N days of trades for quick pattern detection"""
-        
+        """Analyze last N days of trades for quick pattern detection (PHASE 5 ENHANCED)"""
+
         if not trades:
             return {}
-        
+
         # Filter to recent trades
         cutoff_date = datetime.now() - timedelta(days=days)
         recent_trades = []
-        
+
         for trade in trades:
             try:
                 exit_date = datetime.strptime(trade.get('Exit_Date', ''), '%Y-%m-%d')
@@ -55,7 +55,7 @@ class DailyLearning:
                     recent_trades.append(trade)
             except:
                 continue
-        
+
         # Analyze by catalyst
         catalyst_stats = defaultdict(lambda: {
             'total': 0,
@@ -63,26 +63,49 @@ class DailyLearning:
             'losers': 0,
             'returns': []
         })
-        
+
+        # PHASE 5: Track new metrics
+        tier_stats = defaultdict(lambda: {'total': 0, 'winners': 0, 'returns': []})
+        conviction_stats = defaultdict(lambda: {'total': 0, 'winners': 0, 'returns': []})
+        news_exits = {'count': 0, 'total_trades': len(recent_trades)}
+
         for trade in recent_trades:
             catalyst = trade.get('Catalyst_Type', 'Unknown')
             return_pct = float(trade.get('Return_Percent', 0))
-            
+
             stats = catalyst_stats[catalyst]
             stats['total'] += 1
             stats['returns'].append(return_pct)
-            
+
             if return_pct > 0:
                 stats['winners'] += 1
             else:
                 stats['losers'] += 1
-        
+
+            # PHASE 2: Track tier performance
+            tier = trade.get('Catalyst_Tier', 'Unknown')
+            tier_stats[tier]['total'] += 1
+            tier_stats[tier]['returns'].append(return_pct)
+            if return_pct > 0:
+                tier_stats[tier]['winners'] += 1
+
+            # PHASE 4: Track conviction performance
+            conviction = trade.get('Conviction_Level', 'MEDIUM')
+            conviction_stats[conviction]['total'] += 1
+            conviction_stats[conviction]['returns'].append(return_pct)
+            if return_pct > 0:
+                conviction_stats[conviction]['winners'] += 1
+
+            # PHASE 1: Track news exit triggers
+            if trade.get('News_Exit_Triggered', '').lower() in ['true', '1', 'yes']:
+                news_exits['count'] += 1
+
         # Calculate win rates
         results = {}
         for catalyst, stats in catalyst_stats.items():
             win_rate = (stats['winners'] / stats['total']) * 100 if stats['total'] > 0 else 0
             avg_return = sum(stats['returns']) / len(stats['returns']) if stats['returns'] else 0
-            
+
             results[catalyst] = {
                 'total_trades': stats['total'],
                 'winners': stats['winners'],
@@ -91,7 +114,20 @@ class DailyLearning:
                 'avg_return': avg_return,
                 'last_7_days': True
             }
-        
+
+        # PHASE 5: Add new dimensions to results
+        results['_phase_metrics'] = {
+            'tier_performance': {tier: {'win_rate': (s['winners']/s['total']*100) if s['total'] > 0 else 0,
+                                        'avg_return': sum(s['returns'])/len(s['returns']) if s['returns'] else 0,
+                                        'count': s['total']}
+                                for tier, s in tier_stats.items()},
+            'conviction_performance': {conv: {'win_rate': (s['winners']/s['total']*100) if s['total'] > 0 else 0,
+                                              'avg_return': sum(s['returns'])/len(s['returns']) if s['returns'] else 0,
+                                              'count': s['total']}
+                                      for conv, s in conviction_stats.items()},
+            'news_exit_rate': (news_exits['count'] / news_exits['total_trades'] * 100) if news_exits['total_trades'] > 0 else 0
+        }
+
         return results
     
     def analyze_all_time_performance(self, trades):
@@ -249,36 +285,59 @@ class DailyLearning:
         
         print(f"   ✓ Updated strategy_rules.md with {len(exclusions)} exclusions")
     
-    def append_learning_insights(self, all_time_stats, exclusions, warnings):
-        """Append insights to lessons_learned.md"""
-        
+    def append_learning_insights(self, all_time_stats, exclusions, warnings, recent_stats=None):
+        """Append insights to lessons_learned.md (PHASE 5 ENHANCED)"""
+
         insights = []
         insights.append(f"\n\n{'='*80}\n")
         insights.append(f"# DAILY LEARNING UPDATE - {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
-        
+
         if exclusions:
             insights.append("## 🚫 NEW EXCLUSIONS\n\n")
             for ex in exclusions:
                 insights.append(f"- **{ex['catalyst']}** excluded: {ex['win_rate']:.1f}% win rate over {ex['total_trades']} trades\n")
-        
+
         if warnings:
             insights.append("\n## ⚠️ PERFORMANCE WARNINGS\n\n")
             for w in warnings:
                 insights.append(f"- **{w['catalyst']}**: Recent {w['recent_win_rate']:.1f}% win rate (last 7 days) vs {w['all_time_win_rate']:.1f}% all-time\n")
-        
+
+        # PHASE 5: Add new metrics if available
+        if recent_stats and '_phase_metrics' in recent_stats:
+            phase_metrics = recent_stats['_phase_metrics']
+
+            insights.append("\n## 📈 PHASE 1-4 PERFORMANCE (Last 7 Days)\n\n")
+
+            # Tier performance
+            if phase_metrics['tier_performance']:
+                insights.append("**Catalyst Tier Performance:**\n")
+                for tier, stats in sorted(phase_metrics['tier_performance'].items()):
+                    insights.append(f"- {tier}: {stats['win_rate']:.1f}% win rate, {stats['avg_return']:.2f}% avg ({stats['count']} trades)\n")
+                insights.append("\n")
+
+            # Conviction performance
+            if phase_metrics['conviction_performance']:
+                insights.append("**Conviction Performance:**\n")
+                for conv, stats in sorted(phase_metrics['conviction_performance'].items(), reverse=True):
+                    insights.append(f"- {conv}: {stats['win_rate']:.1f}% win rate, {stats['avg_return']:.2f}% avg ({stats['count']} trades)\n")
+                insights.append("\n")
+
+            # News exits
+            insights.append(f"**News Exit Rate:** {phase_metrics['news_exit_rate']:.1f}% (Phase 1 invalidation system)\n\n")
+
         if all_time_stats:
             insights.append("\n## 📊 CURRENT PERFORMANCE BY CATALYST\n\n")
             sorted_catalysts = sorted(all_time_stats.items(), key=lambda x: x[1]['win_rate'], reverse=True)
-            
+
             for catalyst, stats in sorted_catalysts:
                 insights.append(f"- **{catalyst}**: {stats['win_rate']:.1f}% ({stats['winners']}/{stats['total_trades']} wins) - {stats['confidence']} confidence\n")
-        
-        insights.append(f"\n*Auto-generated by Daily Learning Engine*\n")
-        
+
+        insights.append(f"\n*Auto-generated by Daily Learning Engine (Phase 5 Enhanced)*\n")
+
         # Append to lessons_learned.md
         with open(self.lessons_file, 'a') as f:
             f.write(''.join(insights))
-        
+
         print(f"   ✓ Appended insights to lessons_learned.md")
     
     def run_learning_cycle(self):
@@ -338,9 +397,9 @@ class DailyLearning:
         self.update_strategy_rules(exclusions)
         print()
         
-        # Append insights
+        # Append insights (PHASE 5: pass recent_stats)
         print("7. Documenting learning insights...")
-        self.append_learning_insights(all_time_stats, exclusions, warnings)
+        self.append_learning_insights(all_time_stats, exclusions, warnings, recent_stats)
         print()
         
         # Summary
