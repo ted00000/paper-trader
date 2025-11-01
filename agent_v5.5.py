@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.5.0 - ALL 5 PHASES COMPLETE
+Paper Trading Lab - Agent v5.6.0 - COMPOUND GROWTH ENABLED
 SWING TRADING SYSTEM WITH INTELLIGENT LEARNING & OPTIMIZATION
 
 MAJOR IMPROVEMENTS FROM v4.3:
@@ -9,6 +9,16 @@ MAJOR IMPROVEMENTS FROM v4.3:
 3. HOLD/EXIT/BUY decision logic instead of daily portfolio rebuild
 4. Leverages Polygon.io 15-min delayed data for premarket gap analysis
 5. True swing trading: positions held 3-7 days unless stops/targets hit
+
+v5.6.0 - COMPOUND GROWTH (2025-10-31):
+** CRITICAL FIX: Position sizing now compounds with account growth **
+- Position sizes now calculated from CURRENT account value (not fixed $1000)
+- Example: With +$100 profit, 10% position = $110 (not $100)
+- Losses also reduce position sizes proportionally
+- Formula: position_size = (pct / 100) * (STARTING_CAPITAL + realized_pl)
+- Cash tracking prevents over-allocation
+- Money earns money - exponential growth potential enabled
+- FIXED: Previous version left profits in cash without reinvestment
 
 v5.5.0 - PHASE 5: LEARNING ENHANCEMENTS (2025-10-31):
 ** FINAL PHASE - COMPLETE SYSTEM **
@@ -2946,6 +2956,27 @@ RECENT LESSONS LEARNED:
         # Process BUYS
         print("\n5. Entering NEW positions...")
         if buy_positions:
+            # Calculate current account value for position sizing (COMPOUND GROWTH)
+            STARTING_CAPITAL = 1000.00
+            portfolio_value = sum(p.get('position_size', 0) for p in updated_positions)
+
+            # Calculate realized P&L from completed trades
+            realized_pl = 0.00
+            if self.trades_csv.exists():
+                with open(self.trades_csv, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('Trade_ID'):
+                            realized_pl += float(row.get('Return_Dollars', 0))
+
+            # Current account value = starting capital + all profits/losses
+            current_account_value = STARTING_CAPITAL + realized_pl
+
+            # Cash available = account value - currently invested positions
+            cash_available = current_account_value - portfolio_value
+
+            print(f"   Account Value: ${current_account_value:.2f} (Cash: ${cash_available:.2f}, Invested: ${portfolio_value:.2f})")
+
             buy_tickers = [p['ticker'] for p in buy_positions]
             market_prices = self.fetch_current_prices(buy_tickers)
 
@@ -2953,18 +2984,32 @@ RECENT LESSONS LEARNED:
                 ticker = pos['ticker']
                 if ticker in market_prices:
                     entry_price = market_prices[ticker]
+
+                    # COMPOUND GROWTH: Calculate position size based on CURRENT account value
+                    position_size_pct = pos.get('position_size_pct', 10.0)
+                    position_size_dollars = round((position_size_pct / 100) * current_account_value, 2)
+
+                    # Ensure we don't exceed available cash
+                    if position_size_dollars > cash_available:
+                        position_size_dollars = round(cash_available, 2)
+                        print(f"   ⚠️ {ticker}: Reduced size to available cash ${cash_available:.2f}")
+
                     pos['entry_price'] = entry_price
                     pos['current_price'] = entry_price
                     pos['entry_date'] = datetime.now().strftime('%Y-%m-%d')
                     pos['days_held'] = 0
-                    pos['shares'] = pos.get('position_size', 100) / entry_price
+                    pos['position_size'] = position_size_dollars  # Store actual dollar amount
+                    pos['shares'] = position_size_dollars / entry_price
                     pos['stop_loss'] = round(entry_price * 0.93, 2)  # -7%
                     pos['price_target'] = round(entry_price * 1.10, 2)  # +10%
                     pos['unrealized_gain_pct'] = 0.0
                     pos['unrealized_gain_dollars'] = 0.0
 
+                    # Update cash available for next position
+                    cash_available -= position_size_dollars
+
                     updated_positions.append(pos)
-                    print(f"   ✓ ENTERED {ticker}: ${entry_price:.2f}, {pos['shares']:.2f} shares")
+                    print(f"   ✓ ENTERED {ticker}: ${entry_price:.2f}, {pos['shares']:.2f} shares (${position_size_dollars:.2f} = {position_size_pct}% of ${current_account_value:.2f})")
                 else:
                     print(f"   ⚠️ {ticker}: Failed to fetch price")
         else:
