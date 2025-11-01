@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.3.0 - PHASES 1-3: NEWS + TIERS + VIX/MACRO
-SWING TRADING SYSTEM WITH REGIME-AWARE VALIDATION
+Paper Trading Lab - Agent v5.4.0 - PHASES 1-4: COMPLETE VALIDATION SYSTEM
+SWING TRADING SYSTEM WITH CONVICTION-BASED SIZING & SECTOR LEADERSHIP
 
 MAJOR IMPROVEMENTS FROM v4.3:
 1. GO command reviews EXISTING portfolio with 15-min delayed premarket data
@@ -9,6 +9,34 @@ MAJOR IMPROVEMENTS FROM v4.3:
 3. HOLD/EXIT/BUY decision logic instead of daily portfolio rebuild
 4. Leverages Polygon.io 15-min delayed data for premarket gap analysis
 5. True swing trading: positions held 3-7 days unless stops/targets hit
+
+v5.4.0 - PHASE 4: CONVICTION SIZING + RELATIVE STRENGTH (2025-10-31):
+** MAJOR FEATURE RELEASE **
+- Implemented relative strength calculator (3-month performance vs sector)
+  - get_3month_return(): Fetches 90-day returns from Polygon.io
+  - calculate_relative_strength(): Stock vs sector ETF comparison
+  - SECTOR_ETF_MAP: All 11 S&P sectors mapped to ETFs
+  - REQUIRED FILTER: Stock must outperform sector by ≥3%
+- Implemented conviction-based position sizing system
+  - calculate_conviction_level(): Determines HIGH/MEDIUM-HIGH/MEDIUM/SKIP
+  - Supporting factors: Tier1, News≥10, VIX<30, RS≥3%, Multi-catalyst
+  - Position sizes: HIGH 13%, MEDIUM-HIGH 11%, MEDIUM 10%, SKIP 0%
+  - 5+ factors + News≥15 + VIX<25 → HIGH conviction
+  - 4+ factors + News≥10 + VIX<30 → MEDIUM-HIGH conviction
+  - 3+ factors + News≥5 + VIX<30 → MEDIUM conviction
+- GO command Phase 4 integration:
+  - Calculates relative strength for each BUY recommendation
+  - Auto-rejects if RS <3% (sector laggards filtered out)
+  - Calculates conviction level based on all factors
+  - Position size determined by conviction (overrides Phase 2 tier sizing)
+  - Prints detailed validation: RS%, conviction, supporting factors
+- Enhanced CSV tracking with 5 new columns:
+  - Relative_Strength (stock vs sector %)
+  - Stock_Return_3M (90-day return %)
+  - Sector_ETF (which ETF used for comparison)
+  - Conviction_Level (HIGH/MEDIUM-HIGH/MEDIUM/SKIP)
+  - Supporting_Factors (count 0-5+)
+- Designed per MASTER_STRATEGY_BLUEPRINT Phase 4 specifications
 
 v5.3.0 - PHASE 3: VIX FILTER + MACRO CALENDAR (2025-10-31):
 ** MAJOR FEATURE RELEASE **
@@ -1339,6 +1367,199 @@ POSITION {i}: {ticker}
         }
 
     # =====================================================================
+    # RELATIVE STRENGTH + CONVICTION SIZING (Phase 4)
+    # =====================================================================
+
+    # Sector to ETF mapping (11 S&P sectors)
+    SECTOR_ETF_MAP = {
+        'Technology': 'XLK',
+        'Healthcare': 'XLV',
+        'Financials': 'XLF',
+        'Consumer Discretionary': 'XLY',
+        'Industrials': 'XLI',
+        'Consumer Staples': 'XLP',
+        'Energy': 'XLE',
+        'Utilities': 'XLU',
+        'Real Estate': 'XLRE',
+        'Materials': 'XLB',
+        'Communication Services': 'XLC'
+    }
+
+    def get_3month_return(self, ticker):
+        """
+        Get 3-month return for a ticker using Polygon.io
+
+        Returns: Float (percentage return over 3 months, e.g., 15.5 = +15.5%)
+        """
+        if not POLYGON_API_KEY:
+            return 0.0  # Can't calculate without API
+
+        try:
+            from datetime import timedelta
+
+            # Calculate date range (90 days ago to today)
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=90)
+
+            # Format dates for Polygon API
+            start_str = start_date.strftime('%Y-%m-%d')
+            end_str = end_date.strftime('%Y-%m-%d')
+
+            # Use aggregates (bars) endpoint for historical data
+            # Get first bar (90 days ago) and last bar (today)
+            url = f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_str}/{end_str}?apiKey={POLYGON_API_KEY}'
+            response = requests.get(url, timeout=15)
+            data = response.json()
+
+            if data.get('status') == 'OK' and 'results' in data and len(data['results']) >= 2:
+                results = data['results']
+
+                # First close (90 days ago) and last close (today)
+                first_close = results[0]['c']
+                last_close = results[-1]['c']
+
+                # Calculate percentage return
+                return_pct = ((last_close - first_close) / first_close) * 100
+                return round(return_pct, 2)
+
+            return 0.0  # Not enough data
+
+        except Exception as e:
+            print(f"   ⚠️ Error calculating 3M return for {ticker}: {e}")
+            return 0.0
+
+    def calculate_relative_strength(self, ticker, sector):
+        """
+        Calculate stock's 3-month performance vs its sector ETF
+
+        Args:
+            ticker: Stock ticker
+            sector: Sector name (e.g., 'Technology', 'Healthcare')
+
+        Returns:
+            {
+                'relative_strength': float (e.g., 5.2 = outperforming sector by 5.2%),
+                'stock_return_3m': float,
+                'sector_return_3m': float,
+                'sector_etf': str,
+                'passed_filter': bool (True if RS ≥3%)
+            }
+        """
+
+        # Get sector ETF
+        sector_etf = self.SECTOR_ETF_MAP.get(sector, 'SPY')  # Default to S&P 500 if unknown sector
+
+        # Calculate returns
+        stock_return = self.get_3month_return(ticker)
+        sector_return = self.get_3month_return(sector_etf)
+
+        # Relative strength = stock return - sector return
+        relative_strength = stock_return - sector_return
+
+        return {
+            'relative_strength': round(relative_strength, 2),
+            'stock_return_3m': stock_return,
+            'sector_return_3m': sector_return,
+            'sector_etf': sector_etf,
+            'passed_filter': relative_strength >= 3.0  # Required threshold
+        }
+
+    def calculate_conviction_level(self, catalyst_tier, news_score, vix, relative_strength, multi_catalyst=False):
+        """
+        Determine conviction level based on multiple factors
+
+        Conviction levels determine position sizing:
+        - HIGH: 13% (12-15% range)
+        - MEDIUM-HIGH: 11%
+        - MEDIUM: 10% (standard)
+        - SKIP: 0% (do not enter)
+
+        Args:
+            catalyst_tier: 'Tier1', 'Tier2', or 'Tier3'
+            news_score: News validation score (0-20)
+            vix: VIX level
+            relative_strength: Stock's 3M performance vs sector (%)
+            multi_catalyst: Boolean, are there multiple catalysts?
+
+        Returns:
+            {
+                'conviction': str ('HIGH' | 'MEDIUM-HIGH' | 'MEDIUM' | 'SKIP'),
+                'position_size_pct': float (0-13%),
+                'reasoning': str,
+                'supporting_factors': int (count of positive factors)
+            }
+        """
+
+        supporting_factors = 0
+        reasoning_parts = []
+
+        # Count supporting factors
+        if catalyst_tier == 'Tier1':
+            supporting_factors += 1
+            reasoning_parts.append('Tier 1 catalyst')
+
+        if news_score >= 15:
+            supporting_factors += 1
+            reasoning_parts.append(f'Strong news ({news_score}/20)')
+        elif news_score >= 10:
+            supporting_factors += 1
+            reasoning_parts.append(f'Good news ({news_score}/20)')
+
+        if vix < 25:
+            supporting_factors += 1
+            reasoning_parts.append(f'Low VIX ({vix})')
+        elif vix < 30:
+            reasoning_parts.append(f'Moderate VIX ({vix})')
+
+        if relative_strength >= 3.0:
+            supporting_factors += 1
+            reasoning_parts.append(f'Sector leader (RS +{relative_strength:.1f}%)')
+
+        if multi_catalyst:
+            supporting_factors += 1
+            reasoning_parts.append('Multi-catalyst synergy')
+
+        # REQUIRED FILTERS (auto-reject if failed)
+        if relative_strength < 3.0:
+            return {
+                'conviction': 'SKIP',
+                'position_size_pct': 0.0,
+                'reasoning': f'Failed RS filter ({relative_strength:.1f}% <3%)',
+                'supporting_factors': supporting_factors
+            }
+
+        if catalyst_tier != 'Tier1':
+            return {
+                'conviction': 'SKIP',
+                'position_size_pct': 0.0,
+                'reasoning': f'Not Tier 1 ({catalyst_tier})',
+                'supporting_factors': supporting_factors
+            }
+
+        # CONVICTION DETERMINATION (based on supporting factors)
+        if supporting_factors >= 5 and news_score >= 15 and vix < 25:
+            conviction = 'HIGH'
+            position_size = 13.0
+        elif supporting_factors >= 4 and news_score >= 10 and vix < 30:
+            conviction = 'MEDIUM-HIGH'
+            position_size = 11.0
+        elif supporting_factors >= 3 and news_score >= 5 and vix < 30:
+            conviction = 'MEDIUM'
+            position_size = 10.0
+        else:
+            conviction = 'SKIP'
+            position_size = 0.0
+
+        reasoning = ', '.join(reasoning_parts) if reasoning_parts else 'Insufficient factors'
+
+        return {
+            'conviction': conviction,
+            'position_size_pct': position_size,
+            'reasoning': reasoning,
+            'supporting_factors': supporting_factors
+        }
+
+    # =====================================================================
     # CLAUDE API INTEGRATION
     # =====================================================================
     
@@ -1964,7 +2185,9 @@ RECENT LESSONS LEARNED:
                     'Exit_Reason', 'Catalyst_Type', 'Catalyst_Tier', 'Catalyst_Age_Days',
                     'News_Validation_Score', 'News_Exit_Triggered',
                     'VIX_At_Entry', 'Market_Regime', 'Macro_Event_Near',
-                    'Sector', 'Confidence_Level', 'Stop_Loss', 'Price_Target',
+                    'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
+                    'Conviction_Level', 'Supporting_Factors',
+                    'Sector', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After'
                 ])
 
@@ -1994,8 +2217,12 @@ RECENT LESSONS LEARNED:
                 trade_data.get('vix_at_entry', 0.0),
                 trade_data.get('market_regime', 'Unknown'),
                 trade_data.get('macro_event_near', 'None'),
+                trade_data.get('relative_strength', 0.0),
+                trade_data.get('stock_return_3m', 0.0),
+                trade_data.get('sector_etf', 'Unknown'),
+                trade_data.get('conviction_level', 'MEDIUM'),
+                trade_data.get('supporting_factors', 0),
                 trade_data.get('sector', ''),
-                trade_data.get('confidence_level', ''),
                 trade_data.get('stop_loss', 0),
                 trade_data.get('price_target', 0),
                 trade_data.get('thesis', ''),
@@ -2237,9 +2464,9 @@ RECENT LESSONS LEARNED:
 
         print()
 
-        # Step 5.5: PHASE 1 & 2 & 3 - Validate BUY recommendations
+        # Step 5.5: PHASE 1-4 - Validate BUY recommendations
         if buy_positions and can_enter_positions:
-            print("5.5 Validating BUY recommendations (Phase 1: News + Phase 2: Catalyst Tiers)...")
+            print("5.5 Validating BUY recommendations (Phases 1-4: Full validation pipeline)...")
             validated_buys = []
 
             for buy_pos in buy_positions:
@@ -2247,6 +2474,7 @@ RECENT LESSONS LEARNED:
                 catalyst_type = buy_pos.get('catalyst', 'Unknown')
                 catalyst_age = buy_pos.get('catalyst_age_days', 0)
                 catalyst_details = buy_pos.get('catalyst_details', {})
+                sector = buy_pos.get('sector', 'Unknown')
 
                 validation_passed = True
                 rejection_reasons = []
@@ -2292,27 +2520,54 @@ RECENT LESSONS LEARNED:
                             validation_passed = False
                             rejection_reasons.append(f"VIX {vix_result['vix']} - requires Tier1 + News≥15")
 
+                    # PHASE 4: Relative Strength + Conviction Sizing
+                    rs_result = self.calculate_relative_strength(ticker, sector)
+
+                    # Check relative strength filter (≥3% required)
+                    if not rs_result['passed_filter']:
+                        validation_passed = False
+                        rejection_reasons.append(f"Failed RS filter ({rs_result['relative_strength']:.1f}% <3%)")
+
+                    # Calculate conviction level (determines final position size)
+                    multi_catalyst = catalyst_type == 'Multi_Catalyst' or catalyst_details.get('multi_catalyst', False)
+                    conviction_result = self.calculate_conviction_level(
+                        catalyst_tier=tier_result['tier'],
+                        news_score=news_result['score'],
+                        vix=vix_result['vix'],
+                        relative_strength=rs_result['relative_strength'],
+                        multi_catalyst=multi_catalyst
+                    )
+
+                    # Conviction may downgrade to SKIP based on factors
+                    if conviction_result['conviction'] == 'SKIP':
+                        validation_passed = False
+                        rejection_reasons.append(f"Conviction: {conviction_result['reasoning']}")
+
                     # If all validations pass, accept the position
                     if validation_passed:
-                        # Enrich position with tier data + Phase 3 data
+                        # Enrich position with all Phase data (1-4)
                         buy_pos['catalyst_tier'] = tier_result['tier']
                         buy_pos['tier_name'] = tier_result['tier_name']
                         buy_pos['tier_reasoning'] = tier_result['reasoning']
-                        buy_pos['position_size_pct'] = tier_result['position_size_pct']
-                        buy_pos['target_pct'] = tier_result['target_pct']
                         buy_pos['news_score'] = news_result['score']
                         buy_pos['vix_at_entry'] = vix_result['vix']
                         buy_pos['market_regime'] = vix_result['regime']
                         buy_pos['macro_event_near'] = macro_result['event_type'] or 'None'
+                        buy_pos['relative_strength'] = rs_result['relative_strength']
+                        buy_pos['stock_return_3m'] = rs_result['stock_return_3m']
+                        buy_pos['sector_etf'] = rs_result['sector_etf']
+                        buy_pos['conviction_level'] = conviction_result['conviction']
+                        buy_pos['position_size_pct'] = conviction_result['position_size_pct']  # Phase 4 overrides Phase 2
+                        buy_pos['target_pct'] = tier_result['target_pct']
+                        buy_pos['supporting_factors'] = conviction_result['supporting_factors']
 
                         validated_buys.append(buy_pos)
 
-                        print(f"   ✓ {ticker}: {tier_result['tier']} - {news_result['decision']}")
+                        print(f"   ✓ {ticker}: {conviction_result['conviction']} - {rs_result['relative_strength']:+.1f}% RS")
                         print(f"      Catalyst: {tier_result['tier_name']}")
-                        print(f"      News Score: {news_result['score']}/20")
-                        print(f"      Position Size: {tier_result['position_size_pct']}%")
-                        if news_result['key_findings'][:1]:
-                            print(f"      Key Finding: {news_result['key_findings'][0]}")
+                        print(f"      News: {news_result['score']}/20, RS: {rs_result['relative_strength']:+.1f}%, VIX: {vix_result['vix']}")
+                        print(f"      Position Size: {conviction_result['position_size_pct']}% ({conviction_result['conviction']})")
+                        print(f"      Reasoning: {conviction_result['reasoning']}")
                     else:
                         print(f"   ✗ {ticker}: REJECTED")
                         for reason in rejection_reasons:
