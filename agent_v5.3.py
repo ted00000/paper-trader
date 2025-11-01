@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.2.0 - PHASE 1 & 2: NEWS + CATALYST TIERS
-SWING TRADING SYSTEM WITH AUTOMATED VALIDATION & TIERED CATALYSTS
+Paper Trading Lab - Agent v5.3.0 - PHASES 1-3: NEWS + TIERS + VIX/MACRO
+SWING TRADING SYSTEM WITH REGIME-AWARE VALIDATION
 
 MAJOR IMPROVEMENTS FROM v4.3:
 1. GO command reviews EXISTING portfolio with 15-min delayed premarket data
@@ -9,6 +9,28 @@ MAJOR IMPROVEMENTS FROM v4.3:
 3. HOLD/EXIT/BUY decision logic instead of daily portfolio rebuild
 4. Leverages Polygon.io 15-min delayed data for premarket gap analysis
 5. True swing trading: positions held 3-7 days unless stops/targets hit
+
+v5.3.0 - PHASE 3: VIX FILTER + MACRO CALENDAR (2025-10-31):
+** MAJOR FEATURE RELEASE **
+- Implemented VIX-based market regime detection
+  - fetch_vix_level(): Fetches VIX from Polygon.io
+  - VIX ≥35: SYSTEM SHUTDOWN (no new entries)
+  - VIX 30-35: CAUTIOUS (Tier 1 + News ≥15 only)
+  - VIX <30: NORMAL operations
+- Implemented macro event calendar with blackout windows
+  - check_macro_calendar(): Checks for FOMC, CPI, NFP, PCE events
+  - FOMC: 2 days before → 1 day after (4-day blackout)
+  - CPI/NFP/PCE: 1 day before → day of (2-day blackout)
+  - Auto-blocks ALL entries during blackout periods
+- GO command regime-aware filtering (Phase 3 integration):
+  - Checks VIX and macro calendar BEFORE individual validation
+  - Applies regime-specific filtering to BUY recommendations
+  - Enriches validated positions with: vix_at_entry, market_regime, macro_event_near
+- Enhanced CSV tracking with 3 new columns:
+  - VIX_At_Entry (float)
+  - Market_Regime (NORMAL/CAUTIOUS/SHUTDOWN)
+  - Macro_Event_Near (FOMC/CPI/NFP/PCE/None)
+- Designed per MASTER_STRATEGY_BLUEPRINT Phase 3 specifications
 
 v5.2.0 - PHASE 2: CATALYST TIER SYSTEM (2025-10-31):
 ** MAJOR FEATURE RELEASE **
@@ -1151,6 +1173,172 @@ POSITION {i}: {ticker}
                 return {'is_valid': False, 'reason': f'Stale catalyst ({catalyst_age_days} days >3 day limit)'}
 
     # =====================================================================
+    # VIX FILTER + MACRO CALENDAR (Phase 3)
+    # =====================================================================
+
+    def fetch_vix_level(self):
+        """
+        Fetch current VIX (CBOE Volatility Index) from Polygon.io
+
+        Returns:
+            {
+                'vix': float (e.g., 18.5),
+                'timestamp': str,
+                'regime': str ('NORMAL' | 'CAUTIOUS' | 'SHUTDOWN'),
+                'message': str
+            }
+        """
+
+        if not POLYGON_API_KEY:
+            print("   ⚠️ POLYGON_API_KEY not set - VIX check skipped")
+            return {
+                'vix': 20.0,  # Assume normal
+                'timestamp': datetime.now().isoformat(),
+                'regime': 'NORMAL',
+                'message': 'API key not set - assumed normal regime'
+            }
+
+        try:
+            # Fetch VIX (ticker: VIX) from Polygon.io
+            url = f'https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/VIX?apiKey={POLYGON_API_KEY}'
+            response = requests.get(url, timeout=10)
+            data = response.json()
+
+            if data.get('status') == 'OK' and 'ticker' in data:
+                ticker_data = data['ticker']
+
+                # Get last trade price
+                vix_level = None
+                if 'lastTrade' in ticker_data and ticker_data['lastTrade']:
+                    vix_level = float(ticker_data['lastTrade'].get('p', 0))
+                elif 'day' in ticker_data and ticker_data['day']:
+                    vix_level = float(ticker_data['day'].get('c', 0))
+
+                if vix_level and vix_level > 0:
+                    # Determine regime based on VIX level
+                    if vix_level >= 35:
+                        regime = 'SHUTDOWN'
+                        message = f'VIX {vix_level:.1f} ≥35: SYSTEM SHUTDOWN - No new entries'
+                    elif vix_level >= 30:
+                        regime = 'CAUTIOUS'
+                        message = f'VIX {vix_level:.1f} (30-35): HIGHEST CONVICTION ONLY'
+                    else:
+                        regime = 'NORMAL'
+                        message = f'VIX {vix_level:.1f} <30: Normal operations'
+
+                    return {
+                        'vix': round(vix_level, 2),
+                        'timestamp': datetime.now().isoformat(),
+                        'regime': regime,
+                        'message': message
+                    }
+
+            # If no data, try alternative method (index snapshot)
+            print("   ⚠️ VIX data unavailable from ticker, assuming normal regime")
+            return {
+                'vix': 20.0,
+                'timestamp': datetime.now().isoformat(),
+                'regime': 'NORMAL',
+                'message': 'VIX data unavailable - assumed normal regime'
+            }
+
+        except Exception as e:
+            print(f"   ⚠️ Error fetching VIX: {e}")
+            return {
+                'vix': 20.0,
+                'timestamp': datetime.now().isoformat(),
+                'regime': 'NORMAL',
+                'message': f'Error fetching VIX - assumed normal regime'
+            }
+
+    def check_macro_calendar(self, check_date=None):
+        """
+        Check if a date falls within blackout windows for major macro events
+
+        Major events with blackout windows:
+        - FOMC Meeting: 2 days before → 1 day after
+        - CPI Release: 1 day before → day of
+        - NFP (Jobs Report): 1 day before → day of
+        - PCE (Inflation): 1 day before → day of
+
+        Args:
+            check_date: Date to check (datetime object, defaults to today)
+
+        Returns:
+            {
+                'is_blackout': bool,
+                'event_type': str ('FOMC' | 'CPI' | 'NFP' | 'PCE' | None),
+                'event_date': str,
+                'message': str
+            }
+        """
+
+        if check_date is None:
+            check_date = datetime.now()
+
+        # Convert to date for comparison
+        check_date = check_date.date() if hasattr(check_date, 'date') else check_date
+
+        # 2025 Macro Calendar (hardcoded for reliability)
+        # Format: (event_date, event_type, description)
+        macro_events_2025 = [
+            # FOMC Meetings (2-day before, 1-day after blackout)
+            ('2025-01-29', 'FOMC', 'FOMC Meeting'),
+            ('2025-03-19', 'FOMC', 'FOMC Meeting'),
+            ('2025-05-07', 'FOMC', 'FOMC Meeting'),
+            ('2025-06-18', 'FOMC', 'FOMC Meeting'),
+            ('2025-07-30', 'FOMC', 'FOMC Meeting'),
+            ('2025-09-17', 'FOMC', 'FOMC Meeting'),
+            ('2025-11-05', 'FOMC', 'FOMC Meeting'),
+            ('2025-12-17', 'FOMC', 'FOMC Meeting'),
+
+            # CPI Release (1-day before, day of blackout) - typically mid-month
+            ('2025-11-13', 'CPI', 'CPI Release'),
+            ('2025-12-11', 'CPI', 'CPI Release'),
+
+            # NFP (Jobs Report) - First Friday of each month (1-day before, day of blackout)
+            ('2025-11-07', 'NFP', 'Jobs Report'),
+            ('2025-12-05', 'NFP', 'Jobs Report'),
+
+            # PCE (Inflation) - End of month (1-day before, day of blackout)
+            ('2025-11-26', 'PCE', 'PCE Release'),
+            ('2025-12-23', 'PCE', 'PCE Release'),
+        ]
+
+        # Check each event
+        for event_date_str, event_type, description in macro_events_2025:
+            event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
+
+            # Define blackout windows
+            if event_type == 'FOMC':
+                # 2 days before → 1 day after
+                from datetime import timedelta
+                blackout_start = event_date - timedelta(days=2)
+                blackout_end = event_date + timedelta(days=1)
+            else:
+                # CPI, NFP, PCE: 1 day before → day of
+                from datetime import timedelta
+                blackout_start = event_date - timedelta(days=1)
+                blackout_end = event_date
+
+            # Check if check_date falls in blackout window
+            if blackout_start <= check_date <= blackout_end:
+                return {
+                    'is_blackout': True,
+                    'event_type': event_type,
+                    'event_date': event_date_str,
+                    'message': f'{event_type} blackout ({description} on {event_date_str})'
+                }
+
+        # No blackout
+        return {
+            'is_blackout': False,
+            'event_type': None,
+            'event_date': None,
+            'message': 'No macro events - safe to trade'
+        }
+
+    # =====================================================================
     # CLAUDE API INTEGRATION
     # =====================================================================
     
@@ -1775,6 +1963,7 @@ RECENT LESSONS LEARNED:
                     'Shares', 'Position_Size', 'Position_Size_Percent', 'Hold_Days', 'Return_Percent', 'Return_Dollars',
                     'Exit_Reason', 'Catalyst_Type', 'Catalyst_Tier', 'Catalyst_Age_Days',
                     'News_Validation_Score', 'News_Exit_Triggered',
+                    'VIX_At_Entry', 'Market_Regime', 'Macro_Event_Near',
                     'Sector', 'Confidence_Level', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After'
                 ])
@@ -1802,6 +1991,9 @@ RECENT LESSONS LEARNED:
                 trade_data.get('catalyst_age_days', 0),
                 trade_data.get('news_validation_score', 0),
                 trade_data.get('news_exit_triggered', False),
+                trade_data.get('vix_at_entry', 0.0),
+                trade_data.get('market_regime', 'Unknown'),
+                trade_data.get('macro_event_near', 'None'),
                 trade_data.get('sector', ''),
                 trade_data.get('confidence_level', ''),
                 trade_data.get('stop_loss', 0),
@@ -2008,8 +2200,45 @@ RECENT LESSONS LEARNED:
         print(f"   ✓ EXIT: {len(exit_positions)} positions")
         print(f"   ✓ BUY:  {len(buy_positions)} new positions\n")
 
-        # Step 5.5: PHASE 1 & 2 - Validate BUY recommendations with news + catalyst tiers
-        if buy_positions:
+        # Step 5.4: PHASE 3 - Check VIX and Macro Calendar
+        print("5.4 Checking market regime (Phase 3: VIX + Macro Calendar)...")
+
+        # Fetch VIX level
+        vix_result = self.fetch_vix_level()
+        print(f"   {vix_result['message']}")
+
+        # Check macro calendar
+        macro_result = self.check_macro_calendar()
+        print(f"   {macro_result['message']}")
+
+        # Determine if we should proceed with BUY recommendations
+        can_enter_positions = True
+        regime_adjustment = None
+
+        if vix_result['regime'] == 'SHUTDOWN':
+            # VIX ≥35: No new entries at all
+            print(f"   🚨 SYSTEM SHUTDOWN: VIX {vix_result['vix']} ≥35")
+            print(f"   ✗ Blocking ALL {len(buy_positions)} BUY recommendations")
+            buy_positions = []  # Clear all BUY recommendations
+            can_enter_positions = False
+
+        elif vix_result['regime'] == 'CAUTIOUS':
+            # VIX 30-35: Only highest conviction (Tier 1 with news score ≥15)
+            print(f"   ⚠️ CAUTIOUS MODE: VIX {vix_result['vix']} (30-35)")
+            print(f"   → Filtering for HIGHEST CONVICTION ONLY (Tier 1 + News ≥15)")
+            regime_adjustment = 'HIGHEST_CONVICTION_ONLY'
+
+        if macro_result['is_blackout']:
+            # Macro event blackout: No new entries
+            print(f"   🚨 MACRO BLACKOUT: {macro_result['event_type']} on {macro_result['event_date']}")
+            print(f"   ✗ Blocking ALL {len(buy_positions)} BUY recommendations")
+            buy_positions = []  # Clear all BUY recommendations
+            can_enter_positions = False
+
+        print()
+
+        # Step 5.5: PHASE 1 & 2 & 3 - Validate BUY recommendations
+        if buy_positions and can_enter_positions:
             print("5.5 Validating BUY recommendations (Phase 1: News + Phase 2: Catalyst Tiers)...")
             validated_buys = []
 
@@ -2056,15 +2285,25 @@ RECENT LESSONS LEARNED:
                         validation_passed = False
                         rejection_reasons.append(f"News score too low ({news_result['score']}/20)")
 
+                    # PHASE 3: Apply regime-based filtering
+                    if regime_adjustment == 'HIGHEST_CONVICTION_ONLY':
+                        # VIX 30-35: Only accept Tier 1 with news score ≥15
+                        if tier_result['tier'] != 'Tier1' or news_result['score'] < 15:
+                            validation_passed = False
+                            rejection_reasons.append(f"VIX {vix_result['vix']} - requires Tier1 + News≥15")
+
                     # If all validations pass, accept the position
                     if validation_passed:
-                        # Enrich position with tier data
+                        # Enrich position with tier data + Phase 3 data
                         buy_pos['catalyst_tier'] = tier_result['tier']
                         buy_pos['tier_name'] = tier_result['tier_name']
                         buy_pos['tier_reasoning'] = tier_result['reasoning']
                         buy_pos['position_size_pct'] = tier_result['position_size_pct']
                         buy_pos['target_pct'] = tier_result['target_pct']
                         buy_pos['news_score'] = news_result['score']
+                        buy_pos['vix_at_entry'] = vix_result['vix']
+                        buy_pos['market_regime'] = vix_result['regime']
+                        buy_pos['macro_event_near'] = macro_result['event_type'] or 'None'
 
                         validated_buys.append(buy_pos)
 
