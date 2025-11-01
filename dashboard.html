@@ -947,7 +947,7 @@
             document.getElementById('positionCount').textContent = data.positions.length + ' Positions';
 
             // MOBILE FIX: Wrap table in scroll wrapper
-            let html = '<div class="mobile-table-wrapper"><table><thead><tr>';
+            let html = '<div class="mobile-table-wrapper" style="overflow-x: auto; display: block; max-width: 100%;"><table style="width: 600px;"><thead><tr>';
             html += '<th>Symbol</th>';
             html += '<th>Entry</th>';
             html += '<th>Current</th>';
