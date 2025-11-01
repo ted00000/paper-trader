@@ -462,16 +462,17 @@
 
         /* Mobile table wrapper - for dynamically generated tables */
         .mobile-table-wrapper {
-            overflow-x: auto;
+            overflow-x: scroll;
             -webkit-overflow-scrolling: touch;
             width: 100%;
             display: block;
         }
 
         .mobile-table-wrapper table {
-            min-width: 600px;
+            min-width: 700px;
             width: 100%;
             display: table;
+            table-layout: auto;
         }
 
         /* Responsive */
