@@ -460,6 +460,18 @@
             padding: 0 24px;
         }
 
+        /* Mobile table wrapper - for dynamically generated tables */
+        .mobile-table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            width: 100%;
+        }
+
+        .mobile-table-wrapper table {
+            min-width: 600px;
+            width: 100%;
+        }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .content-grid {
@@ -508,11 +520,15 @@
             .table-scroll {
                 margin: 0 -20px;
                 padding: 0 20px;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
             }
 
-            table {
+            .table-scroll table,
+            .mobile-table-wrapper table {
                 font-size: 0.813rem;
-                min-width: 600px; /* Force horizontal scroll if needed */
+                min-width: 600px !important; /* Force horizontal scroll if needed */
+                display: table !important;
             }
 
             th, td {
@@ -648,7 +664,7 @@
                     <h2 class="section-title">Active Portfolio</h2>
                     <span class="section-badge" id="positionCount">10 Positions</span>
                 </div>
-                <div id="portfolioContent" class="table-scroll loading">Loading portfolio data</div>
+                <div id="portfolioContent" class="loading">Loading portfolio data</div>
             </div>
 
             <div>
@@ -927,8 +943,8 @@
 
             document.getElementById('positionCount').textContent = data.positions.length + ' Positions';
 
-            // MOBILE FIX: Wrap table in a div to ensure proper scrolling
-            let html = '<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table style="min-width: 600px;"><thead><tr>';
+            // MOBILE FIX: Wrap table in scroll wrapper
+            let html = '<div class="mobile-table-wrapper"><table><thead><tr>';
             html += '<th>Symbol</th>';
             html += '<th>Entry</th>';
             html += '<th>Current</th>';
