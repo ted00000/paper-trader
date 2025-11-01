@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.4.0 - PHASES 1-4: COMPLETE VALIDATION SYSTEM
-SWING TRADING SYSTEM WITH CONVICTION-BASED SIZING & SECTOR LEADERSHIP
+Paper Trading Lab - Agent v5.5.0 - ALL 5 PHASES COMPLETE
+SWING TRADING SYSTEM WITH INTELLIGENT LEARNING & OPTIMIZATION
 
 MAJOR IMPROVEMENTS FROM v4.3:
 1. GO command reviews EXISTING portfolio with 15-min delayed premarket data
@@ -9,6 +9,38 @@ MAJOR IMPROVEMENTS FROM v4.3:
 3. HOLD/EXIT/BUY decision logic instead of daily portfolio rebuild
 4. Leverages Polygon.io 15-min delayed data for premarket gap analysis
 5. True swing trading: positions held 3-7 days unless stops/targets hit
+
+v5.5.0 - PHASE 5: LEARNING ENHANCEMENTS (2025-10-31):
+** FINAL PHASE - COMPLETE SYSTEM **
+- Implemented comprehensive performance analysis system
+  - analyze_performance_metrics(days): Multi-dimensional analysis
+  - Analyzes: Conviction accuracy, Tier performance, VIX regime, News effectiveness, RS impact, Macro events
+  - Returns detailed statistics with win rates and avg returns per category
+  - Generates automated recommendations for strategy calibration
+- Added "learn" command to CLI
+  - Usage: python agent.py learn [days]
+  - Default: 30-day analysis period
+  - Prints formatted performance report to console
+  - Saves analysis to JSON files for tracking over time
+- Performance analysis categories:
+  - **Conviction Accuracy**: Win rate by HIGH/MEDIUM-HIGH/MEDIUM
+  - **Catalyst Tier Performance**: Tier1 vs Tier2 vs Tier3 results
+  - **VIX Regime Performance**: Win rate by VIX buckets (<15, 15-20, 20-25, 25-30, >30)
+  - **News Score Effectiveness**: Returns by news score (0-5, 5-10, 10-15, 15-20)
+  - **Relative Strength Impact**: RS ≥3% vs RS <3% comparison
+  - **Macro Event Impact**: Performance with/without nearby macro events
+- Automated recommendations system:
+  - Detects if HIGH conviction underperforming MEDIUM
+  - Flags trades entered at VIX >30 (SHUTDOWN violations)
+  - Identifies sector laggards outperforming leaders (RS validation)
+  - Warns if weak news scores getting through (filter bypass)
+- Learning data persistence:
+  - Saves to learning_data/monthly_analysis_YYYY-MM-DD.json
+  - Maintains learning_data/latest_monthly_analysis.json
+  - Enables trend tracking across multiple periods
+- Added pandas dependency to requirements.txt
+- Complete integration with Phases 1-4 CSV columns
+- Designed per MASTER_STRATEGY_BLUEPRINT Phase 5 specifications
 
 v5.4.0 - PHASE 4: CONVICTION SIZING + RELATIVE STRENGTH (2025-10-31):
 ** MAJOR FEATURE RELEASE **
@@ -1560,6 +1592,207 @@ POSITION {i}: {ticker}
         }
 
     # =====================================================================
+    # LEARNING ENHANCEMENTS (Phase 5)
+    # =====================================================================
+
+    def analyze_performance_metrics(self, days=30):
+        """
+        Analyze performance across Phases 1-4 dimensions
+
+        Returns comprehensive analysis of:
+        - Conviction accuracy (HIGH vs MEDIUM win rates)
+        - Catalyst tier performance (Tier1 vs Tier2)
+        - VIX regime performance (<25, 25-30, 30-35)
+        - News score correlation with returns
+        - Relative strength effectiveness
+        - Macro event impact
+
+        Args:
+            days: Number of days to analyze (default 30)
+
+        Returns:
+            Dictionary with analysis results and recommendations
+        """
+
+        if not self.trades_csv.exists():
+            return {'error': 'No trade history available'}
+
+        import pandas as pd
+
+        # Load trade history
+        df = pd.read_csv(self.trades_csv)
+
+        if len(df) == 0:
+            return {'error': 'No completed trades'}
+
+        # Filter to recent trades
+        df['Exit_Date'] = pd.to_datetime(df['Exit_Date'])
+        cutoff_date = datetime.now() - timedelta(days=days)
+        df_recent = df[df['Exit_Date'] >= cutoff_date]
+
+        if len(df_recent) == 0:
+            return {'error': f'No trades in last {days} days'}
+
+        analysis = {
+            'period_days': days,
+            'total_trades': len(df_recent),
+            'total_return_pct': df_recent['Return_Percent'].sum(),
+            'avg_return_pct': df_recent['Return_Percent'].mean(),
+            'win_rate': (df_recent['Return_Percent'] > 0).sum() / len(df_recent) * 100,
+            'avg_hold_days': df_recent['Hold_Days'].mean(),
+        }
+
+        # CONVICTION ACCURACY ANALYSIS
+        conviction_stats = {}
+        for conviction in ['HIGH', 'MEDIUM-HIGH', 'MEDIUM']:
+            subset = df_recent[df_recent['Conviction_Level'] == conviction]
+            if len(subset) > 0:
+                conviction_stats[conviction] = {
+                    'count': len(subset),
+                    'win_rate': (subset['Return_Percent'] > 0).sum() / len(subset) * 100,
+                    'avg_return': subset['Return_Percent'].mean(),
+                    'total_return': subset['Return_Percent'].sum()
+                }
+
+        analysis['conviction_accuracy'] = conviction_stats
+
+        # CATALYST TIER PERFORMANCE
+        tier_stats = {}
+        for tier in ['Tier1', 'Tier2', 'Tier3']:
+            subset = df_recent[df_recent['Catalyst_Tier'] == tier]
+            if len(subset) > 0:
+                tier_stats[tier] = {
+                    'count': len(subset),
+                    'win_rate': (subset['Return_Percent'] > 0).sum() / len(subset) * 100,
+                    'avg_return': subset['Return_Percent'].mean()
+                }
+
+        analysis['tier_performance'] = tier_stats
+
+        # VIX REGIME PERFORMANCE
+        vix_stats = {}
+        df_recent['VIX_Bucket'] = pd.cut(
+            df_recent['VIX_At_Entry'],
+            bins=[0, 15, 20, 25, 30, 100],
+            labels=['<15 (calm)', '15-20 (normal)', '20-25 (elevated)', '25-30 (high)', '>30 (extreme)']
+        )
+        for bucket in df_recent['VIX_Bucket'].unique():
+            if pd.notna(bucket):
+                subset = df_recent[df_recent['VIX_Bucket'] == bucket]
+                vix_stats[str(bucket)] = {
+                    'count': len(subset),
+                    'win_rate': (subset['Return_Percent'] > 0).sum() / len(subset) * 100,
+                    'avg_return': subset['Return_Percent'].mean()
+                }
+
+        analysis['vix_regime_performance'] = vix_stats
+
+        # NEWS SCORE EFFECTIVENESS
+        news_buckets = {}
+        df_recent['News_Bucket'] = pd.cut(
+            df_recent['News_Validation_Score'],
+            bins=[0, 5, 10, 15, 20],
+            labels=['0-5 (weak)', '5-10 (moderate)', '10-15 (strong)', '15-20 (excellent)']
+        )
+        for bucket in df_recent['News_Bucket'].unique():
+            if pd.notna(bucket):
+                subset = df_recent[df_recent['News_Bucket'] == bucket]
+                news_buckets[str(bucket)] = {
+                    'count': len(subset),
+                    'win_rate': (subset['Return_Percent'] > 0).sum() / len(subset) * 100,
+                    'avg_return': subset['Return_Percent'].mean()
+                }
+
+        analysis['news_score_effectiveness'] = news_buckets
+
+        # RELATIVE STRENGTH EFFECTIVENESS
+        rs_positive = df_recent[df_recent['Relative_Strength'] >= 3]
+        rs_negative = df_recent[df_recent['Relative_Strength'] < 3]
+
+        analysis['relative_strength_impact'] = {
+            'rs_positive': {
+                'count': len(rs_positive),
+                'win_rate': (rs_positive['Return_Percent'] > 0).sum() / len(rs_positive) * 100 if len(rs_positive) > 0 else 0,
+                'avg_return': rs_positive['Return_Percent'].mean() if len(rs_positive) > 0 else 0
+            },
+            'rs_negative': {
+                'count': len(rs_negative),
+                'win_rate': (rs_negative['Return_Percent'] > 0).sum() / len(rs_negative) * 100 if len(rs_negative) > 0 else 0,
+                'avg_return': rs_negative['Return_Percent'].mean() if len(rs_negative) > 0 else 0
+            }
+        }
+
+        # MACRO EVENT IMPACT
+        with_macro = df_recent[df_recent['Macro_Event_Near'] != 'None']
+        without_macro = df_recent[df_recent['Macro_Event_Near'] == 'None']
+
+        analysis['macro_event_impact'] = {
+            'with_macro': {
+                'count': len(with_macro),
+                'win_rate': (with_macro['Return_Percent'] > 0).sum() / len(with_macro) * 100 if len(with_macro) > 0 else 0,
+                'avg_return': with_macro['Return_Percent'].mean() if len(with_macro) > 0 else 0
+            },
+            'without_macro': {
+                'count': len(without_macro),
+                'win_rate': (without_macro['Return_Percent'] > 0).sum() / len(without_macro) * 100 if len(without_macro) > 0 else 0,
+                'avg_return': without_macro['Return_Percent'].mean() if len(without_macro) > 0 else 0
+            }
+        }
+
+        # RECOMMENDATIONS
+        recommendations = []
+
+        # Conviction accuracy check
+        if 'HIGH' in conviction_stats and 'MEDIUM' in conviction_stats:
+            if conviction_stats['HIGH']['win_rate'] < conviction_stats['MEDIUM']['win_rate']:
+                recommendations.append('⚠️ HIGH conviction underperforming MEDIUM - review conviction criteria')
+
+        # VIX threshold check
+        if '>30 (extreme)' in vix_stats:
+            if vix_stats['>30 (extreme)']['count'] > 0:
+                recommendations.append('⚠️ Trades entered at VIX >30 detected - verify SHUTDOWN logic')
+
+        # Relative strength validation
+        if rs_positive and rs_negative:
+            if rs_negative['win_rate'] > rs_positive['win_rate']:
+                recommendations.append('⚠️ Sector laggards outperforming leaders - review RS threshold')
+
+        # News score validation
+        if '0-5 (weak)' in news_buckets and news_buckets['0-5 (weak)']['count'] > 0:
+            recommendations.append('⚠️ Trades with weak news scores detected - verify news filter')
+
+        analysis['recommendations'] = recommendations
+
+        return analysis
+
+    def save_learning_analysis(self, analysis, report_type='monthly'):
+        """
+        Save learning analysis to JSON file for tracking over time
+
+        Args:
+            analysis: Dictionary from analyze_performance_metrics()
+            report_type: 'daily', 'weekly', or 'monthly'
+        """
+
+        learning_dir = self.project_dir / 'learning_data'
+        learning_dir.mkdir(exist_ok=True)
+
+        # Create timestamped filename
+        timestamp = datetime.now().strftime('%Y-%m-%d')
+        filename = f'{report_type}_analysis_{timestamp}.json'
+        filepath = learning_dir / filename
+
+        with open(filepath, 'w') as f:
+            json.dump(analysis, f, indent=2, default=str)
+
+        print(f"   ✓ Saved {report_type} analysis to {filename}")
+
+        # Also update the latest analysis file
+        latest_file = learning_dir / f'latest_{report_type}_analysis.json'
+        with open(latest_file, 'w') as f:
+            json.dump(analysis, f, indent=2, default=str)
+
+    # =====================================================================
     # CLAUDE API INTEGRATION
     # =====================================================================
     
@@ -2925,23 +3158,24 @@ def main():
     """Main execution"""
     
     if len(sys.argv) < 2:
-        print("\nUsage: python agent.py [go|execute|analyze]")
+        print("\nUsage: python agent.py [go|execute|analyze|learn]")
         print("\nCommands:")
         print("  go       - Select 10 stocks (8:45 AM)")
         print("  execute  - Enter positions (9:30 AM)")
         print("  analyze  - Update & close positions (4:30 PM)")
+        print("  learn    - Analyze performance metrics (Phase 5)")
         sys.exit(1)
-    
+
     command = sys.argv[1].lower()
-    
+
     print(f"\n{'='*60}")
-    print(f"Paper Trading Lab Agent v5.0")
+    print(f"Paper Trading Lab Agent v5.4.0")
     et_tz = pytz.timezone('America/New_York')
     print(f"Time: {datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S ET')}")
     print(f"{'='*60}")
-    
+
     agent = TradingAgent()
-    
+
     try:
         if command == 'go':
             success = agent.execute_go_command()
@@ -2949,9 +3183,62 @@ def main():
             success = agent.execute_execute_command()
         elif command == 'analyze':
             success = agent.execute_analyze_command()
+        elif command == 'learn':
+            # Phase 5: Learning analysis
+            days = int(sys.argv[2]) if len(sys.argv) > 2 else 30
+            print(f"\nAnalyzing performance over last {days} days...\n")
+
+            analysis = agent.analyze_performance_metrics(days=days)
+
+            if 'error' in analysis:
+                print(f"⚠️ {analysis['error']}\n")
+                success = False
+            else:
+                # Print summary
+                print("="*60)
+                print(f"PERFORMANCE ANALYSIS - Last {days} Days")
+                print("="*60)
+                print(f"\nOverall Performance:")
+                print(f"  Total Trades: {analysis['total_trades']}")
+                print(f"  Win Rate: {analysis['win_rate']:.1f}%")
+                print(f"  Avg Return: {analysis['avg_return_pct']:.2f}%")
+                print(f"  Total Return: {analysis['total_return_pct']:.2f}%")
+                print(f"  Avg Hold Days: {analysis['avg_hold_days']:.1f}")
+
+                # Conviction accuracy
+                if analysis['conviction_accuracy']:
+                    print(f"\nConviction Accuracy:")
+                    for conviction, stats in analysis['conviction_accuracy'].items():
+                        print(f"  {conviction}: {stats['count']} trades, {stats['win_rate']:.1f}% win rate, {stats['avg_return']:.2f}% avg")
+
+                # Tier performance
+                if analysis['tier_performance']:
+                    print(f"\nCatalyst Tier Performance:")
+                    for tier, stats in analysis['tier_performance'].items():
+                        print(f"  {tier}: {stats['count']} trades, {stats['win_rate']:.1f}% win rate, {stats['avg_return']:.2f}% avg")
+
+                # VIX regime
+                if analysis['vix_regime_performance']:
+                    print(f"\nVIX Regime Performance:")
+                    for regime, stats in analysis['vix_regime_performance'].items():
+                        print(f"  {regime}: {stats['count']} trades, {stats['win_rate']:.1f}% win rate, {stats['avg_return']:.2f}% avg")
+
+                # Recommendations
+                if analysis['recommendations']:
+                    print(f"\nRecommendations:")
+                    for rec in analysis['recommendations']:
+                        print(f"  {rec}")
+
+                # Save analysis
+                agent.save_learning_analysis(analysis, 'monthly')
+
+                print("\n" + "="*60)
+                print("LEARNING ANALYSIS COMPLETE")
+                print("="*60 + "\n")
+                success = True
         else:
             print(f"\nERROR: Unknown command '{command}'")
-            print("Valid commands: go, execute, analyze")
+            print("Valid commands: go, execute, analyze, learn")
             sys.exit(1)
         
         if success:
