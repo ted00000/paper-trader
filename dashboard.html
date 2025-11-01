@@ -524,18 +524,34 @@
                 font-size: 1rem;
             }
 
-            /* Performance bars mobile optimization */
+            /* MOBILE FIX: Chart container responsiveness */
+            .chart-container {
+                height: 220px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* MOBILE FIX: Catalyst breakdown responsiveness */
             .performance-item {
+                flex-wrap: wrap;
                 padding: 12px 0;
             }
 
             .performance-label {
-                font-size: 0.875rem;
+                font-size: 0.813rem;
                 min-width: 100px;
+                flex: 0 0 100px;
             }
 
             .performance-bar {
+                flex: 1 1 auto;
+                min-width: 100px;
                 margin: 0 12px;
+            }
+
+            .performance-value {
+                font-size: 1rem;
+                flex: 0 0 auto;
             }
 
             /* FIXED: System Status Bar mobile optimization */
@@ -893,10 +909,10 @@
         
         function updatePortfolio(data) {
             const container = document.getElementById('portfolioContent');
-            
+
             // CRITICAL FIX: Remove loading class FIRST, before any checks
             container.classList.remove('loading');
-            
+
             // Check if positions exist
             if (!data.positions || data.positions.length === 0) {
                 container.innerHTML = `
@@ -908,10 +924,11 @@
                 document.getElementById('positionCount').textContent = '0 Positions';
                 return;
             }
-            
+
             document.getElementById('positionCount').textContent = data.positions.length + ' Positions';
-            
-            let html = '<table><thead><tr>';
+
+            // MOBILE FIX: Wrap table in a div to ensure proper scrolling
+            let html = '<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;"><table style="min-width: 600px;"><thead><tr>';
             html += '<th>Symbol</th>';
             html += '<th>Entry</th>';
             html += '<th>Current</th>';
@@ -920,12 +937,12 @@
             html += '<th>P&L $</th>';
             html += '<th>Catalyst</th>';
             html += '</tr></thead><tbody>';
-            
+
             data.positions.forEach(position => {
                 const pnlPercent = position.unrealized_gain_pct || 0;
                 const pnlDollars = position.unrealized_gain_dollars || 0;
                 const pnlClass = pnlPercent >= 0 ? 'positive' : 'negative';
-                
+
                 html += '<tr>';
                 html += `<td class="ticker">${position.ticker}</td>`;
                 html += `<td>$${position.entry_price.toFixed(2)}</td>`;
@@ -936,8 +953,8 @@
                 html += `<td>${position.catalyst || 'N/A'}</td>`;
                 html += '</tr>';
             });
-            
-            html += '</tbody></table>';
+
+            html += '</tbody></table></div>';
             container.innerHTML = html;
         }
         
