@@ -462,9 +462,10 @@
 
         /* Mobile table wrapper - for dynamically generated tables */
         .mobile-table-wrapper {
-            overflow-x: auto;
+            overflow-x: auto !important;
             -webkit-overflow-scrolling: touch;
-            display: block;
+            display: block !important;
+            max-width: 100% !important;
         }
 
         .mobile-table-wrapper table {
