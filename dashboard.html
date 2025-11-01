@@ -452,46 +452,90 @@
             font-size: 0.938rem;
         }
         
+        /* Table Scroll Container for Mobile */
+        .table-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -24px;
+            padding: 0 24px;
+        }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .content-grid {
                 grid-template-columns: 1fr;
             }
         }
-        
+
         @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+
             .header-content {
                 flex-direction: column;
                 text-align: center;
             }
-            
+
             .header-right {
                 text-align: center;
                 margin-top: 16px;
             }
-            
+
+            header {
+                padding: 24px;
+            }
+
             h1 {
                 font-size: 2rem;
             }
-            
+
             .stats-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .stat-value {
                 font-size: 2rem;
             }
-            
+
             .section {
-                padding: 24px;
+                padding: 20px;
+                background: var(--bg-dark-gray); /* FIXED: Explicit background for mobile */
+                border: 1px solid var(--border-color); /* FIXED: Explicit border */
             }
-            
+
+            /* FIXED: Table scroll container for mobile */
+            .table-scroll {
+                margin: 0 -20px;
+                padding: 0 20px;
+            }
+
             table {
-                font-size: 0.875rem;
+                font-size: 0.813rem;
+                min-width: 600px; /* Force horizontal scroll if needed */
             }
-            
+
             th, td {
-                padding: 12px 8px;
+                padding: 10px 6px;
+                font-size: 0.813rem;
+            }
+
+            .ticker {
+                font-size: 1rem;
+            }
+
+            /* Performance bars mobile optimization */
+            .performance-item {
+                padding: 12px 0;
+            }
+
+            .performance-label {
+                font-size: 0.875rem;
+                min-width: 100px;
+            }
+
+            .performance-bar {
+                margin: 0 12px;
             }
         }
     </style>
@@ -548,6 +592,24 @@
                 <div class="stat-change" id="avgHoldTime">Avg Hold: 0 days</div>
             </div>
         </div>
+
+        <!-- System Status Bar (NEW) -->
+        <div class="section" style="padding: 20px 32px; margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;">System:</span>
+                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">v5.6 COMPOUND GROWTH</span>
+                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">NEWS</span>
+                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">TIERS</span>
+                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">VIX/MACRO</span>
+                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">CONVICTION</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 0.875rem; color: var(--text-secondary);">Next:</span>
+                    <span id="nextScheduled" style="font-size: 0.875rem; color: var(--neon-green); font-weight: 600;">ANALYZE 4:30 PM ET</span>
+                </div>
+            </div>
+        </div>
         
         <div class="content-grid">
             <div class="section">
@@ -555,7 +617,7 @@
                     <h2 class="section-title">Active Portfolio</h2>
                     <span class="section-badge" id="positionCount">10 Positions</span>
                 </div>
-                <div id="portfolioContent" class="loading">Loading portfolio data</div>
+                <div id="portfolioContent" class="table-scroll loading">Loading portfolio data</div>
             </div>
 
             <div>
@@ -619,7 +681,7 @@
                 <h2 class="section-title">Today's Activity</h2>
                 <span class="section-badge" id="activityTime">--</span>
             </div>
-            <div id="todayActivityContent"></div>
+            <div id="todayActivityContent" class="table-scroll"></div>
         </div>
 
         <!-- Recently Closed Section -->
@@ -628,7 +690,7 @@
                 <h2 class="section-title">Recently Closed (Last 7 Days)</h2>
                 <span class="section-badge" id="recentlyClosedCount">0 Trades</span>
             </div>
-            <div id="recentlyClosedContent"></div>
+            <div id="recentlyClosedContent" class="table-scroll"></div>
         </div>
 
         <div class="footer">
@@ -662,6 +724,7 @@
             if (day === 0 || day === 6) {
                 liveText.textContent = 'MARKET CLOSED';
                 liveIndicator.classList.add('market-closed');
+                updateNextScheduled('Monday 8:45 AM');
                 return;
             }
 
@@ -676,6 +739,25 @@
             const marketClose = 16 * 60; // 4:00 PM = 960 minutes
             const postMarketEnd = 20 * 60; // 8:00 PM = 1200 minutes
 
+            // Scheduled actions:
+            // 8:45 AM - GO command
+            // 9:45 AM - EXECUTE command
+            // 4:30 PM - ANALYZE command
+            // 5:00 PM - DAILY LEARN (5x/week)
+            const goTime = 8 * 60 + 45; // 8:45 AM
+            const executeTime = 9 * 60 + 45; // 9:45 AM
+            const analyzeTime = 16 * 60 + 30; // 4:30 PM
+
+            if (totalMinutes < goTime) {
+                updateNextScheduled('GO 8:45 AM ET');
+            } else if (totalMinutes < executeTime) {
+                updateNextScheduled('EXECUTE 9:45 AM ET');
+            } else if (totalMinutes < analyzeTime) {
+                updateNextScheduled('ANALYZE 4:30 PM ET');
+            } else {
+                updateNextScheduled('Tomorrow 8:45 AM ET');
+            }
+
             if (totalMinutes >= preMarketStart && totalMinutes < marketOpen) {
                 liveText.textContent = 'PRE-MARKET';
                 liveIndicator.classList.add('market-extended');
@@ -688,6 +770,13 @@
             } else {
                 liveText.textContent = 'MARKET CLOSED';
                 liveIndicator.classList.add('market-closed');
+            }
+        }
+
+        function updateNextScheduled(text) {
+            const element = document.getElementById('nextScheduled');
+            if (element) {
+                element.textContent = text;
             }
         }
 
