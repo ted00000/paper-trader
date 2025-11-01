@@ -464,16 +464,12 @@
         .mobile-table-wrapper {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
-            width: 100%;
-            max-width: 100%;
             display: block;
         }
 
         .mobile-table-wrapper table {
             min-width: 700px;
-            width: 700px;
             display: table;
-            table-layout: fixed;
         }
 
         /* Responsive */
@@ -518,6 +514,7 @@
                 padding: 20px;
                 background: var(--bg-dark-gray); /* FIXED: Explicit background for mobile */
                 border: 1px solid var(--border-color); /* FIXED: Explicit border */
+                overflow: visible; /* Allow inner elements to scroll */
             }
 
             /* FIXED: Table scroll container for mobile */
