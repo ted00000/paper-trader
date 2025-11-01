@@ -465,11 +465,13 @@
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             width: 100%;
+            display: block;
         }
 
         .mobile-table-wrapper table {
             min-width: 600px;
             width: 100%;
+            display: table;
         }
 
         /* Responsive */
@@ -728,7 +730,7 @@
                 <h2 class="section-title">Today's Activity</h2>
                 <span class="section-badge" id="activityTime">--</span>
             </div>
-            <div id="todayActivityContent" class="table-scroll"></div>
+            <div id="todayActivityContent"></div>
         </div>
 
         <!-- Recently Closed Section -->
@@ -737,7 +739,7 @@
                 <h2 class="section-title">Recently Closed (Last 7 Days)</h2>
                 <span class="section-badge" id="recentlyClosedCount">0 Trades</span>
             </div>
-            <div id="recentlyClosedContent" class="table-scroll"></div>
+            <div id="recentlyClosedContent"></div>
         </div>
 
         <div class="footer">
@@ -1108,7 +1110,7 @@
                 </div>
             `;
 
-            html += '<table><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th><th>Hold Days</th><th>Return</th><th>Exit Reason</th></tr></thead><tbody>';
+            html += '<div class="mobile-table-wrapper"><table><thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th><th>Hold Days</th><th>Return</th><th>Exit Reason</th></tr></thead><tbody>';
 
             data.closed_today.forEach(trade => {
                 const returnClass = trade.return_percent >= 0 ? 'positive' : 'negative';
@@ -1125,7 +1127,7 @@
                 `;
             });
 
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             content.innerHTML = html;
         }
 
@@ -1178,7 +1180,7 @@
             section.style.display = 'block';
             countBadge.textContent = `${trades.length} Trade${trades.length !== 1 ? 's' : ''}`;
 
-            let html = '<table><thead><tr><th>Date</th><th>Ticker</th><th>Entry</th><th>Exit</th><th>Hold Days</th><th>Return</th><th>Exit Reason</th></tr></thead><tbody>';
+            let html = '<div class="mobile-table-wrapper"><table><thead><tr><th>Date</th><th>Ticker</th><th>Entry</th><th>Exit</th><th>Hold Days</th><th>Return</th><th>Exit Reason</th></tr></thead><tbody>';
 
             trades.slice(0, 10).forEach(trade => { // Limit to 10 most recent
                 const returnPct = parseFloat(trade.Return_Percent);
@@ -1199,7 +1201,7 @@
                 `;
             });
 
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             content.innerHTML = html;
         }
 
