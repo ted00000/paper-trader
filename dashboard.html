@@ -755,7 +755,13 @@
             } else if (totalMinutes < analyzeTime) {
                 updateNextScheduled('ANALYZE 4:30 PM ET');
             } else {
-                updateNextScheduled('Tomorrow 8:45 AM ET');
+                // After trading day ends, check if tomorrow is weekend
+                const tomorrow = (day + 1) % 7;
+                if (tomorrow === 0 || tomorrow === 6) {
+                    updateNextScheduled('Monday 8:45 AM ET');
+                } else {
+                    updateNextScheduled('Tomorrow 8:45 AM ET');
+                }
             }
 
             if (totalMinutes >= preMarketStart && totalMinutes < marketOpen) {
