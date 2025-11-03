@@ -222,7 +222,8 @@ def login():
 
             log_audit_event('LOGIN_SUCCESS', username, ip)
 
-            return redirect(url_for('dashboard'))
+            # Redirect to /admin for nginx reverse proxy setup
+            return redirect('/admin')
         else:
             # Failed login
             record_attempt(ip)
