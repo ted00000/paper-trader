@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Dashboard - Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: #1a1a1a;
+            border-bottom: 2px solid #00ff41;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #00ff41;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-info {
+            color: #888;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #dd3333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        .section {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #333;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-success {
+            background: rgba(0, 255, 65, 0.1);
+            color: #00ff41;
+            border: 1px solid #00ff41;
+        }
+
+        .badge-warning {
+            background: rgba(255, 165, 0, 0.1);
+            color: #ffa500;
+            border: 1px solid #ffa500;
+        }
+
+        .badge-danger {
+            background: rgba(255, 68, 68, 0.1);
+            color: #ff4444;
+            border: 1px solid #ff4444;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #00ff41;
+        }
+
+        .pending-action {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .pending-action.parameter {
+            border-left: 4px solid #ffa500;
+        }
+
+        .pending-action.exclusion {
+            border-left: 4px solid #ff4444;
+        }
+
+        .action-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+
+        .action-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .action-meta {
+            color: #666;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .action-details {
+            color: #aaa;
+            font-size: 14px;
+            line-height: 1.8;
+            margin: 16px 0;
+        }
+
+        .action-details strong {
+            color: #fff;
+        }
+
+        .action-reason {
+            background: #0a0a0a;
+            border-left: 3px solid #00ff41;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-approve {
+            background: #00ff41;
+            color: #0a0a0a;
+        }
+
+        .btn-approve:hover {
+            background: #00dd38;
+        }
+
+        .btn-reject {
+            background: #333;
+            color: #fff;
+        }
+
+        .btn-reject:hover {
+            background: #444;
+        }
+
+        .trade-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .trade-item {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .trade-info {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .trade-ticker {
+            font-size: 18px;
+            font-weight: 700;
+            color: #00ff41;
+            min-width: 60px;
+        }
+
+        .trade-detail {
+            font-size: 14px;
+            color: #888;
+        }
+
+        .trade-detail strong {
+            color: #fff;
+        }
+
+        .trade-pnl {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .trade-pnl.positive {
+            color: #00ff41;
+        }
+
+        .trade-pnl.negative {
+            color: #ff4444;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .trade-item {
+                flex-direction: column;
+                gap: 12px;
+                align-items: start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <span class="header-title">🤖 Trading Dashboard</span>
+            <span class="badge badge-success">LIVE</span>
+        </div>
+        <div class="header-right">
+            <span class="user-info">Logged in as: <strong>{{ username }}</strong></span>
+            <a href="/logout"><button class="logout-btn">Logout</button></a>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- System Status -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">System Status</h2>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Account Value</div>
+                    <div class="stat-value">${{ "%.2f"|format(data.system_status.account_value) }}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Active Positions</div>
+                    <div class="stat-value">{{ data.system_status.active_positions }}/10</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Win Rate (30d)</div>
+                    <div class="stat-value">{{ "%.1f"|format(data.system_status.win_rate_30d) }}%</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Last Updated</div>
+                    <div class="stat-value" style="font-size: 14px; color: #888;">
+                        {{ data.system_status.last_updated or 'Never' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Actions -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Actions Required</h2>
+                <span class="badge badge-warning">{{ data.pending_actions|length }} Items</span>
+            </div>
+
+            {% if data.pending_actions %}
+                {% for action in data.pending_actions %}
+                    {% if action.status == 'PENDING_REVIEW' %}
+                    <div class="pending-action {{ action.type|lower }}">
+                        <div class="action-header">
+                            <div>
+                                <div class="action-title">
+                                    {% if action.type == 'PARAMETER_ADJUSTMENT' %}
+                                        ⚙️ Parameter Adjustment: {{ action.parameter }}
+                                    {% else %}
+                                        🚫 Catalyst Exclusion: {{ action.catalyst }}
+                                    {% endif %}
+                                </div>
+                                <div class="action-meta">
+                                    Generated: {{ action.created }} • Confidence: {{ action.confidence }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="action-details">
+                            {% if action.type == 'PARAMETER_ADJUSTMENT' %}
+                                <strong>Current Value:</strong> {{ action.current_value }}<br>
+                                <strong>Suggested Value:</strong> {{ action.suggested_value }}<br>
+                                <strong>Sample Size:</strong> {{ action.sample_size }} trades
+                            {% else %}
+                                <strong>Win Rate:</strong> {{ action.win_rate }}%<br>
+                                <strong>Total Trades:</strong> {{ action.total_trades }}
+                            {% endif %}
+                        </div>
+
+                        <div class="action-reason">
+                            <strong>Reasoning:</strong> {{ action.reasoning }}
+                        </div>
+
+                        <div class="action-buttons">
+                            <button class="btn btn-approve" onclick="approveAction('{{ action.id }}')">
+                                Approve
+                            </button>
+                            <button class="btn btn-reject" onclick="rejectAction('{{ action.id }}')">
+                                Reject
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">✓</div>
+                    <div>No pending actions. System running smoothly.</div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Recent Trades -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Recent Trades</h2>
+            </div>
+
+            <div class="trade-list">
+                {% for trade in data.recent_trades[:5] %}
+                <div class="trade-item">
+                    <div class="trade-info">
+                        <div class="trade-ticker">{{ trade.Ticker }}</div>
+                        <div class="trade-detail">
+                            <strong>Entry:</strong> ${{ trade.Entry_Price }}<br>
+                            <strong>Exit:</strong> ${{ trade.Exit_Price }}
+                        </div>
+                        <div class="trade-detail">
+                            <strong>Hold:</strong> {{ trade.Hold_Days }} days<br>
+                            <strong>Reason:</strong> {{ trade.Exit_Reason }}
+                        </div>
+                    </div>
+                    <div class="trade-pnl {{ 'positive' if trade.Return_Percent|float > 0 else 'negative' }}">
+                        {{ '+' if trade.Return_Percent|float > 0 else '' }}{{ "%.2f"|format(trade.Return_Percent|float) }}%
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Exclusion Overrides -->
+        {% if data.exclusion_overrides %}
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Exclusion Overrides (Last 30 Days)</h2>
+                <span class="badge badge-warning">{{ data.exclusion_overrides|length }} Overrides</span>
+            </div>
+
+            <div class="trade-list">
+                {% for override in data.exclusion_overrides[:5] %}
+                <div class="trade-item">
+                    <div class="trade-info">
+                        <div class="trade-ticker">{{ override.ticker }}</div>
+                        <div class="trade-detail">
+                            <strong>Catalyst:</strong> {{ override.catalyst }}<br>
+                            <strong>Date:</strong> {{ override.timestamp[:10] }}
+                        </div>
+                        <div class="trade-detail" style="max-width: 400px;">
+                            <strong>Reasoning:</strong> {{ override.reasoning }}
+                        </div>
+                    </div>
+                    <div class="trade-pnl {{ 'positive' if override.result == 'WIN' else 'negative' }}">
+                        {{ override.result }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function approveAction(actionId) {
+            const notes = prompt('Add approval notes (optional):');
+            if (notes === null) return; // Cancelled
+
+            fetch('/api/actions/approve', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action_id: actionId, notes: notes})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Action approved! Refresh page to see updated status.');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+
+        function rejectAction(actionId) {
+            const reason = prompt('Rejection reason:');
+            if (!reason) return;
+
+            fetch('/api/actions/reject', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action_id: actionId, reason: reason})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Action rejected. Refresh page to see updated status.');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+    </script>
+</body>
+</html>

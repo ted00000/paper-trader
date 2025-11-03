@@ -479,12 +479,90 @@ class MonthlyLearning:
     
     def append_to_lessons_learned(self, report):
         """Append monthly report to lessons_learned.md"""
-        
+
         with open(self.lessons_file, 'a') as f:
             f.write(report)
-        
+
         print(f"   ✓ Appended monthly report to lessons_learned.md")
-    
+
+    def generate_parameter_recommendations(self, trades):
+        """Analyze parameter effectiveness and generate recommendations for dashboard"""
+
+        if len(trades) < 30:
+            return []  # Need sufficient data
+
+        recommendations = []
+
+        # Analyze VIX threshold effectiveness
+        vix_high_trades = [t for t in trades if float(t.get('VIX_at_Entry', 25)) > 25]
+        if len(vix_high_trades) >= 15:
+            win_rate = (sum(1 for t in vix_high_trades if float(t['Return_Percent']) > 0) / len(vix_high_trades)) * 100
+
+            if win_rate < 40:
+                recommendations.append({
+                    'id': f"param_vix_{datetime.now().strftime('%Y%m%d')}",
+                    'type': 'PARAMETER_ADJUSTMENT',
+                    'parameter': 'VIX_THRESHOLD',
+                    'current_value': 25,
+                    'suggested_value': 22,
+                    'reasoning': f'VIX >25 showing {win_rate:.1f}% win rate over {len(vix_high_trades)} trades. Lower threshold to avoid extreme volatility.',
+                    'confidence': 'HIGH' if len(vix_high_trades) >= 25 else 'MEDIUM',
+                    'sample_size': len(vix_high_trades),
+                    'created': datetime.now().isoformat(),
+                    'status': 'PENDING_REVIEW'
+                })
+
+        # Analyze RS threshold effectiveness
+        rs_weak_trades = [t for t in trades if 0 < float(t.get('Relative_Strength', 5)) < 5]
+        rs_strong_trades = [t for t in trades if float(t.get('Relative_Strength', 0)) >= 5]
+
+        if len(rs_weak_trades) >= 10 and len(rs_strong_trades) >= 10:
+            weak_wr = (sum(1 for t in rs_weak_trades if float(t['Return_Percent']) > 0) / len(rs_weak_trades)) * 100
+            strong_wr = (sum(1 for t in rs_strong_trades if float(t['Return_Percent']) > 0) / len(rs_strong_trades)) * 100
+
+            if strong_wr > weak_wr + 15:  # Strong RS significantly better
+                recommendations.append({
+                    'id': f"param_rs_{datetime.now().strftime('%Y%m%d')}",
+                    'type': 'PARAMETER_ADJUSTMENT',
+                    'parameter': 'RS_THRESHOLD',
+                    'current_value': 3.0,
+                    'suggested_value': 5.0,
+                    'reasoning': f'RS ≥5%: {strong_wr:.1f}% win rate vs RS 3-5%: {weak_wr:.1f}% win rate. Raise threshold for better sector leaders.',
+                    'confidence': 'HIGH',
+                    'sample_size': len(rs_weak_trades) + len(rs_strong_trades),
+                    'created': datetime.now().isoformat(),
+                    'status': 'PENDING_REVIEW'
+                })
+
+        return recommendations
+
+    def save_recommendations_to_dashboard(self, recommendations):
+        """Save parameter recommendations for admin dashboard review"""
+
+        dashboard_data_dir = PROJECT_DIR / 'dashboard_data'
+        dashboard_data_dir.mkdir(exist_ok=True)
+
+        actions_file = dashboard_data_dir / 'pending_actions.json'
+
+        # Load existing actions
+        existing_actions = []
+        if actions_file.exists():
+            try:
+                with open(actions_file) as f:
+                    existing_actions = json.load(f)
+            except:
+                existing_actions = []
+
+        # Add new recommendations (avoid duplicates)
+        existing_ids = {a['id'] for a in existing_actions}
+        for rec in recommendations:
+            if rec['id'] not in existing_ids:
+                existing_actions.append(rec)
+
+        # Save
+        with open(actions_file, 'w') as f:
+            json.dump(existing_actions, f, indent=2)
+
     def run_learning_cycle(self):
         """Execute monthly learning cycle"""
         
@@ -530,7 +608,14 @@ class MonthlyLearning:
         report = self.generate_monthly_report(monthly_stats, regime, strategy_eval, best_practices)
         self.append_to_lessons_learned(report)
         print()
-        
+
+        # Generate parameter recommendations for dashboard
+        print("7. Analyzing parameter effectiveness...")
+        param_recommendations = self.generate_parameter_recommendations(trades)
+        self.save_recommendations_to_dashboard(param_recommendations)
+        print(f"   ✓ Generated {len(param_recommendations)} parameter recommendations")
+        print()
+
         # Summary
         print("="*60)
         print("MONTHLY LEARNING COMPLETE")

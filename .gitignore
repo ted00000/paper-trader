@@ -33,4 +33,12 @@ Thumbs.db
 
 # Logs
 *.log
+logs/dashboard/
+logs/exclusion_overrides.log
+
+# Dashboard security - NEVER commit these
+dashboard_data/
+.env
+
+# Test files
 test_ba_price.py

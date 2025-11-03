@@ -1,0 +1,5 @@
+# Dashboard Dependencies
+# Install with: pip install -r requirements_dashboard.txt
+
+Flask==3.0.0
+Werkzeug==3.0.1

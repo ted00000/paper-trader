@@ -1920,7 +1920,14 @@ Project Context:
 {context}
 
 Execute the user's command following the PROJECT_INSTRUCTIONS.md guidelines.
-Pay special attention to CATALYST EXCLUSIONS - do not use any catalyst types that are marked as excluded.
+
+⚠️ IMPORTANT - CATALYST EXCLUSIONS:
+Do NOT use any catalyst types marked as excluded UNLESS you have EXCEPTIONAL reasoning.
+If you believe a excluded catalyst should be used despite poor historical performance:
+  1. Set "override_exclusion": true in the JSON
+  2. Provide "override_reasoning": "Detailed explanation of why this time is different"
+  3. Acknowledge the historical win rate and explain specific factors that make this setup different
+Without override fields, excluded catalysts will be automatically rejected.
 
 CRITICAL: When executing 'go' command, you MUST include a properly formatted JSON block at the end of your response."""
 
@@ -2030,17 +2037,36 @@ RECENT LESSONS LEARNED:
     
     def load_catalyst_exclusions(self):
         """Load list of catalysts to avoid based on learning"""
-        
+
         if not self.exclusions_file.exists():
             return []
-        
+
         try:
             with open(self.exclusions_file, 'r') as f:
                 data = json.load(f)
                 return data.get('excluded_catalysts', [])
         except:
             return []
-    
+
+    def log_exclusion_override(self, ticker, catalyst, reasoning, exclusion_data):
+        """Log when Claude overrides an exclusion (for dashboard monitoring)"""
+
+        log_file = self.project_dir / 'logs' / 'exclusion_overrides.log'
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+
+        log_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'ticker': ticker,
+            'catalyst': catalyst,
+            'reasoning': reasoning,
+            'historical_win_rate': exclusion_data.get('win_rate', 0),
+            'historical_trades': exclusion_data.get('total_trades', 0),
+            'result': 'PENDING'  # Will be updated when trade closes
+        }
+
+        with open(log_file, 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+
     # =====================================================================
     # JSON PARSING AND PORTFOLIO CREATION
     # =====================================================================
@@ -2723,6 +2749,36 @@ RECENT LESSONS LEARNED:
                 rejection_reasons = []
 
                 try:
+                    # LEARNED EXCLUSIONS: Check if catalyst is excluded
+                    exclusions = self.load_catalyst_exclusions()
+                    excluded_catalysts = {e['catalyst'].lower(): e for e in exclusions}
+
+                    if catalyst_type.lower() in excluded_catalysts:
+                        excl = excluded_catalysts[catalyst_type.lower()]
+
+                        # Check if Claude provided override justification
+                        if buy_pos.get('override_exclusion') and buy_pos.get('override_reasoning'):
+                            # Claude acknowledged exclusion and provided reasoning - ALLOW but log
+                            print(f"   ⚠️  {ticker}: Using excluded catalyst (OVERRIDE APPROVED)")
+                            print(f"      Historical: {excl['win_rate']:.1f}% win rate over {excl['total_trades']} trades")
+                            print(f"      Reasoning: {buy_pos['override_reasoning']}")
+
+                            # Log this override for dashboard review
+                            self.log_exclusion_override(ticker, catalyst_type, buy_pos['override_reasoning'], excl)
+
+                            # Mark position as high-risk override
+                            buy_pos['exclusion_override'] = True
+                            buy_pos['requires_close_monitoring'] = True
+
+                        else:
+                            # Claude used excluded catalyst without acknowledging - REJECT
+                            validation_passed = False
+                            rejection_reasons.append(
+                                f"Excluded catalyst: {catalyst_type} "
+                                f"({excl['win_rate']:.1f}% win rate, {excl['total_trades']} trades). "
+                                f"Must provide override_reasoning if intentional."
+                            )
+
                     # PHASE 2: Check catalyst tier
                     tier_result = self.classify_catalyst_tier(catalyst_type, catalyst_details)
 
