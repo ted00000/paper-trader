@@ -330,11 +330,24 @@ POSITION {i}: {ticker}
             'exit_price': exit_price,
             'shares': shares,
             'position_size': position_size,
+            'position_size_percent': position.get('position_size_percent', 0),
             'days_held': days_held,
             'pnl_percent': round(pnl_percent, 2),
             'pnl_dollars': round(pnl_dollars, 2),
             'exit_reason': reason,
             'catalyst': position.get('catalyst', ''),
+            'catalyst_tier': position.get('catalyst_tier', 'Unknown'),
+            'catalyst_age_days': position.get('catalyst_age_days', 0),
+            'news_validation_score': position.get('news_validation_score', 0),
+            'news_exit_triggered': position.get('news_exit_triggered', False),
+            'vix_at_entry': position.get('vix_at_entry', 0.0),
+            'market_regime': position.get('market_regime', 'Unknown'),
+            'macro_event_near': position.get('macro_event_near', 'None'),
+            'relative_strength': position.get('relative_strength', 0.0),
+            'stock_return_3m': position.get('stock_return_3m', 0.0),
+            'sector_etf': position.get('sector_etf', 'Unknown'),
+            'conviction_level': position.get('conviction_level', 'MEDIUM'),
+            'supporting_factors': position.get('supporting_factors', 0),
             'sector': position.get('sector', ''),
             'confidence': position.get('confidence', ''),
             'thesis': position.get('thesis', ''),
@@ -353,8 +366,15 @@ POSITION {i}: {ticker}
         """
         from datetime import datetime
 
+        # Get account value after this trade
+        account_value_after = 0
+        if self.account_file.exists():
+            with open(self.account_file, 'r') as f:
+                account_data = json.load(f)
+                account_value_after = account_data.get('account_value', 0)
+
         trade_data = {
-            'trade_id': f"{trade['ticker']}_{trade['entry_date']}_{datetime.now().strftime('%Y%m%d')}",
+            'trade_id': f"{trade['ticker']}_{trade['entry_date']}",
             'entry_date': trade['entry_date'],
             'exit_date': datetime.now().strftime('%Y-%m-%d'),
             'ticker': trade['ticker'],
@@ -364,19 +384,31 @@ POSITION {i}: {ticker}
             'gap_percent': trade.get('gap_percent', 0),
             'shares': trade['shares'],
             'position_size': trade['position_size'],
+            'position_size_percent': trade.get('position_size_percent', 0),
             'hold_days': trade['days_held'],
             'return_percent': trade['pnl_percent'],
             'return_dollars': trade['pnl_dollars'],
             'exit_reason': trade['exit_reason'],
             'catalyst_type': trade.get('catalyst', ''),
+            'catalyst_tier': trade.get('catalyst_tier', 'Unknown'),
+            'catalyst_age_days': trade.get('catalyst_age_days', 0),
+            'news_validation_score': trade.get('news_validation_score', 0),
+            'news_exit_triggered': trade.get('news_exit_triggered', False),
+            'vix_at_entry': trade.get('vix_at_entry', 0.0),
+            'market_regime': trade.get('market_regime', 'Unknown'),
+            'macro_event_near': trade.get('macro_event_near', 'None'),
+            'relative_strength': trade.get('relative_strength', 0.0),
+            'stock_return_3m': trade.get('stock_return_3m', 0.0),
+            'sector_etf': trade.get('sector_etf', 'Unknown'),
+            'conviction_level': trade.get('conviction_level', 'MEDIUM'),
+            'supporting_factors': trade.get('supporting_factors', 0),
             'sector': trade.get('sector', ''),
-            'confidence_level': trade.get('confidence', ''),
             'stop_loss': trade.get('stop_loss', 0),
             'price_target': trade.get('price_target', 0),
             'thesis': trade.get('thesis', ''),
             'what_worked': '',  # Will be filled by learning system
             'what_failed': '',  # Will be filled by learning system
-            'account_value_after': 0  # Will be calculated after portfolio update
+            'account_value_after': account_value_after
         }
 
         self.log_completed_trade(trade_data)
