@@ -102,7 +102,8 @@ Last     - MONTHLY LEARNING
 Sunday   ├─ Market regime detection (Bull/Bear/Choppy)
 6:00 PM  ├─ Comprehensive performance metrics
          ├─ Strategy effectiveness evaluation
-         └─ Major strategic adjustments
+         ├─ Generate parameter recommendations
+         └─ Submit to admin dashboard for approval
 ```
 
 ### Data Flow Architecture
@@ -2121,7 +2122,291 @@ def calculate_position_size(account_value, conviction):
 **GitHub Repository:** [Link when public]
 **Documentation:** This file (MASTER_STRATEGY_BLUEPRINT.md)
 **Version:** 2.0 (Pareto-Optimized)
-**Last Updated:** 2025-10-30
+**Last Updated:** 2025-11-02
+
+---
+
+## APPENDIX: AUTONOMOUS LEARNING & ADMIN DASHBOARD
+
+### Overview (Added 2025-11-02)
+
+The system now features **fully autonomous learning** with **human-in-the-loop approval** for critical parameter changes.
+
+### Learning System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   AUTONOMOUS LEARNING                        │
+│                  (Runs Daily/Weekly/Monthly)                 │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+         ┌───────────┴───────────┐
+         │                       │
+    ┌────▼─────┐         ┌──────▼──────┐
+    │ CATALYST │         │  PARAMETER  │
+    │EXCLUSIONS│         │OPTIMIZATION │
+    │          │         │             │
+    │ AUTO-    │         │ REQUIRES    │
+    │ APPLIED  │         │ APPROVAL    │
+    └────┬─────┘         └──────┬──────┘
+         │                      │
+         │              ┌───────▼────────┐
+         │              │ Admin Dashboard│
+         │              │  tedbot.ai/    │
+         │              │     admin      │
+         │              └───────┬────────┘
+         │                      │
+         │              ┌───────▼────────┐
+         │              │ Human Reviews  │
+         │              │ Approve/Reject │
+         │              └───────┬────────┘
+         │                      │
+         └──────────┬───────────┘
+                    │
+            ┌───────▼────────┐
+            │  Applied to    │
+            │ agent_v5.5.py  │
+            └────────────────┘
+```
+
+### Component 1: Catalyst Exclusion (Automated)
+
+**Purpose:** Automatically exclude catalysts that consistently underperform.
+
+**How It Works:**
+1. **Daily Learning** (`learn_daily.py`) analyzes last 7 days of trades
+2. Identifies catalysts with <35% win rate (minimum 10 trades)
+3. Adds to `catalyst_exclusions.json`
+4. **Automatically enforced** by `agent_v5.5.py` during GO command
+
+**Claude Self-Validation:**
+- When Claude encounters an excluded catalyst, it CAN override if it has strong reasoning
+- Must provide `override_exclusion: true` and `override_reasoning: "..."` in decision
+- Override is logged to `logs/exclusion_overrides.log` for monitoring
+- Dashboard shows override results (WIN/LOSS) for accountability
+
+**Files Modified:**
+- `agent_v5.5.py` (lines 2726-2754): Hard enforcement check with override escape hatch
+- `agent_v5.5.py` (lines 2044-2061): Logging function for overrides
+- `agent_v5.5.py` (lines 1924-1930): Claude prompt instructions about exclusions
+
+**Example:**
+```json
+// catalyst_exclusions.json
+[
+  {
+    "catalyst": "stock_split",
+    "win_rate": 28.5,
+    "total_trades": 14,
+    "added_date": "2025-11-01",
+    "reasoning": "Poor momentum, high false signals"
+  }
+]
+```
+
+**Claude Override Example:**
+```json
+{
+  "action": "BUY",
+  "ticker": "NVDA",
+  "catalyst": "stock_split",
+  "override_exclusion": true,
+  "override_reasoning": "This is a 10:1 split for NVDA with strong institutional support and positive market sentiment. Unlike previous split failures in low-volume stocks, this has $500B+ market cap backing."
+}
+```
+
+### Component 2: Parameter Optimization (Human Approval Required)
+
+**Purpose:** Data-driven recommendations for numerical parameters (VIX threshold, RS threshold, News score minimum, Stop loss %).
+
+**How It Works:**
+1. **Monthly Learning** (`learn_monthly.py`) analyzes 30+ days of trades
+2. Identifies underperforming parameters
+3. Generates recommendations with confidence levels (HIGH/MEDIUM)
+4. Saves to `dashboard_data/pending_actions.json`
+5. **NO automatic application** - waits for human approval
+
+**Why Human Approval?**
+- Market regimes change - parameters that worked in one cycle may not in another
+- Context matters - data alone doesn't capture macro shifts
+- Prevents overfitting - human judgment adds necessary friction
+- Accountability - admin owns the decision
+
+**Parameters Analyzed:**
+- `VIX_THRESHOLD` (current: 25) - Market volatility filter
+- `RS_THRESHOLD` (current: 1.1) - Relative strength requirement
+- `NEWS_SCORE_MIN` (current: 15) - Minimum news quality score
+- `STOP_LOSS_PCT` (current: -7%) - Stop loss percentage
+
+**Files Modified:**
+- `learn_monthly.py` (lines 488-537): Generation logic
+- `learn_monthly.py` (lines 539-564): Save to dashboard
+
+**Example Recommendation:**
+```json
+{
+  "type": "PARAMETER_ADJUSTMENT",
+  "parameter": "VIX_THRESHOLD",
+  "current_value": 25,
+  "suggested_value": 22,
+  "sample_size": 28,
+  "reasoning": "VIX >25 showing 38.2% win rate over 28 trades. Lowering threshold to 22 would have avoided 8 losing trades while only filtering 2 winners. Net improvement: +$187.",
+  "confidence": "HIGH",
+  "status": "PENDING_REVIEW"
+}
+```
+
+### Component 3: Admin Dashboard
+
+**URL:** https://tedbot.ai/admin
+
+**Purpose:** Secure web interface for monitoring system and approving parameter changes.
+
+**Features:**
+1. **System Status**
+   - Real-time account value
+   - Active positions (X/10)
+   - 30-day win rate
+   - Last update timestamp
+
+2. **Actions Required**
+   - Pending parameter recommendations
+   - Approve/Reject buttons
+   - Add approval notes
+   - Shows sample size and confidence
+
+3. **Recent Trades**
+   - Last 5 completed trades
+   - Entry/Exit prices
+   - Hold days and P&L
+   - Exit reasons
+
+4. **Exclusion Overrides**
+   - Claude's override decisions
+   - Override reasoning
+   - Trade results (WIN/LOSS)
+   - Accountability tracking
+
+**Security:**
+- Password-protected (bcrypt hashing)
+- Rate limiting (5 attempts, 15-min lockout)
+- Session timeout (2 hours)
+- Audit logging (`logs/dashboard/audit.log`)
+- HTTPS via nginx reverse proxy
+
+**Files Created:**
+- `dashboard_server.py`: Flask application
+- `dashboard/templates/login.html`: Login page
+- `dashboard/templates/dashboard.html`: Main interface
+- `start_dashboard.sh`: Startup script
+- `generate_dashboard_credentials.py`: Credential generator
+- `DASHBOARD_SETUP.md`: Deployment guide
+
+**Nginx Configuration:**
+- Location: `/etc/nginx/sites-available/trading-dashboard`
+- Routes: `/login`, `/logout`, `/admin`, `/api`
+- Proxy to: `http://127.0.0.1:5000`
+
+**Access:**
+```bash
+# Start dashboard (on server)
+screen -S dashboard
+./start_dashboard.sh
+# Ctrl+A then D to detach
+
+# Access via browser
+https://tedbot.ai/admin
+```
+
+### Approval Workflow
+
+**Step 1: Monthly Learning Runs**
+```bash
+# Automated via cron (last Sunday, 6:00 PM)
+/root/paper_trading_lab/venv/bin/python3 /root/paper_trading_lab/learn_monthly.py
+```
+
+**Step 2: Recommendations Generated**
+- System analyzes 30+ days of data
+- Identifies parameters with statistical underperformance
+- Generates recommendations with reasoning
+- Saves to `dashboard_data/pending_actions.json`
+
+**Step 3: Admin Reviews**
+- Login to https://tedbot.ai/admin
+- Review "Actions Required" section
+- See: parameter, current value, suggested value, reasoning, sample size
+- Decision: Approve or Reject
+
+**Step 4: Apply Changes**
+- If approved, dashboard shows code snippet to apply:
+  ```python
+  # In agent_v5.5.py, update VIX threshold
+  VIX_THRESHOLD = 22
+  ```
+- Admin manually edits `agent_v5.5.py`
+- Restart agent (automatic via cron next morning)
+
+**Step 5: Monitor Results**
+- Next monthly report shows impact of change
+- Validate improvement vs. prediction
+- Iterate
+
+### Design Philosophy
+
+**Catalyst Exclusions:**
+- **Fast feedback loop** (7 days) for bad patterns
+- **Automated enforcement** - data is clear-cut
+- **Claude override** - allows context-aware exceptions
+- **High accountability** - overrides are tracked and measured
+
+**Parameter Optimization:**
+- **Slow feedback loop** (30 days) prevents overreaction
+- **Human approval required** - parameters affect entire strategy
+- **Data-driven recommendations** - not guesses
+- **Context matters** - market regime changes need human judgment
+
+**Why This Works:**
+1. **Separates concerns**: Tactical (catalysts) vs. Strategic (parameters)
+2. **Right level of automation**: Fast for obvious failures, slow for systemic changes
+3. **Human-in-the-loop**: Keeps admin engaged and accountable
+4. **Audit trail**: Every decision logged and reviewable
+5. **Escape hatch**: Claude can override bad exclusions with reasoning
+
+### Monitoring & Maintenance
+
+**Daily:**
+- Check dashboard for system health
+- Review any exclusion overrides
+
+**Weekly:**
+- No action required (reports generate automatically)
+
+**Monthly:**
+- Review pending parameter recommendations
+- Approve/reject based on market context
+- Apply approved changes to `agent_v5.5.py`
+
+**Audit:**
+```bash
+# View security events
+tail -f logs/dashboard/audit.log
+
+# View exclusion overrides
+tail -f logs/exclusion_overrides.log
+
+# Check dashboard status
+screen -r dashboard
+```
+
+### Future Enhancements
+
+**Potential Improvements:**
+- A/B testing framework for parameter changes
+- Confidence intervals on recommendations
+- Rollback mechanism for failed changes
+- Email/SMS alerts for critical issues
+- Mobile-responsive dashboard
 
 ---
 
