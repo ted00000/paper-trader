@@ -362,6 +362,117 @@ def generate_code_snippet(action):
 
     return snippets.get(param, f"# Update {param} to {new_value}")
 
+@app.route('/api/operations/status')
+@require_auth
+def operations_status():
+    """Get status of all system operations"""
+    try:
+        status_dir = PROJECT_DIR / 'dashboard_data' / 'operation_status'
+
+        if not status_dir.exists():
+            return jsonify({'operations': {}, 'health': 'UNKNOWN'})
+
+        operations = {}
+        overall_health = 'HEALTHY'
+
+        for status_file in status_dir.glob('*_status.json'):
+            try:
+                with open(status_file) as f:
+                    status = json.load(f)
+                    op_name = status['operation']
+
+                    # Calculate age
+                    if status.get('last_run'):
+                        last_run = datetime.fromisoformat(status['last_run'])
+                        age_hours = (datetime.now() - last_run).total_seconds() / 3600
+                    else:
+                        age_hours = None
+
+                    # Determine health
+                    if status['status'] == 'FAILED':
+                        health = 'FAILED'
+                        overall_health = 'UNHEALTHY'
+                    elif status['status'] == 'NEVER_RUN':
+                        health = 'NEVER_RUN'
+                    elif age_hours and age_hours > 48:
+                        health = 'STALE'
+                        if overall_health == 'HEALTHY':
+                            overall_health = 'WARNING'
+                    else:
+                        health = 'HEALTHY'
+
+                    operations[op_name] = {
+                        'status': status['status'],
+                        'health': health,
+                        'last_run': status.get('last_run'),
+                        'age_hours': age_hours,
+                        'error': status.get('error'),
+                        'log_file': status.get('log_file')
+                    }
+            except Exception as e:
+                print(f"Error loading {status_file}: {e}")
+                continue
+
+        return jsonify({
+            'operations': operations,
+            'health': overall_health,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/operations/logs/<operation>')
+@require_auth
+def view_log(operation):
+    """View log file for an operation"""
+    try:
+        # Validate operation name
+        valid_ops = ['go', 'execute', 'analyze', 'learn_daily', 'learn_weekly', 'learn_monthly']
+        if operation.lower() not in valid_ops:
+            return jsonify({'error': 'Invalid operation'}), 400
+
+        log_file = PROJECT_DIR / 'logs' / f'{operation.lower()}.log'
+
+        if not log_file.exists():
+            return jsonify({'error': 'Log file not found', 'log': ''}), 404
+
+        # Get last N lines (default 100)
+        lines = int(request.args.get('lines', 100))
+
+        with open(log_file) as f:
+            all_lines = f.readlines()
+            last_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+
+        return jsonify({
+            'operation': operation,
+            'log_file': str(log_file),
+            'lines_returned': len(last_lines),
+            'total_lines': len(all_lines),
+            'content': ''.join(last_lines)
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system/health')
+@require_auth
+def system_health():
+    """Get comprehensive system health check"""
+    try:
+        health_file = PROJECT_DIR / 'dashboard_data' / 'system_health.json'
+
+        if health_file.exists():
+            with open(health_file) as f:
+                health_data = json.load(f)
+        else:
+            health_data = {'status': 'unknown', 'message': 'Health check not run yet'}
+
+        return jsonify(health_data)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("ADMIN DASHBOARD SERVER")
