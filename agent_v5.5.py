@@ -1269,58 +1269,72 @@ POSITION {i}: {ticker}
             }
 
         try:
-            # Fetch VIX as INDEX (I:VIX) from Polygon.io
-            # Try previous day's close first (most reliable for pre-market GO command)
-            url = f'https://api.polygon.io/v2/aggs/ticker/I:VIX/prev?adjusted=true&apiKey={POLYGON_API_KEY}'
-            response = requests.get(url, timeout=10)
-            data = response.json()
-
             vix_level = None
+            source = None
 
-            # Check previous close data
-            if data.get('status') == 'OK' and 'results' in data and len(data['results']) > 0:
-                result = data['results'][0]
-                vix_level = float(result.get('c', 0))  # Close price
-
-            # If previous close fails, try snapshot endpoint
-            if not vix_level or vix_level <= 0:
-                url = f'https://api.polygon.io/v3/snapshot/indices/I:VIX?apiKey={POLYGON_API_KEY}'
+            # METHOD 1: Try Polygon Indices (if available)
+            try:
+                url = f'https://api.polygon.io/v2/aggs/ticker/I:VIX/prev?adjusted=true&apiKey={POLYGON_API_KEY}'
                 response = requests.get(url, timeout=10)
                 data = response.json()
 
-                if data.get('status') == 'OK' and 'results' in data:
-                    results = data['results']
-                    if 'value' in results:
-                        vix_level = float(results['value'])
-                    elif 'session' in results and 'close' in results['session']:
-                        vix_level = float(results['session']['close'])
+                if data.get('status') == 'OK' and 'results' in data and len(data['results']) > 0:
+                    result = data['results'][0]
+                    vix_level = float(result.get('c', 0))
+                    source = 'Polygon'
+            except Exception as e:
+                print(f"   ℹ️ Polygon VIX unavailable: {e}")
 
+            # METHOD 2: Yahoo Finance fallback (free, reliable)
+            if not vix_level or vix_level <= 0:
+                try:
+                    # Yahoo Finance CSV download - gets last trading day's data
+                    url = 'https://query1.finance.yahoo.com/v7/finance/download/%5EVIX?period1=0&period2=9999999999&interval=1d&events=history'
+                    response = requests.get(url, timeout=10)
+
+                    if response.status_code == 200:
+                        lines = response.text.strip().split('\n')
+                        if len(lines) >= 2:
+                            # Get last line (most recent data)
+                            last_line = lines[-1]
+                            parts = last_line.split(',')
+                            # CSV format: Date,Open,High,Low,Close,Adj Close,Volume
+                            if len(parts) >= 5:
+                                vix_level = float(parts[4])  # Close price
+                                source = 'Yahoo Finance'
+                                print(f"   ℹ️ Using Yahoo Finance VIX: {vix_level:.2f}")
+                except Exception as e:
+                    print(f"   ℹ️ Yahoo Finance VIX unavailable: {e}")
+
+            # If we got VIX data from any source, use it
             if vix_level and vix_level > 0:
                 # Determine regime based on VIX level
                 if vix_level >= 35:
                     regime = 'SHUTDOWN'
-                    message = f'VIX {vix_level:.1f} ≥35: SYSTEM SHUTDOWN - No new entries'
+                    message = f'VIX {vix_level:.1f} ≥35: SYSTEM SHUTDOWN - No new entries (source: {source})'
                 elif vix_level >= 30:
                     regime = 'CAUTIOUS'
-                    message = f'VIX {vix_level:.1f} (30-35): HIGHEST CONVICTION ONLY'
+                    message = f'VIX {vix_level:.1f} (30-35): HIGHEST CONVICTION ONLY (source: {source})'
                 else:
                     regime = 'NORMAL'
-                    message = f'VIX {vix_level:.1f} <30: Normal operations'
+                    message = f'VIX {vix_level:.1f} <30: Normal operations (source: {source})'
 
                 return {
                     'vix': round(vix_level, 2),
                     'timestamp': datetime.now().isoformat(),
                     'regime': regime,
-                    'message': message
+                    'message': message,
+                    'source': source
                 }
 
-            # If no data, fall back to assumption
-            print("   ⚠️ VIX data unavailable from Polygon Indices, assuming normal regime")
+            # If all sources failed, fall back to assumption
+            print("   ⚠️ VIX data unavailable from all sources, assuming normal regime")
             return {
                 'vix': 20.0,
                 'timestamp': datetime.now().isoformat(),
                 'regime': 'NORMAL',
-                'message': 'VIX data unavailable - assumed normal regime'
+                'message': 'VIX data unavailable - assumed normal regime',
+                'source': 'assumption'
             }
 
         except Exception as e:
@@ -1329,7 +1343,8 @@ POSITION {i}: {ticker}
                 'vix': 20.0,
                 'timestamp': datetime.now().isoformat(),
                 'regime': 'NORMAL',
-                'message': f'Error fetching VIX - assumed normal regime'
+                'message': f'Error fetching VIX - assumed normal regime',
+                'source': 'assumption'
             }
 
     def check_macro_calendar(self, check_date=None):

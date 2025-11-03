@@ -72,6 +72,50 @@ try:
 except Exception as e:
     print(f"❌ ERROR: {e}")
 
+# Test 3: Yahoo Finance (free fallback)
+print("\n📊 Test 3: Yahoo Finance CSV (%5EVIX)")
+print("-" * 70)
+url3 = 'https://query1.finance.yahoo.com/v7/finance/download/%5EVIX?period1=0&period2=9999999999&interval=1d&events=history'
+try:
+    response = requests.get(url3, timeout=10)
+    print(f"Status Code: {response.status_code}")
+
+    if response.status_code == 200:
+        lines = response.text.strip().split('\n')
+        if len(lines) >= 2:
+            print(f"✅ SUCCESS!")
+            print(f"Total data rows: {len(lines) - 1}")
+
+            # Show last 3 days
+            print("\nLast 3 trading days:")
+            for line in lines[-4:-1]:
+                parts = line.split(',')
+                if len(parts) >= 5:
+                    date = parts[0]
+                    close = parts[4]
+                    print(f"  {date}: VIX Close = {close}")
+
+            # Most recent
+            last_line = lines[-1]
+            parts = last_line.split(',')
+            if len(parts) >= 5:
+                vix_close = float(parts[4])
+                vix_date = parts[0]
+                print(f"\n📍 MOST RECENT: {vix_date} - VIX = {vix_close:.2f}")
+        else:
+            print(f"❌ FAILED: Not enough data")
+    else:
+        print(f"❌ FAILED with status {response.status_code}")
+except Exception as e:
+    print(f"❌ ERROR: {e}")
+
+print("\n" + "=" * 70)
+print("RECOMMENDATION")
+print("=" * 70)
+print("Based on test results:")
+print("- If Test 1 or 2 passed: Polygon Indices access works")
+print("- If only Test 3 passed: Use Yahoo Finance fallback (free)")
+print("- System will automatically try Polygon first, then Yahoo")
 print("\n" + "=" * 70)
 print("TEST COMPLETE")
 print("=" * 70)
