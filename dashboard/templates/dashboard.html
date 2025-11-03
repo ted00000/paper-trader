@@ -772,11 +772,11 @@
             const modalTitle = document.getElementById('modalTitle');
             const logContent = document.getElementById('logContent');
 
-            modalTitle.textContent = `${operation.toUpperCase()} Log`;
+            modalTitle.textContent = `${operation.toUpperCase()} Log - Today's Activity`;
             logContent.textContent = 'Loading...';
             modal.style.display = 'block';
 
-            fetch(`/api/operations/logs/${operation}?lines=200`)
+            fetch(`/api/operations/logs/${operation}`)
                 .then(r => r.json())
                 .then(data => {
                     if (data.error) {

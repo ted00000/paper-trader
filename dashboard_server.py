@@ -428,7 +428,7 @@ def operations_status():
 @app.route('/api/operations/logs/<operation>')
 @require_auth
 def view_log(operation):
-    """View log file for an operation"""
+    """View log file for an operation - shows today's entries only"""
     try:
         # Validate operation name
         valid_ops = ['go', 'execute', 'analyze', 'learn_daily', 'learn_weekly', 'learn_monthly']
@@ -440,19 +440,43 @@ def view_log(operation):
         if not log_file.exists():
             return jsonify({'error': 'Log file not found', 'log': ''}), 404
 
-        # Get last N lines (default 100)
-        lines = int(request.args.get('lines', 100))
+        # Get today's date string
+        today = datetime.now().strftime('%Y-%m-%d')
 
+        # Read log and filter for today's entries
         with open(log_file) as f:
             all_lines = f.readlines()
-            last_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+
+            # Find today's entries
+            today_lines = []
+            in_todays_section = False
+
+            for line in all_lines:
+                # Check if line contains today's date (handles various formats)
+                if today in line or datetime.now().strftime('%m/%d') in line:
+                    in_todays_section = True
+                    today_lines.append(line)
+                elif in_todays_section:
+                    # Continue collecting lines until we see a different date or section marker
+                    if '=====' in line and today not in line:
+                        # New section for different date
+                        in_todays_section = False
+                    else:
+                        today_lines.append(line)
+
+            # If no today's entries found, show last 50 lines as fallback
+            if not today_lines:
+                today_lines = all_lines[-50:] if len(all_lines) > 50 else all_lines
+                content_note = "(No entries found for today - showing last 50 lines)\n\n"
+            else:
+                content_note = f"(Showing today's entries: {today})\n\n"
 
         return jsonify({
             'operation': operation,
             'log_file': str(log_file),
-            'lines_returned': len(last_lines),
+            'lines_returned': len(today_lines),
             'total_lines': len(all_lines),
-            'content': ''.join(last_lines)
+            'content': content_note + ''.join(today_lines)
         })
 
     except Exception as e:
