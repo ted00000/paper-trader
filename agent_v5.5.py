@@ -1272,41 +1272,27 @@ POSITION {i}: {ticker}
             vix_level = None
             source = None
 
-            # METHOD 1: Try Polygon Indices (if available)
+            # Fetch from CBOE (official VIX source - free)
             try:
-                url = f'https://api.polygon.io/v2/aggs/ticker/I:VIX/prev?adjusted=true&apiKey={POLYGON_API_KEY}'
+                # CBOE publishes daily VIX data as CSV
+                url = 'https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv'
                 response = requests.get(url, timeout=10)
-                data = response.json()
 
-                if data.get('status') == 'OK' and 'results' in data and len(data['results']) > 0:
-                    result = data['results'][0]
-                    vix_level = float(result.get('c', 0))
-                    source = 'Polygon'
+                if response.status_code == 200:
+                    lines = response.text.strip().split('\n')
+                    if len(lines) >= 2:
+                        # Get last line (most recent data)
+                        last_line = lines[-1]
+                        parts = last_line.split(',')
+                        # CSV format: DATE,OPEN,HIGH,LOW,CLOSE
+                        if len(parts) >= 5:
+                            vix_level = float(parts[4])  # Close price
+                            source = 'CBOE'
+                            print(f"   ℹ️ Using CBOE VIX: {vix_level:.2f}")
             except Exception as e:
-                print(f"   ℹ️ Polygon VIX unavailable: {e}")
+                print(f"   ℹ️ CBOE VIX unavailable: {e}")
 
-            # METHOD 2: Yahoo Finance fallback (free, reliable)
-            if not vix_level or vix_level <= 0:
-                try:
-                    # Yahoo Finance CSV download - gets last trading day's data
-                    url = 'https://query1.finance.yahoo.com/v7/finance/download/%5EVIX?period1=0&period2=9999999999&interval=1d&events=history'
-                    response = requests.get(url, timeout=10)
-
-                    if response.status_code == 200:
-                        lines = response.text.strip().split('\n')
-                        if len(lines) >= 2:
-                            # Get last line (most recent data)
-                            last_line = lines[-1]
-                            parts = last_line.split(',')
-                            # CSV format: Date,Open,High,Low,Close,Adj Close,Volume
-                            if len(parts) >= 5:
-                                vix_level = float(parts[4])  # Close price
-                                source = 'Yahoo Finance'
-                                print(f"   ℹ️ Using Yahoo Finance VIX: {vix_level:.2f}")
-                except Exception as e:
-                    print(f"   ℹ️ Yahoo Finance VIX unavailable: {e}")
-
-            # If we got VIX data from any source, use it
+            # If we got VIX data, use it
             if vix_level and vix_level > 0:
                 # Determine regime based on VIX level
                 if vix_level >= 35:
@@ -1327,8 +1313,8 @@ POSITION {i}: {ticker}
                     'source': source
                 }
 
-            # If all sources failed, fall back to assumption
-            print("   ⚠️ VIX data unavailable from all sources, assuming normal regime")
+            # If CBOE failed, fall back to assumption
+            print("   ⚠️ VIX data unavailable from CBOE, assuming normal regime")
             return {
                 'vix': 20.0,
                 'timestamp': datetime.now().isoformat(),
