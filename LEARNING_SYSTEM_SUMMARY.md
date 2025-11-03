@@ -26,8 +26,8 @@ Your trading system now has **autonomous learning** with **human oversight** for
 
 ### What It Does
 - Identifies bad catalysts (e.g., "stock_split", "activist_investor")
-- Automatically excludes them from future trades
-- Claude can override with strong reasoning
+- **Warns Claude** about poor historical performance
+- **Claude makes the final decision** with full context
 
 ### How It Works
 ```
@@ -39,13 +39,15 @@ Finds catalysts with <35% win rate (10+ trades)
   ↓
 Updates catalyst_exclusions.json
   ↓
-agent_v5.5.py enforces exclusions
+agent_v5.5.py loads exclusions into context
   ↓
-Claude can override with reasoning
+Claude sees warning: "stock_split: 28.5% win rate over 14 trades"
   ↓
-Override logged to exclusion_overrides.log
+Claude makes decision (can still trade if conviction strong)
   ↓
-Dashboard shows override results
+If Claude uses poor catalyst → logged to exclusion_overrides.log
+  ↓
+Dashboard shows results (WIN/LOSS) for accountability
 ```
 
 ### Example Exclusion
@@ -59,23 +61,32 @@ Dashboard shows override results
 }
 ```
 
-### Claude Override
-When Claude sees an excluded catalyst, it can still trade if it provides strong reasoning:
+### Claude Decision Example
+When Claude sees a poor-performing catalyst, it's informed but can still choose to trade:
 
+**What Claude Sees in Context:**
+```
+⚠️  HISTORICALLY UNDERPERFORMING CATALYSTS:
+- stock_split: 28.5% win rate over 14 trades - Poor momentum, high false signals
+```
+
+**Claude's Response:**
 ```json
 {
   "action": "BUY",
   "ticker": "NVDA",
   "catalyst": "stock_split",
-  "override_exclusion": true,
-  "override_reasoning": "This is a 10:1 split for NVDA with strong institutional support and positive market sentiment. Unlike previous split failures in low-volume stocks, this has $500B+ market cap backing."
+  "reasoning": "Despite stock_split's poor historical performance, this is different: NVDA is a $500B+ mega-cap with strong institutional support. The 10:1 split comes after earnings beat, unlike previous failures on low-volume stocks."
 }
 ```
 
+The system logs this decision and tracks the outcome for accountability.
+
 ### Files Modified
-- `agent_v5.5.py` (lines 2726-2754): Enforcement + override logic
-- `agent_v5.5.py` (lines 2044-2061): Override logging
-- `agent_v5.5.py` (lines 1924-1930): Claude prompt instructions
+- `agent_v5.5.py` (lines 1994-2002): Load exclusions with performance data into context
+- `agent_v5.5.py` (lines 2024-2029): Warning in context string
+- `agent_v5.5.py` (lines 2752-2775): Soft warning + logging (not hard enforcement)
+- `agent_v5.5.py` (lines 2052-2069): Logging function for tracking
 
 ---
 
@@ -216,11 +227,11 @@ screen -r dashboard
 
 ## Why This Design?
 
-### Catalyst Exclusions = Automated
-- **Data is clear**: 28% win rate = bad catalyst
+### Catalyst Exclusions = Soft Warning
+- **Data is clear**: 28% win rate = warning to Claude
 - **Fast feedback**: 7 days is enough signal
-- **Override available**: Claude can use judgment
-- **High accountability**: Overrides are tracked
+- **Claude decides**: Has full context to make final call
+- **High accountability**: All decisions tracked
 
 ### Parameter Changes = Human Approval
 - **Context matters**: Market regimes change
@@ -229,10 +240,11 @@ screen -r dashboard
 - **Prevents overfitting**: Human judgment adds friction
 
 ### Best of Both Worlds
-- **Autonomous where appropriate**: Bad catalysts get cut fast
-- **Human where needed**: Strategic parameters require context
-- **Accountability**: All decisions logged
-- **Flexibility**: System can adapt while you maintain control
+- **Trust AI where appropriate**: Claude can handle tactical catalyst decisions
+- **Human where needed**: Strategic parameters require approval
+- **Full accountability**: All decisions logged and measured
+- **Learning feedback loop**: If Claude succeeds with "bad" catalysts, we learn from it
+- **Flexibility**: System adapts while you maintain control
 
 ---
 

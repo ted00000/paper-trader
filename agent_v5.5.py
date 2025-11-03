@@ -1921,14 +1921,6 @@ Project Context:
 
 Execute the user's command following the PROJECT_INSTRUCTIONS.md guidelines.
 
-⚠️ IMPORTANT - CATALYST EXCLUSIONS:
-Do NOT use any catalyst types marked as excluded UNLESS you have EXCEPTIONAL reasoning.
-If you believe a excluded catalyst should be used despite poor historical performance:
-  1. Set "override_exclusion": true in the JSON
-  2. Provide "override_reasoning": "Detailed explanation of why this time is different"
-  3. Acknowledge the historical win rate and explain specific factors that make this setup different
-Without override fields, excluded catalysts will be automatically rejected.
-
 CRITICAL: When executing 'go' command, you MUST include a properly formatted JSON block at the end of your response."""
 
         payload = {
@@ -1990,15 +1982,15 @@ CRITICAL: When executing 'go' command, you MUST include a properly formatted JSO
         if strategy_file.exists():
             context['strategy'] = strategy_file.read_text()[:8000]
         
-        # Load catalyst exclusions
+        # Load catalyst exclusions with performance data
         exclusions = self.load_catalyst_exclusions()
         if exclusions:
             context['exclusions'] = '\n'.join([
-                f"- {e['catalyst']}: {e.get('reason', 'Poor performance')}" 
+                f"- {e['catalyst']}: {e.get('win_rate', 0):.1f}% win rate over {e.get('total_trades', 0)} trades - {e.get('reasoning', 'Poor performance')}"
                 for e in exclusions
             ])
         else:
-            context['exclusions'] = 'None'
+            context['exclusions'] = 'None (all catalysts available)'
         
         # Load portfolio
         if self.portfolio_file.exists():
@@ -2020,7 +2012,11 @@ PROJECT INSTRUCTIONS:
 STRATEGY RULES (AUTO-UPDATED BY LEARNING):
 {context.get('strategy', 'Not found')}
 
-⚠️ CATALYST EXCLUSIONS (DO NOT USE THESE):
+⚠️  HISTORICALLY UNDERPERFORMING CATALYSTS:
+The following catalysts have shown poor results. You may still use them if you have strong conviction,
+but explain your reasoning and consider what makes this situation different from past failures.
+Your decisions will be tracked for accountability.
+
 {context.get('exclusions', 'None')}
 
 CURRENT PORTFOLIO:
@@ -2749,35 +2745,30 @@ RECENT LESSONS LEARNED:
                 rejection_reasons = []
 
                 try:
-                    # LEARNED EXCLUSIONS: Check if catalyst is excluded
+                    # LEARNED EXCLUSIONS: Check if catalyst was historically poor (soft warning)
                     exclusions = self.load_catalyst_exclusions()
                     excluded_catalysts = {e['catalyst'].lower(): e for e in exclusions}
 
                     if catalyst_type.lower() in excluded_catalysts:
                         excl = excluded_catalysts[catalyst_type.lower()]
 
-                        # Check if Claude provided override justification
-                        if buy_pos.get('override_exclusion') and buy_pos.get('override_reasoning'):
-                            # Claude acknowledged exclusion and provided reasoning - ALLOW but log
-                            print(f"   ⚠️  {ticker}: Using excluded catalyst (OVERRIDE APPROVED)")
-                            print(f"      Historical: {excl['win_rate']:.1f}% win rate over {excl['total_trades']} trades")
-                            print(f"      Reasoning: {buy_pos['override_reasoning']}")
+                        # Log usage of excluded catalyst (Claude made this choice with full context)
+                        print(f"   ⚠️  {ticker}: Using historically poor catalyst '{catalyst_type}'")
+                        print(f"      Historical: {excl['win_rate']:.1f}% win rate over {excl['total_trades']} trades")
+                        print(f"      Claude's reasoning: {buy_pos.get('reasoning', 'Not specified')}")
 
-                            # Log this override for dashboard review
-                            self.log_exclusion_override(ticker, catalyst_type, buy_pos['override_reasoning'], excl)
+                        # Log for dashboard accountability tracking
+                        self.log_exclusion_override(
+                            ticker,
+                            catalyst_type,
+                            buy_pos.get('reasoning', 'Claude chose despite historical underperformance'),
+                            excl
+                        )
 
-                            # Mark position as high-risk override
-                            buy_pos['exclusion_override'] = True
-                            buy_pos['requires_close_monitoring'] = True
-
-                        else:
-                            # Claude used excluded catalyst without acknowledging - REJECT
-                            validation_passed = False
-                            rejection_reasons.append(
-                                f"Excluded catalyst: {catalyst_type} "
-                                f"({excl['win_rate']:.1f}% win rate, {excl['total_trades']} trades). "
-                                f"Must provide override_reasoning if intentional."
-                            )
+                        # Mark position for close monitoring
+                        buy_pos['used_excluded_catalyst'] = True
+                        buy_pos['exclusion_win_rate'] = excl['win_rate']
+                        buy_pos['requires_close_monitoring'] = True
 
                     # PHASE 2: Check catalyst tier
                     tier_result = self.classify_catalyst_tier(catalyst_type, catalyst_details)

@@ -2171,24 +2171,27 @@ The system now features **fully autonomous learning** with **human-in-the-loop a
 
 ### Component 1: Catalyst Exclusion (Automated)
 
-**Purpose:** Automatically exclude catalysts that consistently underperform.
+**Purpose:** Warn Claude about catalysts that have historically underperformed.
 
 **How It Works:**
 1. **Daily Learning** (`learn_daily.py`) analyzes last 7 days of trades
 2. Identifies catalysts with <35% win rate (minimum 10 trades)
-3. Adds to `catalyst_exclusions.json`
-4. **Automatically enforced** by `agent_v5.5.py` during GO command
+3. Adds to `catalyst_exclusions.json` with performance data
+4. **Context warning** loaded into Claude's prompt by `agent_v5.5.py`
 
-**Claude Self-Validation:**
-- When Claude encounters an excluded catalyst, it CAN override if it has strong reasoning
-- Must provide `override_exclusion: true` and `override_reasoning: "..."` in decision
-- Override is logged to `logs/exclusion_overrides.log` for monitoring
-- Dashboard shows override results (WIN/LOSS) for accountability
+**Claude Self-Validation (Soft Warning Approach):**
+- Claude is **warned** about poor catalysts in context with performance data
+- Example: "stock_split: 28.5% win rate over 14 trades - Poor momentum"
+- Claude can STILL choose to trade if it has strong conviction
+- **No hard enforcement** - Claude makes final decision with full information
+- All uses of poor catalysts are logged to `logs/exclusion_overrides.log`
+- Dashboard shows results (WIN/LOSS) to validate Claude's judgment over time
 
 **Files Modified:**
-- `agent_v5.5.py` (lines 2726-2754): Hard enforcement check with override escape hatch
-- `agent_v5.5.py` (lines 2044-2061): Logging function for overrides
-- `agent_v5.5.py` (lines 1924-1930): Claude prompt instructions about exclusions
+- `agent_v5.5.py` (lines 1994-2002): Load exclusions with performance data into context
+- `agent_v5.5.py` (lines 2024-2029): Warning text in context string
+- `agent_v5.5.py` (lines 2752-2775): Soft warning + logging (not hard enforcement)
+- `agent_v5.5.py` (lines 2052-2069): Logging function for tracking
 
 **Example:**
 ```json
@@ -2204,16 +2207,25 @@ The system now features **fully autonomous learning** with **human-in-the-loop a
 ]
 ```
 
-**Claude Override Example:**
+**Claude Decision Example:**
+
+What Claude sees in context:
+```
+⚠️  HISTORICALLY UNDERPERFORMING CATALYSTS:
+- stock_split: 28.5% win rate over 14 trades - Poor momentum, high false signals
+```
+
+Claude's response (can still choose to trade):
 ```json
 {
   "action": "BUY",
   "ticker": "NVDA",
   "catalyst": "stock_split",
-  "override_exclusion": true,
-  "override_reasoning": "This is a 10:1 split for NVDA with strong institutional support and positive market sentiment. Unlike previous split failures in low-volume stocks, this has $500B+ market cap backing."
+  "reasoning": "Despite stock_split's poor historical performance, this is different: NVDA is a $500B+ mega-cap with strong institutional support. The 10:1 split comes after earnings beat, unlike previous failures on low-volume stocks."
 }
 ```
+
+System logs this decision and tracks the outcome for accountability.
 
 ### Component 2: Parameter Optimization (Human Approval Required)
 
@@ -2356,9 +2368,9 @@ https://tedbot.ai/admin
 
 **Catalyst Exclusions:**
 - **Fast feedback loop** (7 days) for bad patterns
-- **Automated enforcement** - data is clear-cut
-- **Claude override** - allows context-aware exceptions
-- **High accountability** - overrides are tracked and measured
+- **Soft warning approach** - Claude is informed, not blocked
+- **Trust AI judgment** - Claude sees full context and decides
+- **High accountability** - all decisions with poor catalysts are tracked and measured
 
 **Parameter Optimization:**
 - **Slow feedback loop** (30 days) prevents overreaction
@@ -2368,10 +2380,11 @@ https://tedbot.ai/admin
 
 **Why This Works:**
 1. **Separates concerns**: Tactical (catalysts) vs. Strategic (parameters)
-2. **Right level of automation**: Fast for obvious failures, slow for systemic changes
-3. **Human-in-the-loop**: Keeps admin engaged and accountable
-4. **Audit trail**: Every decision logged and reviewable
-5. **Escape hatch**: Claude can override bad exclusions with reasoning
+2. **Right level of automation**: Fast warnings for patterns, slow for systemic changes
+3. **Trusts AI where appropriate**: Claude has context and can make nuanced decisions
+4. **Human oversight where needed**: Strategic parameter changes require approval
+5. **Full accountability**: Every decision logged, tracked, and measured
+6. **Learns from results**: If Claude succeeds with "bad" catalysts, we learn from it
 
 ### Monitoring & Maintenance
 
