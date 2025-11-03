@@ -384,6 +384,9 @@ def operations_status():
                     # Calculate age
                     if status.get('last_run'):
                         last_run = datetime.fromisoformat(status['last_run'])
+                        # Remove timezone info to compare with timezone-naive datetime.now()
+                        if last_run.tzinfo is not None:
+                            last_run = last_run.replace(tzinfo=None)
                         age_hours = (datetime.now() - last_run).total_seconds() / 3600
                     else:
                         age_hours = None
