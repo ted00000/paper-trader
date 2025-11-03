@@ -1269,42 +1269,53 @@ POSITION {i}: {ticker}
             }
 
         try:
-            # Fetch VIX (ticker: VIX) from Polygon.io
-            url = f'https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/VIX?apiKey={POLYGON_API_KEY}'
+            # Fetch VIX as INDEX (I:VIX) from Polygon.io
+            # Try previous day's close first (most reliable for pre-market GO command)
+            url = f'https://api.polygon.io/v2/aggs/ticker/I:VIX/prev?adjusted=true&apiKey={POLYGON_API_KEY}'
             response = requests.get(url, timeout=10)
             data = response.json()
 
-            if data.get('status') == 'OK' and 'ticker' in data:
-                ticker_data = data['ticker']
+            vix_level = None
 
-                # Get last trade price
-                vix_level = None
-                if 'lastTrade' in ticker_data and ticker_data['lastTrade']:
-                    vix_level = float(ticker_data['lastTrade'].get('p', 0))
-                elif 'day' in ticker_data and ticker_data['day']:
-                    vix_level = float(ticker_data['day'].get('c', 0))
+            # Check previous close data
+            if data.get('status') == 'OK' and 'results' in data and len(data['results']) > 0:
+                result = data['results'][0]
+                vix_level = float(result.get('c', 0))  # Close price
 
-                if vix_level and vix_level > 0:
-                    # Determine regime based on VIX level
-                    if vix_level >= 35:
-                        regime = 'SHUTDOWN'
-                        message = f'VIX {vix_level:.1f} ≥35: SYSTEM SHUTDOWN - No new entries'
-                    elif vix_level >= 30:
-                        regime = 'CAUTIOUS'
-                        message = f'VIX {vix_level:.1f} (30-35): HIGHEST CONVICTION ONLY'
-                    else:
-                        regime = 'NORMAL'
-                        message = f'VIX {vix_level:.1f} <30: Normal operations'
+            # If previous close fails, try snapshot endpoint
+            if not vix_level or vix_level <= 0:
+                url = f'https://api.polygon.io/v3/snapshot/indices/I:VIX?apiKey={POLYGON_API_KEY}'
+                response = requests.get(url, timeout=10)
+                data = response.json()
 
-                    return {
-                        'vix': round(vix_level, 2),
-                        'timestamp': datetime.now().isoformat(),
-                        'regime': regime,
-                        'message': message
-                    }
+                if data.get('status') == 'OK' and 'results' in data:
+                    results = data['results']
+                    if 'value' in results:
+                        vix_level = float(results['value'])
+                    elif 'session' in results and 'close' in results['session']:
+                        vix_level = float(results['session']['close'])
 
-            # If no data, try alternative method (index snapshot)
-            print("   ⚠️ VIX data unavailable from ticker, assuming normal regime")
+            if vix_level and vix_level > 0:
+                # Determine regime based on VIX level
+                if vix_level >= 35:
+                    regime = 'SHUTDOWN'
+                    message = f'VIX {vix_level:.1f} ≥35: SYSTEM SHUTDOWN - No new entries'
+                elif vix_level >= 30:
+                    regime = 'CAUTIOUS'
+                    message = f'VIX {vix_level:.1f} (30-35): HIGHEST CONVICTION ONLY'
+                else:
+                    regime = 'NORMAL'
+                    message = f'VIX {vix_level:.1f} <30: Normal operations'
+
+                return {
+                    'vix': round(vix_level, 2),
+                    'timestamp': datetime.now().isoformat(),
+                    'regime': regime,
+                    'message': message
+                }
+
+            # If no data, fall back to assumption
+            print("   ⚠️ VIX data unavailable from Polygon Indices, assuming normal regime")
             return {
                 'vix': 20.0,
                 'timestamp': datetime.now().isoformat(),
