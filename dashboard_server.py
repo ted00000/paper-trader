@@ -440,36 +440,48 @@ def view_log(operation):
         if not log_file.exists():
             return jsonify({'error': 'Log file not found', 'log': ''}), 404
 
-        # Get today's date string
+        # Get today's date string in format used by logs
         today = datetime.now().strftime('%Y-%m-%d')
+        today_short = datetime.now().strftime('%b %d')  # e.g., "Nov  3"
 
         # Read log and filter for today's entries
         with open(log_file) as f:
             all_lines = f.readlines()
 
-            # Find today's entries
+            # Find complete sections for today
             today_lines = []
             in_todays_section = False
+            current_section = []
 
-            for line in all_lines:
-                # Check if line contains today's date (handles various formats)
-                if today in line or datetime.now().strftime('%m/%d') in line:
+            for i, line in enumerate(all_lines):
+                # Check if this line starts a new section for today
+                if (today in line or today_short in line) and ('Time:' in line or 'Starting:' in line or '====' in line):
+                    # If we were in a section, save it
+                    if current_section:
+                        today_lines.extend(current_section)
+                    # Start new section
                     in_todays_section = True
-                    today_lines.append(line)
+                    current_section = [line]
                 elif in_todays_section:
-                    # Continue collecting lines until we see a different date or section marker
-                    if '=====' in line and today not in line:
-                        # New section for different date
-                        in_todays_section = False
-                    else:
-                        today_lines.append(line)
+                    current_section.append(line)
+                    # Check if we've hit a section marker that indicates end of this run
+                    if 'COMPLETED SUCCESSFULLY' in line or 'FAILED' in line:
+                        # Look ahead - if next non-empty line is a different date, stop
+                        if i + 1 < len(all_lines):
+                            next_line = all_lines[i + 1].strip()
+                            if next_line and today not in next_line and today_short not in next_line:
+                                in_todays_section = False
 
-            # If no today's entries found, show last 50 lines as fallback
+            # Add any remaining section
+            if current_section:
+                today_lines.extend(current_section)
+
+            # If no today's entries found, show last 100 lines as fallback
             if not today_lines:
-                today_lines = all_lines[-50:] if len(all_lines) > 50 else all_lines
-                content_note = "(No entries found for today - showing last 50 lines)\n\n"
+                today_lines = all_lines[-100:] if len(all_lines) > 100 else all_lines
+                content_note = "(No entries found for today - showing last 100 lines)\n\n"
             else:
-                content_note = f"(Showing today's entries: {today})\n\n"
+                content_note = f"(Showing today's activity: {today})\n\n"
 
         return jsonify({
             'operation': operation,
