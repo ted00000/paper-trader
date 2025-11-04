@@ -373,6 +373,9 @@ POSITION {i}: {ticker}
                 account_data = json.load(f)
                 account_value_after = account_data.get('account_value', 0)
 
+        # Determine exit type
+        exit_type = self._determine_exit_type(trade['exit_reason'], trade)
+
         trade_data = {
             'trade_id': f"{trade['ticker']}_{trade['entry_date']}",
             'entry_date': trade['entry_date'],
@@ -389,6 +392,7 @@ POSITION {i}: {ticker}
             'return_percent': trade['pnl_percent'],
             'return_dollars': trade['pnl_dollars'],
             'exit_reason': trade['exit_reason'],
+            'exit_type': exit_type,
             'catalyst_type': trade.get('catalyst', ''),
             'catalyst_tier': trade.get('catalyst_tier', 'Unknown'),
             'catalyst_age_days': trade.get('catalyst_age_days', 0),
@@ -408,7 +412,9 @@ POSITION {i}: {ticker}
             'thesis': trade.get('thesis', ''),
             'what_worked': '',  # Will be filled by learning system
             'what_failed': '',  # Will be filled by learning system
-            'account_value_after': account_value_after
+            'account_value_after': account_value_after,
+            'rotation_into_ticker': trade.get('rotation_into_ticker', ''),
+            'rotation_reason': trade.get('rotation_reason', '')
         }
 
         self.log_completed_trade(trade_data)
@@ -2433,25 +2439,28 @@ RECENT LESSONS LEARNED:
     
     def close_position(self, position, exit_price, exit_reason):
         """Close a position and prepare trade data for CSV logging"""
-        
+
         entry_price = position['entry_price']
         shares = position['shares']
-        
+
         return_pct = ((exit_price - entry_price) / entry_price) * 100
         return_dollars = (exit_price - entry_price) * shares
-        
+
         entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
         exit_date = datetime.now()
         hold_days = (exit_date - entry_date).days
-        
+
+        # Determine exit type from exit_reason
+        exit_type = self._determine_exit_type(exit_reason, position)
+
         # Get current account value
         account_data = {}
         if self.account_file.exists():
             with open(self.account_file, 'r') as f:
                 account_data = json.load(f)
-        
+
         account_value_after = account_data.get('account_value', 1000.00)
-        
+
         trade_data = {
             'trade_id': f"{position['ticker']}_{position['entry_date']}",
             'entry_date': position['entry_date'],
@@ -2467,6 +2476,7 @@ RECENT LESSONS LEARNED:
             'return_percent': return_pct,
             'return_dollars': return_dollars,
             'exit_reason': exit_reason,
+            'exit_type': exit_type,
             'catalyst_type': position.get('catalyst', 'Unknown'),
             'sector': position.get('sector', 'Unknown'),
             'confidence_level': position.get('confidence', 'Medium'),
@@ -2475,10 +2485,29 @@ RECENT LESSONS LEARNED:
             'thesis': position.get('thesis', ''),
             'what_worked': 'Auto-closed by system' if 'Target' in exit_reason else '',
             'what_failed': 'Hit stop loss' if 'Stop' in exit_reason else '',
-            'account_value_after': account_value_after
+            'account_value_after': account_value_after,
+            'rotation_into_ticker': position.get('rotation_into_ticker', ''),
+            'rotation_reason': position.get('rotation_reason', '')
         }
-        
+
         return trade_data
+
+    def _determine_exit_type(self, exit_reason, position):
+        """Determine exit type category from exit reason"""
+        reason_lower = exit_reason.lower()
+
+        if 'rotation' in reason_lower or 'strategic' in reason_lower:
+            return 'Strategic_Rotation'
+        elif 'stop' in reason_lower:
+            return 'Stop_Loss'
+        elif 'target' in reason_lower:
+            return 'Target_Reached'
+        elif 'time' in reason_lower or 'days' in reason_lower:
+            return 'Time_Stop'
+        elif 'news' in reason_lower or 'invalid' in reason_lower:
+            return 'News_Invalidation'
+        else:
+            return 'Other'
     
     def log_completed_trade(self, trade_data):
         """Write completed trade to CSV for learning system"""
@@ -2491,13 +2520,14 @@ RECENT LESSONS LEARNED:
                     'Trade_ID', 'Entry_Date', 'Exit_Date', 'Ticker',
                     'Premarket_Price', 'Entry_Price', 'Exit_Price', 'Gap_Percent',
                     'Shares', 'Position_Size', 'Position_Size_Percent', 'Hold_Days', 'Return_Percent', 'Return_Dollars',
-                    'Exit_Reason', 'Catalyst_Type', 'Catalyst_Tier', 'Catalyst_Age_Days',
+                    'Exit_Reason', 'Exit_Type', 'Catalyst_Type', 'Catalyst_Tier', 'Catalyst_Age_Days',
                     'News_Validation_Score', 'News_Exit_Triggered',
                     'VIX_At_Entry', 'Market_Regime', 'Macro_Event_Near',
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Sector', 'Stop_Loss', 'Price_Target',
-                    'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After'
+                    'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
+                    'Rotation_Into_Ticker', 'Rotation_Reason'
                 ])
 
         with open(self.trades_csv, 'a', newline='') as f:
@@ -2518,6 +2548,7 @@ RECENT LESSONS LEARNED:
                 trade_data.get('return_percent', 0),
                 trade_data.get('return_dollars', 0),
                 trade_data.get('exit_reason', ''),
+                trade_data.get('exit_type', ''),
                 trade_data.get('catalyst_type', ''),
                 trade_data.get('catalyst_tier', 'Unknown'),
                 trade_data.get('catalyst_age_days', 0),
@@ -2537,7 +2568,9 @@ RECENT LESSONS LEARNED:
                 trade_data.get('thesis', ''),
                 trade_data.get('what_worked', ''),
                 trade_data.get('what_failed', ''),
-                trade_data.get('account_value_after', 0)
+                trade_data.get('account_value_after', 0),
+                trade_data.get('rotation_into_ticker', ''),
+                trade_data.get('rotation_reason', '')
             ])
         
         print(f"   ✓ Logged trade to CSV: {trade_data.get('ticker')} "
@@ -2642,9 +2675,134 @@ RECENT LESSONS LEARNED:
         return closed_trades
     
     # =====================================================================
+    # PORTFOLIO ROTATION (PHASE 4)
+    # =====================================================================
+
+    def evaluate_portfolio_rotation(self, hold_positions, new_opportunities, premarket_data):
+        """
+        Phase 4: Evaluate strategic rotation opportunities when portfolio is full
+
+        Args:
+            hold_positions: List of current positions being held
+            new_opportunities: List of BUY recommendations from Claude
+            premarket_data: Current price/P&L data for positions
+
+        Returns:
+            Dict with rotation decisions or empty if no rotations recommended
+        """
+
+        if len(hold_positions) < 10 or len(new_opportunities) == 0:
+            return {'rotations': []}
+
+        print("\n" + "="*70)
+        print("PORTFOLIO ROTATION EVALUATION")
+        print("="*70)
+        print(f"Portfolio Status: {len(hold_positions)}/10 positions (FULL)")
+        print(f"New Opportunities: {len(new_opportunities)} strong signals identified")
+        print()
+
+        # Build context for Claude with detailed position analysis
+        context = self._build_rotation_context(hold_positions, new_opportunities, premarket_data)
+
+        # Ask Claude to evaluate rotation opportunities
+        print("Calling Claude to evaluate rotation opportunities...")
+        response = self.call_claude_api('rotation_evaluation', context)
+
+        # Extract rotation decisions
+        decisions = self.extract_json_from_response(response)
+
+        if not decisions or not decisions.get('rotations'):
+            print("   ✓ No rotations recommended - holding current portfolio\n")
+            return {'rotations': []}
+
+        rotations = decisions['rotations']
+        print(f"   ✓ Claude recommends {len(rotations)} rotation(s):\n")
+
+        for rot in rotations:
+            print(f"     EXIT: {rot['ticker']} → ENTER: {rot['target_ticker']}")
+            print(f"     Reason: {rot['reason']}")
+            print(f"     Expected Net Gain: {rot.get('expected_net_gain', 'N/A')}")
+            print()
+
+        return decisions
+
+    def _build_rotation_context(self, hold_positions, new_opportunities, premarket_data):
+        """Build detailed context string for rotation evaluation"""
+
+        context = "PORTFOLIO ROTATION EVALUATION\n\n"
+        context += "="*70 + "\n\n"
+
+        # Current holdings analysis
+        context += "CURRENT HOLDINGS (10/10 - Portfolio Full):\n"
+        context += "-"*70 + "\n\n"
+
+        for pos in hold_positions:
+            ticker = pos['ticker']
+            entry_price = pos.get('entry_price', 0)
+            current_price = pos.get('current_price', entry_price)
+            days_held = pos.get('days_held', 0)
+            catalyst = pos.get('catalyst', 'Unknown')
+            catalyst_tier = pos.get('catalyst_tier', 'Unknown')
+            unrealized_pct = pos.get('unrealized_gain_pct', 0)
+
+            # Calculate momentum velocity
+            velocity = unrealized_pct / max(days_held, 1)
+
+            context += f"Ticker: {ticker}\n"
+            context += f"  Current P&L: {unrealized_pct:+.2f}% (${current_price:.2f} vs ${entry_price:.2f})\n"
+            context += f"  Days Held: {days_held} | Momentum: {velocity:+.2f}%/day\n"
+            context += f"  Catalyst: {catalyst} ({catalyst_tier})\n"
+            context += f"  Entry: {pos.get('entry_date', 'Unknown')}\n"
+            context += "\n"
+
+        # New opportunities analysis
+        context += "\n" + "="*70 + "\n\n"
+        context += f"NEW OPPORTUNITIES ({len(new_opportunities)} signals):\n"
+        context += "-"*70 + "\n\n"
+
+        for opp in new_opportunities:
+            context += f"Ticker: {opp['ticker']}\n"
+            context += f"  Catalyst: {opp.get('catalyst', 'Unknown')} ({opp.get('catalyst_tier', 'Unknown')})\n"
+            context += f"  Thesis: {opp.get('thesis', 'N/A')[:150]}...\n"
+            context += f"  News Score: {opp.get('news_validation_score', 0)}/100\n"
+            context += f"  Catalyst Age: {opp.get('catalyst_age_hours', 'Unknown')} hours\n"
+            context += "\n"
+
+        # Rotation guidance
+        context += "\n" + "="*70 + "\n\n"
+        context += "ROTATION DECISION CRITERIA:\n\n"
+        context += "Consider rotating IF:\n"
+        context += "1. WEAK POSITION: Low momentum (<0.3%/day), stalling thesis, or underperforming\n"
+        context += "2. STRONG OPPORTUNITY: Tier 1 catalyst, fresh (<24hrs), high validation (>80/100)\n"
+        context += "3. NET POSITIVE EV: Expected gain from new > current position + exit cost\n\n"
+        context += "AVOID rotating IF:\n"
+        context += "- Position has strong momentum (>0.5%/day)\n"
+        context += "- Position near target (+8% or more)\n"
+        context += "- New opportunity is stale (>48hrs) or low conviction\n"
+        context += "- Would cause excessive churn (>3 rotations/week)\n\n"
+        context += "="*70 + "\n\n"
+        context += "TASK: Should we rotate any positions?\n\n"
+        context += "Return JSON in this format:\n"
+        context += "{\n"
+        context += '  "rotations": [\n'
+        context += '    {\n'
+        context += '      "ticker": "XYZ",  // Position to exit\n'
+        context += '      "reason": "Stalling at +2% after 8 days, momentum fading",\n'
+        context += '      "target_ticker": "NVDA",  // New position to enter\n'
+        context += '      "target_rationale": "Fresh Tier 1 earnings beat, 95/100 validation",\n'
+        context += '      "expected_net_gain": "+6-8% vs holding to stop",\n'
+        context += '      "confidence": "HIGH"\n'
+        context += '    }\n'
+        context += '  ]\n'
+        context += "}\n\n"
+        context += "If NO rotations recommended, return: {\"rotations\": []}\n"
+
+        return context
+
+    # =====================================================================
     # COMMAND EXECUTION
     # =====================================================================
-    
+
     def execute_go_command(self):
         """
         Execute GO command (8:45 AM) - SWING TRADING VERSION
@@ -2735,6 +2893,48 @@ RECENT LESSONS LEARNED:
         print(f"   ✓ HOLD: {len(hold_positions)} positions")
         print(f"   ✓ EXIT: {len(exit_positions)} positions")
         print(f"   ✓ BUY:  {len(buy_positions)} new positions\n")
+
+        # Step 5.3: PHASE 4 - Portfolio Rotation (when portfolio full)
+        if len(hold_positions) >= 10 and len(buy_positions) > 0:
+            print("5.3 Portfolio at capacity - evaluating rotation opportunities...")
+            rotation_decision = self.evaluate_portfolio_rotation(
+                hold_positions=hold_positions,
+                new_opportunities=buy_positions,
+                premarket_data=premarket_data
+            )
+
+            # Process rotation decisions
+            if rotation_decision.get('rotations'):
+                for rotation in rotation_decision['rotations']:
+                    exit_ticker = rotation['ticker']
+                    target_ticker = rotation['target_ticker']
+                    rotation_reason = rotation['reason']
+
+                    # Find the position to rotate out
+                    rotated_position = None
+                    for i, pos in enumerate(hold_positions):
+                        if pos.get('ticker') == exit_ticker:
+                            rotated_position = hold_positions.pop(i)
+                            break
+
+                    if rotated_position:
+                        # Add rotation metadata
+                        rotated_position['rotation_into_ticker'] = target_ticker
+                        rotated_position['rotation_reason'] = rotation_reason
+                        rotated_position['exit_reason'] = f"Strategic rotation for {target_ticker}: {rotation_reason}"
+
+                        # Move to exit list
+                        exit_positions.append(rotated_position)
+
+                        print(f"   ✓ Rotation: {exit_ticker} → {target_ticker}")
+                        print(f"      Reason: {rotation_reason}")
+
+                print(f"   ✓ Processed {len(rotation_decision['rotations'])} rotation(s)\n")
+
+                # Update decision counts
+                print(f"   ✓ UPDATED - HOLD: {len(hold_positions)}, EXIT: {len(exit_positions)}, BUY: {len(buy_positions)}\n")
+            else:
+                print()
 
         # Step 5.4: PHASE 3 - Check VIX and Macro Calendar
         print("5.4 Checking market regime (Phase 3: VIX + Macro Calendar)...")

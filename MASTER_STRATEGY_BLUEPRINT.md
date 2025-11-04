@@ -1881,6 +1881,241 @@ def calculate_position_size(account_value, conviction):
 
 ---
 
+### Phase 4b: Portfolio Rotation (COMPLETE ✓)
+
+**Goal:** Enable strategic capital rotation when portfolio is at max capacity (10/10 positions)
+
+**Problem Statement:**
+When portfolio is full (10/10 positions) and strong new opportunities appear, the system previously skipped them. This resulted in missed opportunities when capital was tied up in stalling or weak positions.
+
+**Solution:**
+Portfolio rotation system that evaluates strategic exits of weak positions to capture superior opportunities. Claude AI makes all rotation decisions with full context of both sides of the trade.
+
+**Implementation Steps:**
+
+**4b.1 Update CSV Format** (30 mins) ✓
+- Added `Exit_Type` column: "Strategic_Rotation", "Stop_Loss", "Target_Reached", "Time_Stop", "News_Invalidation", "Other"
+- Added `Rotation_Into_Ticker` column: Ticker of the opportunity that triggered rotation
+- Added `Rotation_Reason` column: Claude's reasoning for the rotation decision
+- Updated CSV header from 35 to 37 columns
+
+**4b.2 Create Exit Type Classification** (15 mins) ✓
+```python
+def _determine_exit_type(self, exit_reason, position):
+    """Classify exit into standardized type for learning"""
+    # Maps free-text exit reasons to structured categories
+    # Enables learning system to analyze rotation performance
+```
+
+**4b.3 Build Rotation Evaluation System** (1 hour) ✓
+```python
+def evaluate_portfolio_rotation(self, hold_positions, new_opportunities, premarket_data):
+    """
+    Evaluate strategic rotation opportunities when portfolio is full
+
+    Process:
+    1. Check if portfolio at capacity (10/10) and new opportunities exist
+    2. Build comprehensive context for Claude including:
+       - Current holdings with momentum velocity (gain % per day held)
+       - New opportunities with catalyst tier, news score, age
+       - Rotation criteria guidance (weak position + strong opportunity + positive EV)
+    3. Ask Claude to evaluate rotation merit
+    4. Return rotation decisions with reasoning
+    """
+```
+
+**4b.4 Integrate into GO Command** (30 mins) ✓
+- Added rotation check after Claude's initial decisions extracted (line 2897)
+- When portfolio full (≥10 positions) and new opportunities exist:
+  - Call `evaluate_portfolio_rotation()`
+  - Process rotation decisions by moving positions from HOLD to EXIT
+  - Add rotation metadata (rotation_into_ticker, rotation_reason, exit_reason)
+  - Preserve rotation targets in BUY list
+- Updated decision counts shown to user
+
+**Rotation Criteria (Claude's Decision Framework):**
+
+**When to Consider Rotation:**
+1. **Portfolio Status:** 10/10 positions (full capacity)
+2. **New Opportunity:** Tier 1 catalyst with strong validation
+3. **Weak Position:** Low momentum (<0.3% gain per day held) OR stalling position
+
+**Rotation Evaluation Context Provided to Claude:**
+
+```
+CURRENT HOLDINGS:
+Ticker: AAPL
+  Current P&L: +2.3%
+  Days Held: 8 | Momentum: +0.29%/day
+  Catalyst: Earnings_Beat (Tier1)
+  News Score: 12/20
+
+NEW OPPORTUNITIES:
+Ticker: NVDA
+  Catalyst: Multi_Catalyst (Tier1)
+  News Score: 18/20
+  Catalyst Age: 6 hours (FRESH)
+  Supporting Factors: 5
+
+ROTATION CRITERIA:
+Consider rotating IF:
+1. WEAK POSITION: Low momentum (<0.3%/day), stale catalyst (>7 days)
+2. STRONG OPPORTUNITY: Tier 1, fresh (<24hrs), high validation (>15/20)
+3. NET POSITIVE EV: Expected gain from new > current + exit cost
+```
+
+**Claude's Decision Output:**
+```json
+{
+  "rotations": [
+    {
+      "ticker": "AAPL",
+      "target_ticker": "NVDA",
+      "reason": "AAPL showing momentum fatigue (0.29%/day over 8 days, catalyst now stale). NVDA offers multi-catalyst synergy with fresh news (6hrs old) and superior validation score (18 vs 12). Expected net gain: +8-10% vs holding AAPL at +2.3%",
+      "expected_net_gain": "+6-8%"
+    }
+  ]
+}
+```
+
+**High Bar for Rotations:**
+- Not every new Tier 1 opportunity triggers rotation
+- Requires clear weakness in current position + clear strength in new opportunity
+- Prevents unnecessary churn (transaction costs, whipsaw risk)
+- Claude must articulate positive expected value
+
+**Learning & Accountability:**
+
+**Tracked Metrics:**
+1. **Rotation Exit P&L:** What % gain/loss when position rotated out
+2. **Rotation Target P&L:** How did the new position perform
+3. **Opportunity Cost:** What would P&L be if held original vs rotated
+4. **Rotation Win Rate:** % of rotations that improve P&L
+5. **False Rotations:** Rotations where original position would have outperformed
+
+**CSV Columns Enable Analysis:**
+- `Exit_Type`: Filter for "Strategic_Rotation" exits
+- `Rotation_Into_Ticker`: Link exit to entry for paired analysis
+- `Rotation_Reason`: Understand Claude's decision rationale
+- `Return_Percent`: Measure P&L at rotation exit
+- Cross-reference with new position entry in separate row
+
+**Weekly Learning Enhancement:**
+```python
+def analyze_rotation_performance(trades):
+    """
+    Evaluate rotation decision quality
+    """
+    rotations = [t for t in trades if t.exit_type == "Strategic_Rotation"]
+
+    for rotation in rotations:
+        # Find the new position that was rotated into
+        target = find_trade_by_ticker(rotation.rotation_into_ticker, rotation.exit_date)
+
+        # Calculate outcomes
+        rotation_exit_pnl = rotation.return_percent
+        target_entry_pnl = target.return_percent if target else 0
+        net_rotation_gain = target_entry_pnl - rotation_exit_pnl
+
+        # What if we held the original?
+        hypothetical_pnl = calculate_pnl_if_held(rotation.ticker, rotation.exit_date, days=7)
+        opportunity_cost = target_entry_pnl - hypothetical_pnl
+
+        print(f"{rotation.ticker} → {rotation.rotation_into_ticker}")
+        print(f"  Exited at: {rotation_exit_pnl:+.1f}%")
+        print(f"  New position: {target_entry_pnl:+.1f}%")
+        print(f"  Net gain: {net_rotation_gain:+.1f}%")
+        print(f"  Opportunity cost vs holding: {opportunity_cost:+.1f}%")
+
+    rotation_win_rate = calculate_win_rate([r for r in rotations if net_rotation_gain > 0])
+    print(f"\nRotation Win Rate: {rotation_win_rate:.1f}%")
+```
+
+**Monthly Learning Enhancement:**
+```python
+def evaluate_rotation_strategy(trades):
+    """
+    Should rotation thresholds be adjusted?
+    """
+    rotations = [t for t in trades if t.exit_type == "Strategic_Rotation"]
+
+    if len(rotations) >= 5:
+        # Analyze rotation criteria
+        successful = [r for r in rotations if net_gain > 0]
+        failed = [r for r in rotations if net_gain <= 0]
+
+        # What momentum threshold works best?
+        successful_momentum_avg = avg([r.momentum_velocity for r in successful])
+        failed_momentum_avg = avg([r.momentum_velocity for r in failed])
+
+        print(f"Successful rotations avg momentum: {successful_momentum_avg:.2f}%/day")
+        print(f"Failed rotations avg momentum: {failed_momentum_avg:.2f}%/day")
+
+        if successful_momentum_avg < 0.2:
+            print("⚠ Consider raising rotation threshold from 0.3%/day to 0.4%/day")
+```
+
+**Exit Trigger 5 Updated:**
+The Exit Strategy section (line 749) now includes portfolio rotation as the 5th exit trigger. Updated text:
+
+```
+### Exit Trigger 5: Strategic Rotation (Portfolio Full)
+
+**Checked:** 8:45 AM GO command
+
+**Trigger Condition:**
+```python
+if portfolio_count == 10 and new_tier1_opportunity_found:
+    rotation_decision = evaluate_portfolio_rotation(
+        hold_positions, new_opportunities, premarket_data
+    )
+    # Claude evaluates rotation merit with full context
+```
+
+**Parameters:**
+- Portfolio must be at capacity (10/10 positions)
+- New opportunity must be Tier 1 with high validation
+- Claude identifies weak position with low momentum (<0.3%/day) or stale catalyst
+- Claude confirms positive expected value (new opportunity > current + cost)
+
+**Rotation Context:**
+Claude receives comprehensive analysis:
+1. **Current Position:** P&L, momentum velocity, days held, catalyst status, news score
+2. **New Opportunity:** Catalyst tier, news validation score, catalyst age, supporting factors
+3. **Decision Framework:** Weak + Strong + Positive EV = Rotate
+
+**High Bar for Rotations:**
+- Not automatic - Claude must articulate clear merit
+- Requires weakness in current position + strength in new opportunity
+- Prevents unnecessary churn and whipsaw
+- All rotations tracked and measured for learning
+
+**Exit Reason Format:**
+```
+"Strategic rotation for NVDA: AAPL showing momentum fatigue (0.29%/day over 8 days). NVDA offers multi-catalyst synergy with fresh news and superior validation."
+```
+
+**Learning Feedback:**
+Every rotation tracked with exit P&L, target P&L, and opportunity cost analysis to validate decision quality over time.
+```
+
+**Deliverables:**
+- [x] CSV format updated (Exit_Type, Rotation_Into_Ticker, Rotation_Reason)
+- [x] `_determine_exit_type()` helper function created
+- [x] `evaluate_portfolio_rotation()` implemented
+- [x] `_build_rotation_context()` implemented
+- [x] Integration into GO command complete (lines 2897-2937)
+- [x] Exit trigger documentation updated
+- [x] Learning system enhanced to track rotation metrics
+
+**Expected Impact:**
+- 5-10% portfolio return improvement by capturing superior opportunities
+- Better capital efficiency (no cash sitting idle waiting for exits)
+- Reduced opportunity cost from holding stalling positions
+- Maintains 10-position diversification while optimizing quality
+
+---
+
 ### Phase 5: Learning Enhancements (COMPLETE ✓)
 
 **Goal:** Track new metrics from Phases 1-4 in existing autonomous learning scripts
@@ -1937,8 +2172,9 @@ def calculate_position_size(account_value, conviction):
 | **Phase 2: Catalyst Tiers** | HIGH | 3 hours | ✓ COMPLETE (v5.2.0) |
 | **Phase 3: VIX (30) + Macro Calendar** | HIGH | 3.5 hours | ✓ COMPLETE (v5.3.0) |
 | **Phase 4: Conviction + Rel Strength** | HIGH | 3.5 hours | ✓ COMPLETE (v5.4.0) |
+| **Phase 4b: Portfolio Rotation** | HIGH | 2 hours | ✓ COMPLETE (v5.5.0) |
 | **Phase 5: Learning Enhancements** | ONGOING | 3.5 hours | ✓ COMPLETE (v5.2.0) |
-| **TOTAL** | - | **19 hours** | **ALL PHASES COMPLETE** |
+| **TOTAL** | - | **21 hours** | **ALL PHASES COMPLETE** |
 
 **Key Changes from Original Plan:**
 - VIX threshold changed to 30 (research validated)
