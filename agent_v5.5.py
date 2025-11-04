@@ -3332,6 +3332,12 @@ RECENT LESSONS LEARNED:
         self.update_account_status()
         print("   ✓ Account status updated\n")
 
+        # Create daily activity summary (show trades closed in EXECUTE)
+        if closed_trades:
+            print("9. Creating daily activity summary...")
+            self.create_daily_activity_summary(closed_trades)
+            print()
+
         # Clean up pending file
         self.pending_file.unlink()
 
