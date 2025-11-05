@@ -482,17 +482,22 @@ POSITION {i}: {ticker}
                     price = None
                     source = None
 
-                    # PRIORITY 1: After market close (4:00 PM+), use today's closing price
-                    if is_after_market and 'day' in ticker_data and ticker_data['day'] and 'c' in ticker_data['day']:
+                    # PRIORITY 1: Use today's price (day.c) if available (works during AND after market)
+                    if 'day' in ticker_data and ticker_data['day'] and 'c' in ticker_data['day']:
                         price = float(ticker_data['day']['c'])
-                        source = "today's close"
+                        source = "today's close" if is_after_market else "intraday"
 
-                    # PRIORITY 2: Use most recent trade (for intraday or if day.c not available)
+                    # PRIORITY 2: Use most recent minute bar (for intraday when day.c not available)
+                    elif 'min' in ticker_data and ticker_data['min'] and 'c' in ticker_data['min']:
+                        price = float(ticker_data['min']['c'])
+                        source = "recent min"
+
+                    # PRIORITY 3: Use most recent trade (if available)
                     elif 'lastTrade' in ticker_data and ticker_data['lastTrade'] and 'p' in ticker_data['lastTrade']:
                         price = float(ticker_data['lastTrade']['p'])
                         source = "last trade"
 
-                    # PRIORITY 3: Emergency fallback to yesterday's close (should rarely happen)
+                    # PRIORITY 4: Emergency fallback to yesterday's close (should rarely happen)
                     elif 'prevDay' in ticker_data and ticker_data['prevDay'] and 'c' in ticker_data['prevDay']:
                         price = float(ticker_data['prevDay']['c'])
                         source = "prev close ⚠️"
