@@ -325,6 +325,59 @@ class DataIntegrityChecker:
             print("\n❌ ERRORS DETECTED - Immediate action required!")
             return 1
 
+    def get_status_json(self):
+        """Return status as JSON for API consumption"""
+        if not self.errors and not self.warnings:
+            status = "healthy"
+            status_message = "All checks passed"
+        elif not self.errors:
+            status = "warning"
+            status_message = "Warnings detected"
+        else:
+            status = "error"
+            status_message = "Errors detected"
+
+        return {
+            "status": status,
+            "message": status_message,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "checks_passed": self.checks_passed,
+            "checks_total": self.checks_total,
+            "errors": self.errors,
+            "warnings": self.warnings
+        }
+
+    def run_checks_silent(self):
+        """Run all checks without printing (for API use)"""
+        # 1. Check critical files exist
+        self.check_file_exists("portfolio_data/current_portfolio.json")
+        self.check_file_exists("portfolio_data/account_status.json")
+        self.check_file_exists("portfolio_data/daily_activity.json")
+        self.check_file_exists("trade_history/completed_trades.csv")
+        self.check_file_exists("dashboard_data/daily_picks.json", required=False)
+
+        # 2. Check JSON validity
+        if (self.project_dir / "portfolio_data/current_portfolio.json").exists():
+            self.check_json_valid("portfolio_data/current_portfolio.json")
+        if (self.project_dir / "portfolio_data/account_status.json").exists():
+            self.check_json_valid("portfolio_data/account_status.json")
+        if (self.project_dir / "portfolio_data/daily_activity.json").exists():
+            self.check_json_valid("portfolio_data/daily_activity.json")
+        if (self.project_dir / "dashboard_data/daily_picks.json").exists():
+            self.check_json_valid("dashboard_data/daily_picks.json")
+
+        # 3. Check data consistency
+        self.check_portfolio_consistency()
+        self.check_account_consistency()
+        self.check_csv_integrity()
+        self.check_portfolio_csv_sync()
+
+        # 4. Check freshness
+        self.check_daily_activity_freshness()
+        self.check_daily_picks_freshness()
+
+        return self.get_status_json()
+
 if __name__ == "__main__":
     # Get project directory (default to current directory)
     project_dir = sys.argv[1] if len(sys.argv) > 1 else "."

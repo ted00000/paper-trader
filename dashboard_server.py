@@ -449,6 +449,32 @@ def daily_picks():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/system-health')
+@require_auth
+def system_health():
+    """Run data integrity checks and return system health status"""
+    try:
+        # Import and run integrity checker
+        import sys
+        sys.path.insert(0, str(PROJECT_DIR))
+        from data_integrity_check import DataIntegrityChecker
+
+        checker = DataIntegrityChecker(PROJECT_DIR)
+        health_status = checker.run_checks_silent()
+
+        return jsonify(health_status)
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Health check failed: {str(e)}',
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'checks_passed': 0,
+            'checks_total': 0,
+            'errors': [str(e)],
+            'warnings': []
+        }), 500
+
 @app.route('/api/operations/logs/<operation>')
 @require_auth
 def view_log(operation):
