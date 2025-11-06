@@ -2982,6 +2982,7 @@ RECENT LESSONS LEARNED:
         if buy_positions and can_enter_positions:
             print("5.5 Validating BUY recommendations (Phases 1-4: Full validation pipeline)...")
             validated_buys = []
+            all_picks = []  # Track all picks (accepted + rejected) for dashboard
 
             for buy_pos in buy_positions:
                 ticker = buy_pos.get('ticker', 'UNKNOWN')
@@ -3102,12 +3103,46 @@ RECENT LESSONS LEARNED:
 
                         validated_buys.append(buy_pos)
 
+                        # Add to daily picks (accepted)
+                        all_picks.append({
+                            'ticker': ticker,
+                            'status': 'ACCEPTED',
+                            'conviction': conviction_result['conviction'],
+                            'position_size_pct': conviction_result['position_size_pct'],
+                            'catalyst': catalyst_type,
+                            'catalyst_tier': tier_result['tier'],
+                            'tier_name': tier_result['tier_name'],
+                            'news_score': news_result['score'],
+                            'relative_strength': rs_result['relative_strength'],
+                            'vix': vix_result['vix'],
+                            'supporting_factors': conviction_result['supporting_factors'],
+                            'reasoning': buy_pos.get('reasoning', ''),
+                            'rejection_reasons': []
+                        })
+
                         print(f"   ✓ {ticker}: {conviction_result['conviction']} - {rs_result['relative_strength']:+.1f}% RS")
                         print(f"      Catalyst: {tier_result['tier_name']}")
                         print(f"      News: {news_result['score']}/20, RS: {rs_result['relative_strength']:+.1f}%, VIX: {vix_result['vix']}")
                         print(f"      Position Size: {conviction_result['position_size_pct']}% ({conviction_result['conviction']})")
                         print(f"      Reasoning: {conviction_result['reasoning']}")
                     else:
+                        # Add to daily picks (rejected)
+                        all_picks.append({
+                            'ticker': ticker,
+                            'status': 'REJECTED',
+                            'conviction': conviction_result.get('conviction', 'N/A') if 'conviction_result' in locals() else 'N/A',
+                            'position_size_pct': 0,
+                            'catalyst': catalyst_type,
+                            'catalyst_tier': tier_result.get('tier', 'Unknown') if 'tier_result' in locals() else 'Unknown',
+                            'tier_name': tier_result.get('tier_name', 'Unknown') if 'tier_result' in locals() else 'Unknown',
+                            'news_score': news_result.get('score', 0) if 'news_result' in locals() else 0,
+                            'relative_strength': rs_result.get('relative_strength', 0) if 'rs_result' in locals() else 0,
+                            'vix': vix_result['vix'],
+                            'supporting_factors': conviction_result.get('supporting_factors', 0) if 'conviction_result' in locals() else 0,
+                            'reasoning': buy_pos.get('reasoning', ''),
+                            'rejection_reasons': rejection_reasons
+                        })
+
                         print(f"   ✗ {ticker}: REJECTED")
                         for reason in rejection_reasons:
                             print(f"      - {reason}")
@@ -3122,6 +3157,9 @@ RECENT LESSONS LEARNED:
             # Replace buy_positions with validated list
             buy_positions = validated_buys
             print(f"   ✓ Validated: {len(validated_buys)} BUY positions passed checks\n")
+
+            # Save daily picks for dashboard visibility
+            self.save_daily_picks(all_picks, vix_result, macro_result)
 
         # Step 6: Build pending_positions.json
         print("6. Building pending positions file...")
@@ -3355,7 +3393,63 @@ RECENT LESSONS LEARNED:
         print(f"  - Total Active: {len(updated_positions)} positions\n")
 
         return True
-    
+
+    def save_daily_picks(self, all_picks, vix_result, macro_result):
+        """
+        Save daily picks (all opportunities analyzed) for admin dashboard visibility
+        Shows what Claude looked at, what passed/failed, and why
+        """
+        et_tz = pytz.timezone('America/New_York')
+        today = datetime.now(et_tz).strftime('%Y-%m-%d')
+
+        # Sort picks: ACCEPTED first (by conviction), then REJECTED
+        accepted = [p for p in all_picks if p['status'] == 'ACCEPTED']
+        rejected = [p for p in all_picks if p['status'] == 'REJECTED']
+
+        # Sort accepted by conviction level (HIGH > MEDIUM-HIGH > MEDIUM)
+        conviction_order = {'HIGH': 3, 'MEDIUM-HIGH': 2, 'MEDIUM': 1, 'SKIP': 0, 'N/A': 0}
+        accepted_sorted = sorted(accepted, key=lambda x: (
+            conviction_order.get(x['conviction'], 0),
+            x['news_score'],
+            x['relative_strength']
+        ), reverse=True)
+
+        # Sort rejected by tier (Tier1 rejected are more noteworthy than Tier3)
+        tier_order = {'Tier1': 3, 'Tier2': 2, 'Tier3': 1, 'Unknown': 0}
+        rejected_sorted = sorted(rejected, key=lambda x: (
+            tier_order.get(x['catalyst_tier'], 0),
+            x['news_score']
+        ), reverse=True)
+
+        daily_picks = {
+            'date': today,
+            'time': datetime.now(et_tz).strftime('%H:%M:%S ET'),
+            'market_conditions': {
+                'vix': vix_result['vix'],
+                'regime': vix_result['regime'],
+                'macro_event': macro_result.get('event_type') or 'None',
+                'macro_blackout': macro_result['is_blackout']
+            },
+            'summary': {
+                'total_analyzed': len(all_picks),
+                'accepted': len(accepted),
+                'rejected': len(rejected),
+                'high_conviction': len([p for p in accepted if p['conviction'] == 'HIGH']),
+                'medium_high_conviction': len([p for p in accepted if p['conviction'] == 'MEDIUM-HIGH']),
+                'medium_conviction': len([p for p in accepted if p['conviction'] == 'MEDIUM'])
+            },
+            'picks': accepted_sorted + rejected_sorted
+        }
+
+        # Save to dashboard_data directory
+        daily_picks_file = self.project_dir / 'dashboard_data' / 'daily_picks.json'
+        daily_picks_file.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(daily_picks_file, 'w') as f:
+            json.dump(daily_picks, f, indent=2)
+
+        print(f"   ✓ Saved daily picks: {len(accepted)} accepted, {len(rejected)} rejected")
+
     def create_daily_activity_summary(self, closed_trades):
         """
         Create daily activity summary for dashboard
