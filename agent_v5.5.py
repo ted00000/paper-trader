@@ -2969,6 +2969,9 @@ RECENT LESSONS LEARNED:
             print(f"   → Filtering for HIGHEST CONVICTION ONLY (Tier 1 + News ≥15)")
             regime_adjustment = 'HIGHEST_CONVICTION_ONLY'
 
+        # Store original buy_positions for daily picks tracking
+        original_buy_positions = buy_positions.copy()
+
         if macro_result['is_blackout']:
             # Macro event blackout: No new entries
             print(f"   🚨 MACRO BLACKOUT: {macro_result['event_type']} on {macro_result['event_date']}")
@@ -2978,13 +2981,13 @@ RECENT LESSONS LEARNED:
 
         print()
 
-        # Step 5.5: PHASE 1-4 - Validate BUY recommendations
-        if buy_positions and can_enter_positions:
+        # Step 5.5: PHASE 1-4 - Validate BUY recommendations OR track blocked picks
+        if original_buy_positions:
             print("5.5 Validating BUY recommendations (Phases 1-4: Full validation pipeline)...")
             validated_buys = []
             all_picks = []  # Track all picks (accepted + rejected) for dashboard
 
-            for buy_pos in buy_positions:
+            for buy_pos in original_buy_positions:
                 ticker = buy_pos.get('ticker', 'UNKNOWN')
                 catalyst_type = buy_pos.get('catalyst', 'Unknown')
                 catalyst_age = buy_pos.get('catalyst_age_days', 0)
@@ -2994,7 +2997,36 @@ RECENT LESSONS LEARNED:
                 validation_passed = True
                 rejection_reasons = []
 
+                # Auto-reject if blackout or shutdown
+                if not can_enter_positions:
+                    validation_passed = False
+                    if vix_result['regime'] == 'SHUTDOWN':
+                        rejection_reasons.append(f"System shutdown: VIX {vix_result['vix']} ≥35")
+                    elif macro_result['is_blackout']:
+                        rejection_reasons.append(f"Macro blackout: {macro_result['event_type']} on {macro_result['event_date']}")
+
                 try:
+                    # Skip detailed validation during blackouts (just track the rejection)
+                    if not can_enter_positions:
+                        # Create minimal pick data for blackout scenario
+                        all_picks.append({
+                            'ticker': ticker,
+                            'status': 'REJECTED',
+                            'conviction': 'N/A',
+                            'position_size_pct': 0,
+                            'catalyst': catalyst_type,
+                            'catalyst_tier': 'Unknown',
+                            'tier_name': 'Unknown',
+                            'news_score': 0,
+                            'relative_strength': 0,
+                            'vix': vix_result['vix'],
+                            'supporting_factors': 0,
+                            'reasoning': buy_pos.get('reasoning', ''),
+                            'rejection_reasons': rejection_reasons
+                        })
+                        print(f"   ✗ {ticker}: REJECTED - {rejection_reasons[0]}")
+                        continue  # Skip to next position
+
                     # LEARNED EXCLUSIONS: Check if catalyst was historically poor (soft warning)
                     exclusions = self.load_catalyst_exclusions()
                     excluded_catalysts = {e['catalyst'].lower(): e for e in exclusions}
