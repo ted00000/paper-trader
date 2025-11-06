@@ -425,6 +425,30 @@ def operations_status():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/daily-picks')
+@require_auth
+def daily_picks():
+    """Get daily picks (all opportunities analyzed by Claude)"""
+    try:
+        daily_picks_file = PROJECT_DIR / 'dashboard_data' / 'daily_picks.json'
+
+        if not daily_picks_file.exists():
+            return jsonify({
+                'available': False,
+                'message': 'No daily picks data yet. Run GO command to generate.'
+            })
+
+        with open(daily_picks_file) as f:
+            picks_data = json.load(f)
+
+        return jsonify({
+            'available': True,
+            'data': picks_data
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/operations/logs/<operation>')
 @require_auth
 def view_log(operation):
