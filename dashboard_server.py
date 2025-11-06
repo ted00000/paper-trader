@@ -451,7 +451,7 @@ def daily_picks():
 
 @app.route('/api/system-health')
 @require_auth
-def system_health():
+def data_integrity_health():
     """Run data integrity checks and return system health status"""
     try:
         # Import and run integrity checker
