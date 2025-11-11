@@ -1508,7 +1508,8 @@ POSITION {i}: {ticker}
             response = requests.get(url, timeout=15)
             data = response.json()
 
-            if data.get('status') == 'OK' and 'results' in data and len(data['results']) >= 2:
+            # Accept both 'OK' and 'DELAYED' status (delayed data is fine for our purposes)
+            if data.get('status') in ['OK', 'DELAYED'] and 'results' in data and len(data['results']) >= 2:
                 results = data['results']
 
                 # First close (90 days ago) and last close (today)
@@ -1858,9 +1859,90 @@ POSITION {i}: {ticker}
             json.dump(analysis, f, indent=2, default=str)
 
     # =====================================================================
+    # MARKET SCREENER INTEGRATION
+    # =====================================================================
+
+    def load_screener_candidates(self):
+        """
+        Load pre-screened candidates from market screener
+
+        Returns: Dict with screener results, or None if not available
+        """
+        screener_file = self.project_dir / 'screener_candidates.json'
+
+        if not screener_file.exists():
+            return None
+
+        try:
+            with open(screener_file, 'r') as f:
+                data = json.load(f)
+
+            # Check if screener ran today
+            scan_date = data.get('scan_date', '')
+            today = datetime.now().strftime('%Y-%m-%d')
+
+            if scan_date != today:
+                print(f"   ⚠️ Screener data is stale (from {scan_date})")
+                return None
+
+            return data
+
+        except Exception as e:
+            print(f"   ⚠️ Error loading screener results: {e}")
+            return None
+
+    def format_screener_candidates(self, screener_data):
+        """
+        Format screener candidates for Claude
+
+        Returns: String with formatted candidate list
+        """
+        if not screener_data or not screener_data.get('candidates'):
+            return None
+
+        candidates = screener_data['candidates']
+
+        output = f"PRE-SCREENED CANDIDATES (Top {len(candidates)} from S&P 1500 scan):\n\n"
+        output += f"Scanned: {screener_data['universe_size']} stocks\n"
+        output += f"Passed RS ≥3% filter: {screener_data['rs_pass_count']} stocks\n"
+        output += f"Top candidates: {len(candidates)}\n\n"
+
+        output += "TOP CANDIDATES (sorted by composite score):\n"
+        output += "=" * 80 + "\n\n"
+
+        for candidate in candidates[:25]:  # Show top 25 to keep tokens reasonable
+            rank = candidate['rank']
+            ticker = candidate['ticker']
+            score = candidate['composite_score']
+            sector = candidate['sector']
+
+            rs = candidate['relative_strength']
+            news = candidate['catalyst_signals']
+            vol = candidate['volume_analysis']
+            tech = candidate['technical_setup']
+
+            output += f"{rank}. {ticker} ({sector}) - Score: {score:.1f}/100\n"
+            output += f"   RS: +{rs['rs_pct']}% vs {rs['sector_etf']} "
+            output += f"(stock: +{rs['stock_return_3m']}%, sector: +{rs['sector_return_3m']}%)\n"
+            output += f"   News: {news['score']}/20 ({news['count']} articles"
+            if news['keywords']:
+                output += f", keywords: {', '.join(news['keywords'][:5])}"
+            output += ")\n"
+            output += f"   Volume: {vol['volume_ratio']:.1f}x average "
+            output += f"({vol['yesterday_volume']:,} vs {vol['avg_volume_20d']:,})\n"
+            output += f"   Technical: {tech['distance_from_52w_high_pct']:.1f}% from 52w high "
+            output += f"(${tech['current_price']:.2f} vs ${tech['high_52w']:.2f})\n"
+            output += f"   Why: {candidate['why_selected']}\n\n"
+
+        if len(candidates) > 25:
+            output += f"... and {len(candidates) - 25} more candidates\n"
+
+        return output
+
+    # =====================================================================
     # CLAUDE API INTEGRATION
     # =====================================================================
-    
+
     def call_claude_api(self, command, context, premarket_data=None):
         """Call Claude API with optimized context and retry logic
 
@@ -1935,9 +2017,19 @@ Provide full analysis of each position BEFORE the JSON. Justify all exits agains
 
             else:
                 # INITIAL BUILD MODE - No existing positions
+                # Try to load pre-screened candidates
+                screener_data = self.load_screener_candidates()
+                screener_section = ""
+
+                if screener_data:
+                    screener_section = self.format_screener_candidates(screener_data)
+                    instruction = "Select the BEST 10 stocks from the pre-screened candidates below."
+                else:
+                    instruction = "Select 10 stocks with Tier 1 catalysts. Focus on well-known, liquid stocks."
+
                 user_message = f"""BUILD INITIAL PORTFOLIO - {today_date}
 
-No existing positions. Select 10 stocks with Tier 1 catalysts for swing trading (3-7 day holds).
+No existing positions. {instruction}
 
 TIER 1 CATALYSTS ONLY:
 - Earnings beats with raised guidance
@@ -1945,6 +2037,18 @@ TIER 1 CATALYSTS ONLY:
 - Major analyst upgrades (top-tier firms)
 - Confirmed technical breakouts (2x volume)
 - Binary event winners (FDA, M&A, contracts)
+
+"""
+                if screener_section:
+                    user_message += screener_section + "\n"
+
+                user_message += """
+SELECTION CRITERIA:
+- Prioritize highest composite scores (if screener data available)
+- Look for multiple confirming signals (RS + news + volume)
+- Favor recent catalysts (last 3-7 days)
+- Diversify across sectors
+- All stocks will be validated through Phase 1-4 filters
 
 CRITICAL OUTPUT REQUIREMENT - JSON at end:
 ```json

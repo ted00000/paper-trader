@@ -89,6 +89,23 @@ Maintain an active portfolio of exactly **10 stocks** at all times, holding posi
 
 ## 🔄 DAILY WORKFLOW
 
+### Pre-Market Screening (8:30 AM) - Automated
+
+**Market Screener Runs:**
+1. Scan S&P 1500 universe (~1,500 stocks)
+2. Filter for Relative Strength ≥3% vs sector
+3. Check for recent catalysts (news, volume surges, breakouts)
+4. Score and rank candidates by composite score:
+   - 40% Relative Strength
+   - 30% News/Catalyst Strength
+   - 20% Volume Surge
+   - 10% Technical Setup
+5. Save top 50 candidates to `screener_candidates.json`
+
+**Output:** Pre-qualified list of 50 stocks with real catalysts
+
+---
+
 ### Morning Check-In (8:45 AM) - User Issues: "Go"
 
 **Claude Will:**
@@ -97,15 +114,15 @@ Maintain an active portfolio of exactly **10 stocks** at all times, holding posi
    - Verify stop losses / targets not hit
    - Assess if theses still intact
 
-2. Scan for new Tier 1 catalyst opportunities
-   - Search earnings beats overnight
-   - Check sector momentum developments
-   - Find technical breakouts
-   - Review analyst upgrades
+2. Evaluate pre-screened candidates from Market Screener
+   - Review top 50 candidates from 8:30 AM scan
+   - Analyze composite scores and catalyst strength
+   - Select best opportunities from real market data
+   - Fallback to manual search if screener unavailable
 
 3. Make trading decisions
    - Which positions to EXIT (if any)
-   - Which new positions to ENTER (replacements)
+   - Which new positions to ENTER (from screener candidates)
    - Update any stop losses or targets
 
 4. Provide clear action items:
