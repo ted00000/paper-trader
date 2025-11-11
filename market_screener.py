@@ -64,20 +64,22 @@ class MarketScreener:
         Load S&P 1500 ticker list from Polygon API
 
         Fetches all US stocks meeting our criteria:
-        - Listed on major exchanges (NYSE, NASDAQ)
-        - Market cap ≥ $1B
+        - Listed on major exchanges (NYSE, NASDAQ, AMEX)
+        - Common stock type (CS)
         - Active and primary listings
+        - Filters out ETFs, ADRs, preferred shares
 
-        Returns: List of ticker symbols
+        Returns: List of ticker symbols (~1500 stocks)
         """
         try:
             print("   Fetching S&P 1500 universe from Polygon API...")
 
-            # Get all US stock tickers with market cap filter
+            # Get all US stock tickers
             url = f'https://api.polygon.io/v3/reference/tickers'
             params = {
                 'market': 'stocks',
                 'active': 'true',
+                'type': 'CS',  # Common stock only
                 'limit': 1000,  # Max per page
                 'apiKey': self.api_key
             }
@@ -85,8 +87,8 @@ class MarketScreener:
             all_tickers = []
             next_url = url
 
-            # Paginate through results (may need multiple calls for 1500+ stocks)
-            while next_url and len(all_tickers) < 1500:
+            # Paginate through results (need ~2 calls for 1500+ stocks)
+            for page in range(3):  # Max 3 pages = 3000 stocks
                 if next_url == url:
                     response = requests.get(url, params=params, timeout=30)
                 else:
@@ -94,41 +96,52 @@ class MarketScreener:
 
                 data = response.json()
 
-                if data.get('status') == 'OK' and 'results' in data:
+                if data.get('status') in ['OK', 'DELAYED'] and 'results' in data:
                     for ticker_data in data['results']:
                         ticker = ticker_data.get('ticker', '')
-                        market_cap = ticker_data.get('market_cap', 0)
+                        ticker_type = ticker_data.get('type', '')
+                        primary_exchange = ticker_data.get('primary_exchange', '')
 
-                        # Filter: Only include stocks with market cap ≥ $1B
-                        if market_cap >= MIN_MARKET_CAP and ticker:
-                            # Exclude ETFs, ADRs, preferred shares, warrants
-                            if (not any(x in ticker for x in ['.', '-', '^', '=']) and
+                        # Filter criteria:
+                        # 1. Must be on major exchange
+                        # 2. Must be common stock (type = CS)
+                        # 3. Clean ticker format
+                        if ticker and ticker_type == 'CS':
+                            # Exclude ETFs, ADRs, preferred shares, warrants, units
+                            if (not any(x in ticker for x in ['.', '-', '^', '=', '/']) and
                                 len(ticker) <= 5 and  # Most stocks are 1-5 characters
-                                ticker.isalpha()):  # Only letters, no numbers
+                                ticker.isalpha() and  # Only letters, no numbers
+                                ticker.isupper()):  # All uppercase
                                 all_tickers.append(ticker)
 
                     # Check for next page
                     next_url = data.get('next_url', None)
 
-                    # Stop if we have enough
-                    if len(all_tickers) >= 1500:
-                        all_tickers = all_tickers[:1500]
+                    # Stop if we have enough or no more pages
+                    if len(all_tickers) >= 1500 or not next_url:
                         break
                 else:
                     break
 
                 time.sleep(0.2)  # Rate limit protection
 
+            # Limit to 1500 stocks
+            all_tickers = all_tickers[:1500]
+
             # Sort alphabetically for consistency
             all_tickers.sort()
 
             print(f"   Loaded {len(all_tickers)} tickers from Polygon API")
-            print(f"   (US stocks with market cap ≥ ${MIN_MARKET_CAP:,})\n")
+            print(f"   (US common stocks, active on major exchanges)\n")
+
+            # If we got fewer than 500, fall back to curated list
+            if len(all_tickers) < 500:
+                raise Exception(f"Only got {len(all_tickers)} tickers, using fallback")
 
             return all_tickers
 
         except Exception as e:
-            print(f"   ⚠️ Error fetching S&P 1500 from Polygon: {e}")
+            print(f"   ⚠️ Error fetching tickers from Polygon: {e}")
             print(f"   Falling back to curated list of 500 major stocks\n")
 
             # Fallback: Return curated list of 500 major stocks
