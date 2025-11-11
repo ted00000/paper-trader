@@ -482,7 +482,7 @@ def view_log(operation):
     """View log file for an operation - shows today's entries only"""
     try:
         # Validate operation name
-        valid_ops = ['go', 'execute', 'analyze', 'learn_daily', 'learn_weekly', 'learn_monthly']
+        valid_ops = ['go', 'execute', 'analyze', 'learn_daily', 'learn_weekly', 'learn_monthly', 'screener']
         if operation.lower() not in valid_ops:
             return jsonify({'error': 'Invalid operation'}), 400
 
