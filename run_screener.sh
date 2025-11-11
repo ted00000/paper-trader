@@ -67,8 +67,34 @@ echo "Market Screener Starting: $(date)" >> "$LOG_FILE"
 echo "============================================================" >> "$LOG_FILE"
 
 if python3 "$SCREENER_SCRIPT" >> "$LOG_FILE" 2>&1; then
-    # Success
-    update_status "SUCCESS"
+    # Success - Extract stats from screener_candidates.json
+    CANDIDATES_FILE="$SCRIPT_DIR/screener_candidates.json"
+    if [ -f "$CANDIDATES_FILE" ]; then
+        UNIVERSE_SIZE=$(python3 -c "import json; d=json.load(open('$CANDIDATES_FILE')); print(d.get('universe_size', 0))" 2>/dev/null || echo "0")
+        RS_PASS=$(python3 -c "import json; d=json.load(open('$CANDIDATES_FILE')); print(d.get('rs_pass_count', 0))" 2>/dev/null || echo "0")
+        CANDIDATES=$(python3 -c "import json; d=json.load(open('$CANDIDATES_FILE')); print(d.get('candidates_found', 0))" 2>/dev/null || echo "0")
+
+        # Update status with stats
+        TIMESTAMP=$(date -Iseconds)
+        cat > "$STATUS_FILE" <<EOF
+{
+  "operation": "SCREENER",
+  "last_run": "$TIMESTAMP",
+  "status": "SUCCESS",
+  "log_file": "$LOG_FILE",
+  "error": "",
+  "stats": {
+    "universe_size": $UNIVERSE_SIZE,
+    "rs_pass_count": $RS_PASS,
+    "candidates_found": $CANDIDATES,
+    "rs_pass_rate_pct": $(python3 -c "print(round($RS_PASS / $UNIVERSE_SIZE * 100, 1) if $UNIVERSE_SIZE > 0 else 0)" 2>/dev/null || echo "0")
+  }
+}
+EOF
+    else
+        update_status "SUCCESS"
+    fi
+
     echo "Market screener completed successfully: $(date)" >> "$LOG_FILE"
     exit 0
 else
