@@ -1988,6 +1988,11 @@ SWING TRADING RULES (STRICTLY ENFORCE):
 5. DO NOT churn daily - let swings work (3-7 days typical)
 6. If position is working (profitable, catalyst intact), HOLD it
 
+**NEW POSITIONS: TIER 1 CATALYSTS ONLY**
+- Any new BUY recommendations MUST have Tier 1 catalysts (earnings beat + guidance, FDA, major M&A)
+- Tier 2/3 stocks will be REJECTED by validation - don't recommend them
+- Quality over quantity: Better to add 0-3 Tier 1 stocks than fill slots with Tier 2/3
+
 PREMARKET ANALYSIS:
 - Use gap_percent to gauge overnight sentiment
 - Large gaps (>5%) may signal catalyst change
@@ -2031,12 +2036,18 @@ Provide full analysis of each position BEFORE the JSON. Justify all exits agains
 
 No existing positions. {instruction}
 
-TIER 1 CATALYSTS ONLY:
-- Earnings beats with raised guidance
-- Strong sector momentum with clear catalyst
-- Major analyst upgrades (top-tier firms)
-- Confirmed technical breakouts (2x volume)
-- Binary event winners (FDA, M&A, contracts)
+**CRITICAL: TIER 1 CATALYSTS ONLY - NO EXCEPTIONS**
+
+We ONLY trade stocks with Tier 1 catalysts. This is non-negotiable:
+- ✅ Tier 1: Earnings beats with raised guidance, FDA approvals, major M&A, multi-catalyst events
+- ❌ Tier 2: Analyst upgrades, sector momentum alone, technical breakouts - REJECT THESE
+- ❌ Tier 3: Minor news, earnings meets (no beat), guidance in-line - REJECT THESE
+
+QUALITY OVER QUANTITY:
+- Better to recommend 0-5 Tier 1 stocks than 10 mediocre Tier 2/3 stocks
+- If fewer than 10 Tier 1 opportunities exist today, that's OK - only recommend what qualifies
+- Every recommendation must have a clear, specific Tier 1 catalyst you can articulate
+- Validation will reject any non-Tier 1 stocks, so don't waste time on them
 
 """
                 if screener_section:
@@ -2044,11 +2055,12 @@ TIER 1 CATALYSTS ONLY:
 
                 user_message += """
 SELECTION CRITERIA:
+- MUST have Tier 1 catalyst (verified from recent news/earnings)
 - Prioritize highest composite scores (if screener data available)
 - Look for multiple confirming signals (RS + news + volume)
 - Favor recent catalysts (last 3-7 days)
-- Diversify across sectors
-- All stocks will be validated through Phase 1-4 filters
+- Diversify across sectors when multiple Tier 1 opportunities exist
+- All stocks will be validated through Phase 1-4 filters (Tier 1 required to pass)
 
 CRITICAL OUTPUT REQUIREMENT - JSON at end:
 ```json
