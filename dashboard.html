@@ -55,7 +55,19 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-logo {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+        }
+
         .header-left h1 {
             font-size: 2.5rem;
             font-weight: 800;
@@ -621,8 +633,11 @@
         <header>
             <div class="header-content">
                 <div class="header-left">
-                    <h1>🤖 Tedbot 2.0</h1>
-                    <p class="subtitle">AI-Powered Self-Learning Trading System</p>
+                    <img src="Tedbot.png" alt="Tedbot" class="header-logo">
+                    <div>
+                        <h1>Tedbot 2.0</h1>
+                        <p class="subtitle">AI-Powered Self-Learning Trading System</p>
+                    </div>
                 </div>
                 <div class="header-right">
                     <div class="live-indicator">
