@@ -410,7 +410,8 @@ def operations_status():
                         'last_run': status.get('last_run'),
                         'age_hours': age_hours,
                         'error': status.get('error'),
-                        'log_file': status.get('log_file')
+                        'log_file': status.get('log_file'),
+                        'stats': status.get('stats')  # Include stats for operations like SCREENER
                     }
             except Exception as e:
                 print(f"Error loading {status_file}: {e}")

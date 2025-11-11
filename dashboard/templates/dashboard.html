@@ -957,6 +957,15 @@
                              `${(op.age_hours / 24).toFixed(1)}d ago`) :
                             'Never run';
 
+                        // Add stats display for SCREENER operation
+                        const statsHtml = (name === 'SCREENER' && op.stats) ? `
+                            <div class="operation-info" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
+                                <strong>Universe:</strong> ${op.stats.universe_size} stocks<br>
+                                <strong>Passed RS ≥3%:</strong> ${op.stats.rs_pass_count} (${op.stats.rs_pass_rate_pct}%)<br>
+                                <strong>Candidates:</strong> ${op.stats.candidates_found}
+                            </div>
+                        ` : '';
+
                         return `
                             <div class="operation-card">
                                 <div class="operation-header">
@@ -970,6 +979,7 @@
                                     <strong>Last Run:</strong> ${ageText}
                                 </div>
                                 ${op.error ? `<div class="operation-error">Error: ${op.error}</div>` : ''}
+                                ${statsHtml}
                                 <button class="view-log-btn" onclick="viewLog('${name.toLowerCase()}')">
                                     View Log
                                 </button>
