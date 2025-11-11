@@ -58,7 +58,7 @@
 
         .header-left {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 12px;
         }
 
@@ -66,12 +66,19 @@
             width: 40px;
             height: 40px;
             border-radius: 8px;
+            margin-top: 4px;
+        }
+
+        .header-text {
+            display: flex;
+            flex-direction: column;
         }
 
         .header-left h1 {
             font-size: 2.5rem;
             font-weight: 800;
             margin: 0;
+            line-height: 1;
             letter-spacing: -0.02em;
             color: var(--neon-green);
         }
@@ -80,6 +87,7 @@
             font-size: 1rem;
             color: var(--text-secondary);
             font-weight: 400;
+            margin-top: 4px;
             letter-spacing: 0.02em;
         }
         
@@ -634,8 +642,10 @@
             <div class="header-content">
                 <div class="header-left">
                     <img src="Tedbot.PNG" alt="Tedbot" class="header-logo">
-                    <h1>Tedbot 2.0</h1>
-                    <span class="subtitle">AI-Powered Self-Learning Trading System</span>
+                    <div class="header-text">
+                        <h1>Tedbot 2.0</h1>
+                        <span class="subtitle">AI-Powered Self-Learning Trading System</span>
+                    </div>
                 </div>
                 <div class="header-right">
                     <div class="live-indicator">
