@@ -98,6 +98,29 @@
                 width: 100%;
                 justify-content: center;
             }
+
+            .picks-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .picks-date {
+                font-size: 1em;
+                width: 100%;
+            }
+
+            .market-conditions {
+                width: 100%;
+                gap: 8px;
+            }
+
+            .condition-item {
+                font-size: 12px;
+                padding: 4px 8px;
+                flex: 1 1 auto;
+                text-align: center;
+            }
         }
 
         .header-right {
@@ -560,16 +583,20 @@
             background: #1a1a1a;
             border-radius: 8px;
             border: 1px solid #333;
+            flex-wrap: wrap;
+            gap: 15px;
         }
 
         .picks-date {
             font-size: 1.1em;
             color: #00ff41;
+            flex-shrink: 0;
         }
 
         .market-conditions {
             display: flex;
             gap: 15px;
+            flex-wrap: wrap;
         }
 
         .condition-item {
@@ -578,6 +605,8 @@
             border-radius: 4px;
             border: 1px solid #333;
             color: #888;
+            font-size: 14px;
+            white-space: nowrap;
         }
 
         .condition-warning {
