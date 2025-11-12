@@ -1462,7 +1462,7 @@ POSITION {i}: {ticker}
             ('2025-12-17', 'FOMC', 'FOMC Meeting'),
 
             # CPI Release (1-day before, day of blackout) - typically mid-month
-            ('2025-11-13', 'CPI', 'CPI Release'),
+            # ('2025-11-13', 'CPI', 'CPI Release'),  # CANCELLED - Government shutdown
             ('2025-12-11', 'CPI', 'CPI Release'),
 
             # NFP (Jobs Report) - First Friday of each month (1-day before, day of blackout)
