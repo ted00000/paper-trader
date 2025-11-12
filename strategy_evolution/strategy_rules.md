@@ -1,8 +1,8 @@
 # CURRENT STRATEGY RULES
 
-**Version:** 1.0  
-**Last Updated:** October 24, 2025  
-**Next Review:** After Week 1 (November 1, 2025)
+**Version:** 1.1
+**Last Updated:** November 11, 2025
+**Next Review:** After 25 completed trades or December 1, 2025
 
 ---
 
@@ -23,18 +23,25 @@
    - Earnings beat >10% with raised guidance, OR
    - Strong sector momentum with clear macro driver, OR
    - Major analyst upgrade from top-tier firm, OR
-   - Technical breakout with 2x+ volume, OR
    - Binary event positive outcome (FDA, contract, M&A)
 
-2. **Minimum Market Cap:** $1 billion
+2. **Technical Setup (ALL 4 required):**
+   - ✅ Price above 50-day moving average (uptrend)
+   - ✅ 5 EMA above 20 EMA (momentum accelerating)
+   - ✅ ADX >20 (strong trend, not choppy)
+   - ✅ Volume >1.5x 20-day average (institutional participation)
 
-3. **Clear Thesis:** Can articulate in 2 sentences maximum
+3. **Relative Strength:** Stock must outperform sector by ≥3% over 3 months
 
-4. **Supporting Factors:** At least 3 total (catalyst + technical + sector/macro)
+4. **Minimum Market Cap:** $1 billion
 
-5. **Risk/Reward:** Minimum 2:1 reward-to-risk ratio
+5. **Clear Thesis:** Can articulate in 2 sentences maximum
 
-6. **Liquidity:** Average daily volume >100K shares
+6. **Supporting Factors:** At least 3 total (catalyst + technical + sector/macro)
+
+7. **Risk/Reward:** Minimum 2:1 reward-to-risk ratio
+
+8. **Liquidity:** Average daily volume >100K shares
 
 ---
 
@@ -45,6 +52,11 @@
 - ❌ Penny stocks (<$5/share)
 - ❌ Market cap <$1B
 - ❌ Stocks without Tier 1 catalyst
+- ❌ **Stocks below 50-day MA (downtrends)**
+- ❌ **Weak momentum (5 EMA < 20 EMA)**
+- ❌ **Choppy markets (ADX <20)**
+- ❌ **Low volume (<1.5x average)**
+- ❌ **Relative strength <3% vs sector**
 - ❌ Unclear thesis or "hope" trades
 - ❌ Overleveraged/bankruptcy risk companies
 

@@ -136,6 +136,14 @@ class MonthlyLearning:
             'weak_rs': {'total': 0, 'winners': 0, 'returns': []}
         }
 
+        # PHASE 5.6: Technical indicator tracking
+        technical_stats = {
+            'adx_high': {'total': 0, 'winners': 0, 'returns': []},  # ADX >25
+            'adx_moderate': {'total': 0, 'winners': 0, 'returns': []},  # ADX 20-25
+            'volume_high': {'total': 0, 'winners': 0, 'returns': []},  # Volume >2x
+            'volume_moderate': {'total': 0, 'winners': 0, 'returns': []},  # Volume 1.5-2x
+        }
+
         for trade in recent_trades:
             return_pct = float(trade.get('Return_Percent', 0))
             is_winner = return_pct > 0
@@ -190,13 +198,45 @@ class MonthlyLearning:
                 if is_winner:
                     rs_stats['weak_rs']['winners'] += 1
 
+            # Technical indicator tracking (Phase 5.6)
+            try:
+                adx_value = float(trade.get('Technical_ADX', 0))
+                volume_ratio = float(trade.get('Technical_Volume_Ratio', 0))
+
+                # ADX performance
+                if adx_value > 25:
+                    technical_stats['adx_high']['total'] += 1
+                    technical_stats['adx_high']['returns'].append(return_pct)
+                    if is_winner:
+                        technical_stats['adx_high']['winners'] += 1
+                elif adx_value >= 20:
+                    technical_stats['adx_moderate']['total'] += 1
+                    technical_stats['adx_moderate']['returns'].append(return_pct)
+                    if is_winner:
+                        technical_stats['adx_moderate']['winners'] += 1
+
+                # Volume performance
+                if volume_ratio > 2.0:
+                    technical_stats['volume_high']['total'] += 1
+                    technical_stats['volume_high']['returns'].append(return_pct)
+                    if is_winner:
+                        technical_stats['volume_high']['winners'] += 1
+                elif volume_ratio >= 1.5:
+                    technical_stats['volume_moderate']['total'] += 1
+                    technical_stats['volume_moderate']['returns'].append(return_pct)
+                    if is_winner:
+                        technical_stats['volume_moderate']['winners'] += 1
+            except:
+                pass  # Skip if technical data missing (pre-v5.6 trades)
+
         # Build phase metrics
         phase_metrics = {
             'tier_performance': {},
             'conviction_performance': {},
             'vix_regime_performance': {},
             'news_validation_performance': {},
-            'relative_strength_performance': {}
+            'relative_strength_performance': {},
+            'technical_indicator_performance': {}  # Phase 5.6
         }
 
         # Tier performance
@@ -255,6 +295,32 @@ class MonthlyLearning:
                 'win_rate': (rs_stats['weak_rs']['winners'] / rs_stats['weak_rs']['total'] * 100),
                 'avg_return': statistics.mean(rs_stats['weak_rs']['returns']),
                 'count': rs_stats['weak_rs']['total']
+            }
+
+        # Technical indicator performance (Phase 5.6)
+        if technical_stats['adx_high']['total'] > 0:
+            phase_metrics['technical_indicator_performance']['adx_high'] = {
+                'win_rate': (technical_stats['adx_high']['winners'] / technical_stats['adx_high']['total'] * 100),
+                'avg_return': statistics.mean(technical_stats['adx_high']['returns']),
+                'count': technical_stats['adx_high']['total']
+            }
+        if technical_stats['adx_moderate']['total'] > 0:
+            phase_metrics['technical_indicator_performance']['adx_moderate'] = {
+                'win_rate': (technical_stats['adx_moderate']['winners'] / technical_stats['adx_moderate']['total'] * 100),
+                'avg_return': statistics.mean(technical_stats['adx_moderate']['returns']),
+                'count': technical_stats['adx_moderate']['total']
+            }
+        if technical_stats['volume_high']['total'] > 0:
+            phase_metrics['technical_indicator_performance']['volume_high'] = {
+                'win_rate': (technical_stats['volume_high']['winners'] / technical_stats['volume_high']['total'] * 100),
+                'avg_return': statistics.mean(technical_stats['volume_high']['returns']),
+                'count': technical_stats['volume_high']['total']
+            }
+        if technical_stats['volume_moderate']['total'] > 0:
+            phase_metrics['technical_indicator_performance']['volume_moderate'] = {
+                'win_rate': (technical_stats['volume_moderate']['winners'] / technical_stats['volume_moderate']['total'] * 100),
+                'avg_return': statistics.mean(technical_stats['volume_moderate']['returns']),
+                'count': technical_stats['volume_moderate']['total']
             }
 
         return {
