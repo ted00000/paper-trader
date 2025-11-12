@@ -37,6 +37,13 @@
             margin-bottom: 30px;
         }
 
+        .logo-image {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
         h1 {
             color: #00ff41;
             font-size: 28px;
@@ -166,7 +173,8 @@
 <body>
     <div class="login-container">
         <div class="logo">
-            <h1>🤖 Trading Dashboard</h1>
+            <img src="{{ url_for('static', filename='img/Tedbot Logo 3.png') }}" alt="Tedbot" class="logo-image">
+            <h1>Trading Dashboard</h1>
             <p class="subtitle">Paper Trading Lab v5.6</p>
         </div>
 
