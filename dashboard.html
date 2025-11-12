@@ -58,20 +58,24 @@
 
         .header-left {
             display: flex;
-            align-items: flex-start;
-            gap: 12px;
+            align-items: center;
+            gap: 0;
+            flex-wrap: nowrap;
         }
 
         .header-logo {
-            width: 40px;
-            height: 40px;
+            width: 48px;
+            height: 48px;
             border-radius: 8px;
-            margin-top: 4px;
+            margin-right: 8px;
+            flex-shrink: 0;
         }
 
         .header-text {
-            display: flex;
-            flex-direction: column;
+            display: inline-flex;
+            align-items: baseline;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .header-left h1 {
@@ -81,14 +85,31 @@
             line-height: 1;
             letter-spacing: -0.02em;
             color: var(--neon-green);
+            white-space: nowrap;
         }
 
         .subtitle {
             font-size: 1rem;
             color: var(--text-secondary);
             font-weight: 400;
-            margin-top: 4px;
             letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            .header-left h1 {
+                font-size: 1.75rem;
+            }
+
+            .subtitle {
+                font-size: 0.875rem;
+            }
+
+            .header-logo {
+                width: 36px;
+                height: 36px;
+                margin-right: 6px;
+            }
         }
         
         .header-right {
@@ -641,7 +662,7 @@
         <header>
             <div class="header-content">
                 <div class="header-left">
-                    <img src="Tedbot.PNG" alt="Tedbot" class="header-logo">
+                    <img src="TedBotLogo.jpg" alt="Tedbot" class="header-logo">
                     <div class="header-text">
                         <h1>Tedbot 2.0</h1>
                         <span class="subtitle">AI-Powered Self-Learning Trading System</span>
