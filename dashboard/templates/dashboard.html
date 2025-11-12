@@ -34,6 +34,13 @@
             flex-wrap: nowrap;
         }
 
+        .header-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: nowrap;
+        }
+
         .robot-logo {
             width: 48px;
             height: 48px;
@@ -48,9 +55,29 @@
             white-space: nowrap;
         }
 
+        .header-subtitle {
+            font-size: 16px;
+            color: #888;
+            display: none;
+        }
+
         @media (max-width: 768px) {
             .header {
                 padding: 15px 20px;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .header-left {
+                width: 100%;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                gap: 8px;
+            }
+
+            .header-title-group {
+                justify-content: center;
             }
 
             .robot-logo {
@@ -60,6 +87,16 @@
 
             .header-title {
                 font-size: 18px;
+            }
+
+            .header-subtitle {
+                display: block;
+                font-size: 14px;
+            }
+
+            .header-right {
+                width: 100%;
+                justify-content: center;
             }
         }
 
@@ -716,9 +753,12 @@
 <body>
     <div class="header">
         <div class="header-left">
-            <img src="{{ url_for('static', filename='img/Tedbot Logo 3.png') }}" alt="Tedbot" class="robot-logo">
-            <span class="header-title">Tedbot 2.0 Admin Dashboard</span>
-            <span class="badge badge-success">LIVE</span>
+            <div class="header-title-group">
+                <img src="{{ url_for('static', filename='img/Tedbot Logo 3.png') }}" alt="Tedbot" class="robot-logo">
+                <span class="header-title">Tedbot 2.0</span>
+                <span class="badge badge-success">LIVE</span>
+            </div>
+            <span class="header-subtitle">Admin Dashboard</span>
         </div>
         <div class="header-right">
             <span class="user-info">Logged in as: <strong>{{ username }}</strong></span>
