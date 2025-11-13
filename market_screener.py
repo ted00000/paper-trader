@@ -316,7 +316,7 @@ class MarketScreener:
         """
         Fetch and score recent news (last 7 days)
 
-        Returns: Dict with news metrics
+        Returns: Dict with news metrics INCLUDING top articles
         """
         try:
             # Get news from last 7 days
@@ -336,7 +336,7 @@ class MarketScreener:
             articles = response.json().get('results', [])
 
             if not articles:
-                return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0}
+                return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0, 'top_articles': []}
 
             # Score news articles
             catalyst_keywords = {
@@ -372,15 +372,34 @@ class MarketScreener:
             # Cap at 20
             score = min(score, 20)
 
+            # Extract top 5 most relevant articles for Claude to review
+            top_articles = []
+            for article in articles[:5]:
+                # Parse published date
+                published = article.get('published_utc', '')
+                try:
+                    pub_date = datetime.fromisoformat(published.replace('Z', '+00:00'))
+                    date_str = pub_date.strftime('%b %d')
+                except:
+                    date_str = 'Recent'
+
+                top_articles.append({
+                    'title': article.get('title', ''),
+                    'description': article.get('description', '')[:200],  # Limit to 200 chars
+                    'published': date_str,
+                    'url': article.get('article_url', '')
+                })
+
             return {
                 'score': score,
                 'count': len(articles),
                 'keywords': list(found_keywords),
-                'scaled_score': (score / 20) * 100  # Convert to 0-100 scale
+                'scaled_score': (score / 20) * 100,
+                'top_articles': top_articles  # NEW: Actual article content for Claude
             }
 
         except Exception:
-            return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0}
+            return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0, 'top_articles': []}
 
     def get_volume_analysis(self, ticker):
         """

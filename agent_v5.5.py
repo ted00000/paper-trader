@@ -2221,7 +2221,7 @@ POSITION {i}: {ticker}
         """
         Format screener candidates for Claude
 
-        Returns: String with formatted candidate list
+        Returns: String with formatted candidate list INCLUDING NEWS CONTENT
         """
         if not screener_data or not screener_data.get('candidates'):
             return None
@@ -2236,7 +2236,7 @@ POSITION {i}: {ticker}
         output += "TOP CANDIDATES (sorted by composite score):\n"
         output += "=" * 80 + "\n\n"
 
-        for candidate in candidates[:25]:  # Show top 25 to keep tokens reasonable
+        for candidate in candidates[:15]:  # Show top 15 with full news (reduced from 25 due to news content)
             rank = candidate['rank']
             ticker = candidate['ticker']
             score = candidate['composite_score']
@@ -2254,14 +2254,24 @@ POSITION {i}: {ticker}
             if news['keywords']:
                 output += f", keywords: {', '.join(news['keywords'][:5])}"
             output += ")\n"
+
+            # NEW: Include actual news headlines for catalyst verification
+            if news.get('top_articles'):
+                output += f"   📰 Recent News Headlines:\n"
+                for i, article in enumerate(news['top_articles'][:3], 1):  # Top 3 articles
+                    output += f"      {i}. [{article['published']}] {article['title']}\n"
+                    if article['description']:
+                        output += f"         {article['description'][:150]}...\n"
+
             output += f"   Volume: {vol['volume_ratio']:.1f}x average "
             output += f"({vol['yesterday_volume']:,} vs {vol['avg_volume_20d']:,})\n"
             output += f"   Technical: {tech['distance_from_52w_high_pct']:.1f}% from 52w high "
             output += f"(${tech['current_price']:.2f} vs ${tech['high_52w']:.2f})\n"
             output += f"   Why: {candidate['why_selected']}\n\n"
 
-        if len(candidates) > 25:
-            output += f"... and {len(candidates) - 25} more candidates\n"
+        if len(candidates) > 15:
+            output += f"\n... and {len(candidates) - 15} more candidates available\n"
+            output += f"(News details shown for top 15 only to manage context size)\n"
 
         return output
 
