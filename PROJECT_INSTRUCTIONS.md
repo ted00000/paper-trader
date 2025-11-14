@@ -61,6 +61,63 @@ Maintain an active portfolio of exactly **10 stocks** at all times, holding posi
 
 ---
 
+## 🔬 PHASE 5.6: TECHNICAL VALIDATION (Added Nov 11, 2025)
+
+Every stock must pass **ALL 4 technical filters** in addition to having a Tier 1 catalyst:
+
+### Required Technical Indicators (ALL MUST PASS):
+
+1. **50-Day Moving Average (SMA50):**
+   - Stock price MUST be above 50-day SMA
+   - Confirms uptrend / rejects downtrends
+   - Data source: Polygon.io
+
+2. **EMA Momentum (5/20 Cross):**
+   - 5-day EMA MUST be above 20-day EMA
+   - Confirms momentum acceleration
+   - Rejects choppy or declining momentum
+
+3. **ADX (Average Directional Index):**
+   - ADX MUST be >20
+   - Confirms strong trend (not sideways chop)
+   - ADX <20 indicates weak/choppy market - reject
+
+4. **Volume Confirmation:**
+   - Current volume MUST be >1.5x 20-day average
+   - Confirms institutional participation
+   - Low volume = lack of conviction - reject
+
+**Validation:** All 4 filters checked automatically during GO command. Stocks failing ANY filter are rejected regardless of catalyst quality.
+
+---
+
+## 📰 NEWS INTEGRATION & CATALYST VERIFICATION (Added Nov 14, 2025)
+
+### How Catalyst Verification Works:
+
+1. **Market Screener (8:30 AM):**
+   - Scans S&P 1500 for stocks with RS ≥3%
+   - Fetches top 5 news articles per stock from Polygon.io
+   - Extracts: title, description, publish date, URL
+   - Scores based on catalyst keywords
+
+2. **GO Command (8:45 AM):**
+   - Claude receives top 15 candidates with ACTUAL NEWS CONTENT
+   - Reviews article titles and descriptions (not just keywords)
+   - Verifies which stocks have genuine Tier 1 catalysts
+
+3. **Catalyst Quality Assessment:**
+   - **Tier 1 Verified:** Earnings beat >10% with guidance, FDA approval, M&A deal
+   - **Tier 2/3 Rejected:** Analyst opinions, sector momentum without catalyst, stale news
+
+**Example:**
+- AMD (#1 score): "Investment in quantum company" → Rejected (not Tier 1)
+- BIIB (#12 score): "UK approval for LEQEMBI maintenance dosing" → Selected (Tier 1 binary event)
+
+**This ensures quality over quantity** - system will select lower-ranked stocks if they have superior catalysts.
+
+---
+
 ## 📐 RISK MANAGEMENT RULES
 
 ### Entry Requirements:
@@ -69,6 +126,8 @@ Maintain an active portfolio of exactly **10 stocks** at all times, holding posi
 - Set stop loss at -7% from entry
 - Set initial price target (+10-15% depending on catalyst)
 - Require 3+ supporting factors (catalyst + technical + sector)
+- **Pass ALL 4 technical filters (Phase 5.6)**
+- **Verified Tier 1 catalyst from actual news content**
 
 ### Exit Rules (STRICTLY ENFORCED):
 
