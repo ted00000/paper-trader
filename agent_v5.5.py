@@ -336,11 +336,15 @@ class TradingAgent:
         """Format premarket data for Claude's portfolio review"""
         lines = []
         for i, (ticker, data) in enumerate(premarket_data.items(), 1):
+            # Check if using fallback price
+            price_source = data.get('price_source', 'live')
+            price_note = " ⚠️ (using yesterday's close - live data unavailable)" if price_source != 'live' else ""
+
             lines.append(f"""
 POSITION {i}: {ticker}
   Entry: ${data['entry_price']:.2f} ({data['days_held']} days ago)
   Yesterday Close: ${data['yesterday_close']:.2f}
-  Premarket (~8:30 AM): ${data['premarket_price']:.2f}
+  Premarket (~8:30 AM): ${data['premarket_price']:.2f}{price_note}
   P&L: {data['pnl_percent']:+.1f}% total
   Gap Today: {data['gap_percent']:+.1f}%
   Stop Loss: ${data['stop_loss']:.2f} (-7% trigger)
@@ -485,9 +489,9 @@ POSITION {i}: {ticker}
     # ALPHA VANTAGE PRICE FETCHING
     # =====================================================================
     
-    def fetch_current_prices(self, tickers):
+    def fetch_current_prices(self, tickers, max_retries=2):
         """
-        Fetch current prices using Polygon.io API
+        Fetch current prices using Polygon.io API with retry logic
 
         STARTER PLAN ($29/mo) - 15-MINUTE DELAYED DATA:
         - Unlimited API calls (no daily/minute rate limits)
@@ -502,6 +506,13 @@ POSITION {i}: {ticker}
         3. prevDay.c - Yesterday's close (emergency fallback only)
 
         This ensures we get TODAY's closing prices, not yesterday's stale data.
+
+        Args:
+            tickers: List of ticker symbols to fetch prices for
+            max_retries: Number of retry attempts for failed fetches (default 2)
+
+        Returns:
+            dict: {ticker: price} for successfully fetched prices
         """
 
         if not POLYGON_API_KEY:
@@ -509,63 +520,98 @@ POSITION {i}: {ticker}
             return {}
 
         prices = {}
+        failed_tickers = []
         current_hour = datetime.now().hour
         is_after_market = current_hour >= 16  # After 4:00 PM
 
         print(f"   Fetching prices for {len(tickers)} tickers via Polygon.io...")
 
         for i, ticker in enumerate(tickers, 1):
-            try:
-                # Use snapshot endpoint for 15-min delayed price
-                url = f'https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/{ticker}?apiKey={POLYGON_API_KEY}'
-                response = requests.get(url, timeout=10)
-                data = response.json()
+            price_fetched = False
 
-                if data.get('status') == 'OK' and 'ticker' in data:
-                    ticker_data = data['ticker']
-                    price = None
-                    source = None
+            for attempt in range(max_retries + 1):
+                try:
+                    # Use snapshot endpoint for 15-min delayed price
+                    url = f'https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/{ticker}?apiKey={POLYGON_API_KEY}'
+                    response = requests.get(url, timeout=10)
+                    data = response.json()
 
-                    # PRIORITY 1: Use today's price (day.c) if available (works during AND after market)
-                    if 'day' in ticker_data and ticker_data['day'] and 'c' in ticker_data['day']:
-                        price = float(ticker_data['day']['c'])
-                        source = "today's close" if is_after_market else "intraday"
+                    if data.get('status') == 'OK' and 'ticker' in data:
+                        ticker_data = data['ticker']
+                        price = None
+                        source = None
 
-                    # PRIORITY 2: Use most recent minute bar (for intraday when day.c not available)
-                    elif 'min' in ticker_data and ticker_data['min'] and 'c' in ticker_data['min']:
-                        price = float(ticker_data['min']['c'])
-                        source = "recent min"
+                        # PRIORITY 1: Use today's price (day.c) if available (works during AND after market)
+                        if 'day' in ticker_data and ticker_data['day'] and 'c' in ticker_data['day']:
+                            price = float(ticker_data['day']['c'])
+                            source = "today's close" if is_after_market else "intraday"
 
-                    # PRIORITY 3: Use most recent trade (if available)
-                    elif 'lastTrade' in ticker_data and ticker_data['lastTrade'] and 'p' in ticker_data['lastTrade']:
-                        price = float(ticker_data['lastTrade']['p'])
-                        source = "last trade"
+                        # PRIORITY 2: Use most recent minute bar (for intraday when day.c not available)
+                        elif 'min' in ticker_data and ticker_data['min'] and 'c' in ticker_data['min']:
+                            price = float(ticker_data['min']['c'])
+                            source = "recent min"
 
-                    # PRIORITY 4: Emergency fallback to yesterday's close (should rarely happen)
-                    elif 'prevDay' in ticker_data and ticker_data['prevDay'] and 'c' in ticker_data['prevDay']:
-                        price = float(ticker_data['prevDay']['c'])
-                        source = "prev close ⚠️"
+                        # PRIORITY 3: Use most recent trade (if available)
+                        elif 'lastTrade' in ticker_data and ticker_data['lastTrade'] and 'p' in ticker_data['lastTrade']:
+                            price = float(ticker_data['lastTrade']['p'])
+                            source = "last trade"
 
-                    if price:
-                        prices[ticker] = price
-                        print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f} ({source})")
+                        # PRIORITY 4: Emergency fallback to yesterday's close (should rarely happen)
+                        elif 'prevDay' in ticker_data and ticker_data['prevDay'] and 'c' in ticker_data['prevDay']:
+                            price = float(ticker_data['prevDay']['c'])
+                            source = "prev close ⚠️"
+
+                        if price:
+                            prices[ticker] = price
+                            retry_str = f" (retry {attempt})" if attempt > 0 else ""
+                            print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f} ({source}){retry_str}")
+                            price_fetched = True
+                            break
+                        else:
+                            if attempt < max_retries:
+                                print(f"   [{i}/{len(tickers)}] {ticker}: No price data, retrying...")
+                                time.sleep(1)  # Wait 1 second before retry
+                            else:
+                                print(f"   [{i}/{len(tickers)}] {ticker}: No price data available (after {max_retries} retries)")
+                                failed_tickers.append(ticker)
                     else:
-                        print(f"   [{i}/{len(tickers)}] {ticker}: No price data available")
-                else:
-                    # Debug: show what we actually received
-                    if 'error' in data:
-                        print(f"   [{i}/{len(tickers)}] {ticker}: API error - {data['error']}")
-                    else:
-                        print(f"   [{i}/{len(tickers)}] {ticker}: No data (status: {data.get('status', 'unknown')})")
+                        # Debug: show what we actually received
+                        if attempt < max_retries:
+                            error_msg = data.get('error', f"status: {data.get('status', 'unknown')}")
+                            print(f"   [{i}/{len(tickers)}] {ticker}: {error_msg}, retrying...")
+                            time.sleep(1)  # Wait 1 second before retry
+                        else:
+                            if 'error' in data:
+                                print(f"   [{i}/{len(tickers)}] {ticker}: API error - {data['error']} (after {max_retries} retries)")
+                            else:
+                                print(f"   [{i}/{len(tickers)}] {ticker}: No data (status: {data.get('status', 'unknown')}) (after {max_retries} retries)")
+                            failed_tickers.append(ticker)
+                            break
 
-                # No rate limiting needed for Starter plan (unlimited calls)
-                # Small delay to be respectful to API
+                    # No rate limiting needed for Starter plan (unlimited calls)
+                    # Small delay to be respectful to API
+                    if not price_fetched:
+                        time.sleep(0.1)
+
+                except Exception as e:
+                    if attempt < max_retries:
+                        print(f"   [{i}/{len(tickers)}] {ticker}: Error ({e}), retrying...")
+                        time.sleep(1)  # Wait 1 second before retry
+                    else:
+                        print(f"   ⚠️ Error fetching {ticker} after {max_retries} retries: {e}")
+                        failed_tickers.append(ticker)
+                        break
+
+            # Small delay between tickers
+            if price_fetched:
                 time.sleep(0.1)
 
-            except Exception as e:
-                print(f"   ⚠️ Error fetching {ticker}: {e}")
+        success_count = len(prices)
+        total_count = len(tickers)
+        print(f"   ✓ Fetched {success_count}/{total_count} prices")
 
-        print(f"   ✓ Fetched {len(prices)}/{len(tickers)} prices")
+        if failed_tickers:
+            print(f"   ⚠️ Failed to fetch prices for: {', '.join(failed_tickers)}")
 
         return prices
 
@@ -3316,31 +3362,45 @@ RECENT LESSONS LEARNED:
 
             for pos in existing_positions:
                 ticker = pos['ticker']
+                entry_price = pos.get('entry_price', 0)
+                current_price = pos.get('current_price', entry_price)  # Yesterday's close
+                days_held = pos.get('days_held', 0)
+
+                # Use fetched premarket price if available, otherwise fall back to yesterday's close
                 if ticker in premarket_prices:
-                    entry_price = pos.get('entry_price', 0)
-                    current_price = pos.get('current_price', entry_price)  # Yesterday's close
                     premarket_price = premarket_prices[ticker]
+                    price_source = "live"
+                else:
+                    # CRITICAL: If price fetch failed, use yesterday's close as fallback
+                    # This ensures positions are NEVER silently dropped from review
+                    premarket_price = current_price
+                    price_source = "fallback (yesterday's close)"
+                    print(f"   ⚠️ {ticker}: Using fallback price ${premarket_price:.2f} (yesterday's close)")
 
-                    # Calculate metrics
-                    pnl_percent = ((premarket_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
-                    gap_percent = ((premarket_price - current_price) / current_price * 100) if current_price > 0 else 0
-                    days_held = pos.get('days_held', 0)
+                # Calculate metrics using the price (live or fallback)
+                pnl_percent = ((premarket_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+                gap_percent = ((premarket_price - current_price) / current_price * 100) if current_price > 0 else 0
 
-                    premarket_data[ticker] = {
-                        'entry_price': entry_price,
-                        'yesterday_close': current_price,
-                        'premarket_price': premarket_price,
-                        'pnl_percent': round(pnl_percent, 2),
-                        'gap_percent': round(gap_percent, 2),
-                        'days_held': days_held,
-                        'stop_loss': pos.get('stop_loss', 0),
-                        'price_target': pos.get('price_target', 0),
-                        'thesis': pos.get('thesis', ''),
-                        'catalyst': pos.get('catalyst', '')
-                    }
+                # ALWAYS add position to premarket_data - never skip due to failed price fetch
+                premarket_data[ticker] = {
+                    'entry_price': entry_price,
+                    'yesterday_close': current_price,
+                    'premarket_price': premarket_price,
+                    'pnl_percent': round(pnl_percent, 2),
+                    'gap_percent': round(gap_percent, 2),
+                    'days_held': days_held,
+                    'stop_loss': pos.get('stop_loss', 0),
+                    'price_target': pos.get('price_target', 0),
+                    'thesis': pos.get('thesis', ''),
+                    'catalyst': pos.get('catalyst', ''),
+                    'price_source': price_source  # Track if we're using live or fallback price
+                }
 
+                if price_source == "live":
                     gap_str = f"Gap: {gap_percent:+.1f}%" if abs(gap_percent) > 0.5 else "No gap"
                     print(f"   {ticker}: ${premarket_price:.2f} ({pnl_percent:+.1f}% total, {gap_str}, Day {days_held})")
+
+            print(f"   ✓ Prepared {len(premarket_data)}/{len(existing_positions)} positions for review")
             print()
         else:
             print("2. No existing positions - building initial portfolio\n")
