@@ -510,12 +510,30 @@ def view_log(operation):
                     # Format the response text from JSON
                     response_text = data.get('content', [{}])[0].get('text', '')
 
+                    # Remove JSON decision block (redundant - shown in Daily Picks section)
+                    # Find and remove the ```json ... ``` block
+                    lines = response_text.split('\n')
+                    filtered_lines = []
+                    in_json_block = False
+
+                    for line in lines:
+                        if line.strip().startswith('```json'):
+                            in_json_block = True
+                            continue
+                        elif in_json_block and line.strip() == '```':
+                            in_json_block = False
+                            continue
+                        elif not in_json_block:
+                            filtered_lines.append(line)
+
+                    cleaned_text = '\n'.join(filtered_lines)
+
                     return jsonify({
                         'operation': operation,
                         'log_file': str(latest_file),
-                        'lines_returned': len(response_text.split('\n')),
-                        'total_lines': len(response_text.split('\n')),
-                        'content': f"(Showing today's most recent run: {timestamp})\n\n{response_text}"
+                        'lines_returned': len(cleaned_text.split('\n')),
+                        'total_lines': len(cleaned_text.split('\n')),
+                        'content': f"(Showing today's most recent run: {timestamp})\n\n{cleaned_text}"
                     })
 
         # Fallback to log file for older behavior or if JSON not found
