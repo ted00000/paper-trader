@@ -544,24 +544,37 @@ POSITION {i}: {ticker}
                         # PRIORITY 1: Use today's price (day.c) if available (works during AND after market)
                         if 'day' in ticker_data and ticker_data['day'] and 'c' in ticker_data['day']:
                             price = float(ticker_data['day']['c'])
-                            source = "today's close" if is_after_market else "intraday"
+                            # Validate price is non-zero (0 means no trading data yet)
+                            if price > 0:
+                                source = "today's close" if is_after_market else "intraday"
+                            else:
+                                price = None  # Skip $0 prices
 
                         # PRIORITY 2: Use most recent minute bar (for intraday when day.c not available)
-                        elif 'min' in ticker_data and ticker_data['min'] and 'c' in ticker_data['min']:
+                        if not price and 'min' in ticker_data and ticker_data['min'] and 'c' in ticker_data['min']:
                             price = float(ticker_data['min']['c'])
-                            source = "recent min"
+                            if price > 0:
+                                source = "recent min"
+                            else:
+                                price = None
 
                         # PRIORITY 3: Use most recent trade (if available)
-                        elif 'lastTrade' in ticker_data and ticker_data['lastTrade'] and 'p' in ticker_data['lastTrade']:
+                        if not price and 'lastTrade' in ticker_data and ticker_data['lastTrade'] and 'p' in ticker_data['lastTrade']:
                             price = float(ticker_data['lastTrade']['p'])
-                            source = "last trade"
+                            if price > 0:
+                                source = "last trade"
+                            else:
+                                price = None
 
                         # PRIORITY 4: Emergency fallback to yesterday's close (should rarely happen)
-                        elif 'prevDay' in ticker_data and ticker_data['prevDay'] and 'c' in ticker_data['prevDay']:
+                        if not price and 'prevDay' in ticker_data and ticker_data['prevDay'] and 'c' in ticker_data['prevDay']:
                             price = float(ticker_data['prevDay']['c'])
-                            source = "prev close ⚠️"
+                            if price > 0:
+                                source = "prev close ⚠️"
+                            else:
+                                price = None
 
-                        if price:
+                        if price and price > 0:
                             prices[ticker] = price
                             retry_str = f" (retry {attempt})" if attempt > 0 else ""
                             print(f"   [{i}/{len(tickers)}] {ticker}: ${price:.2f} ({source}){retry_str}")
