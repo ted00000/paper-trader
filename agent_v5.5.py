@@ -3538,10 +3538,11 @@ RECENT LESSONS LEARNED:
         print()
 
         # Step 5.5: PHASE 1-4 - Validate BUY recommendations OR track blocked picks
+        validated_buys = []
+        all_picks = []  # Track all picks (accepted + rejected) for dashboard - ALWAYS initialize
+
         if original_buy_positions:
             print("5.5 Validating BUY recommendations (Phases 1-4: Full validation pipeline)...")
-            validated_buys = []
-            all_picks = []  # Track all picks (accepted + rejected) for dashboard
 
             for buy_pos in original_buy_positions:
                 ticker = buy_pos.get('ticker', 'UNKNOWN')
@@ -3766,8 +3767,8 @@ RECENT LESSONS LEARNED:
             buy_positions = validated_buys
             print(f"   ✓ Validated: {len(validated_buys)} BUY positions passed checks\n")
 
-            # Save daily picks for dashboard visibility
-            self.save_daily_picks(all_picks, vix_result, macro_result)
+        # Save daily picks for dashboard visibility (ALWAYS save, even if 0 picks)
+        self.save_daily_picks(all_picks, vix_result, macro_result)
 
         # Step 6: Build pending_positions.json
         print("6. Building pending positions file...")
