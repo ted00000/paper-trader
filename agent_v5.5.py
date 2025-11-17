@@ -2363,11 +2363,21 @@ POSITION {i}: {ticker}
                 # PORTFOLIO REVIEW MODE - Review existing positions
                 portfolio_review = self._format_portfolio_review(premarket_data)
 
+                # Load screener candidates for vacant slots
+                screener_data = self.load_screener_candidates()
+                screener_section = ""
+                vacant_slots = 10 - len(premarket_data)
+
+                if screener_data and vacant_slots > 0:
+                    screener_section = f"\n\n{'='*70}\nAVAILABLE OPPORTUNITIES FOR {vacant_slots} VACANT SLOTS:\n{'='*70}\n\n"
+                    screener_section += self.format_screener_candidates(screener_data)
+                    screener_section += f"\n\n{'='*70}\n"
+
                 user_message = f"""PORTFOLIO REVIEW - {today_date} @ 8:45 AM (Pre-market)
 
 CURRENT POSITIONS ({len(premarket_data)}):
 {portfolio_review}
-
+{screener_section}
 TASK: Review each position and decide HOLD / EXIT / REPLACE
 
 SWING TRADING RULES (STRICTLY ENFORCE):
