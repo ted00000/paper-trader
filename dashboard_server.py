@@ -479,13 +479,46 @@ def data_integrity_health():
 @app.route('/api/operations/logs/<operation>')
 @require_auth
 def view_log(operation):
-    """View log file for an operation - shows today's entries only"""
+    """View log file for an operation - shows today's most recent run"""
     try:
         # Validate operation name
         valid_ops = ['go', 'execute', 'analyze', 'learn_daily', 'learn_weekly', 'learn_monthly', 'screener']
         if operation.lower() not in valid_ops:
             return jsonify({'error': 'Invalid operation'}), 400
 
+        # For GO, EXECUTE, ANALYZE commands: Check daily_reviews for most recent JSON
+        if operation.lower() in ['go', 'execute', 'analyze']:
+            today = datetime.now().strftime('%Y%m%d')
+            reviews_dir = PROJECT_DIR / 'daily_reviews'
+
+            if reviews_dir.exists():
+                # Find most recent review file for today
+                pattern = f"{operation.lower()}_{today}_*.json"
+                review_files = sorted(reviews_dir.glob(pattern), reverse=True)
+
+                if review_files:
+                    # Use most recent JSON file
+                    latest_file = review_files[0]
+                    with open(latest_file) as f:
+                        data = json.load(f)
+
+                    # Extract timestamp from filename (e.g., go_20251117_092728.json)
+                    filename = latest_file.name
+                    timestamp_str = filename.split('_')[2].replace('.json', '')
+                    timestamp = f"{timestamp_str[:2]}:{timestamp_str[2:4]}:{timestamp_str[4:]}"
+
+                    # Format the response text from JSON
+                    response_text = data.get('content', [{}])[0].get('text', '')
+
+                    return jsonify({
+                        'operation': operation,
+                        'log_file': str(latest_file),
+                        'lines_returned': len(response_text.split('\n')),
+                        'total_lines': len(response_text.split('\n')),
+                        'content': f"(Showing today's most recent run: {timestamp})\n\n{response_text}"
+                    })
+
+        # Fallback to log file for older behavior or if JSON not found
         log_file = PROJECT_DIR / 'logs' / f'{operation.lower()}.log'
 
         if not log_file.exists():
