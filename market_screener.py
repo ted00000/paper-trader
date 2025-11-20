@@ -61,6 +61,8 @@ class MarketScreener:
         # Cache for Finnhub data (reduce API calls)
         self.earnings_calendar_cache = None
         self.analyst_ratings_cache = {}
+        self.insider_transactions_cache = {}
+        self.earnings_surprises_cache = {}
 
         if not self.api_key:
             raise ValueError("POLYGON_API_KEY not set in environment")
@@ -610,10 +612,10 @@ class MarketScreener:
             has_upgrade = upgrade_count > 0
             net_upgrades = upgrade_count - downgrade_count
 
-            # Tier 1 catalyst if upgraded in last 7 days
+            # Tier 1 catalyst if upgraded in last 14 days (extended window)
             catalyst_type = None
             if recent_upgrades:
-                recent_count = sum(1 for u in recent_upgrades if u['days_ago'] <= 7)
+                recent_count = sum(1 for u in recent_upgrades if u['days_ago'] <= 14)
                 if recent_count > 0:
                     catalyst_type = 'analyst_upgrade'
 
@@ -636,6 +638,180 @@ class MarketScreener:
         except Exception as e:
             result = {'has_upgrade': False, 'upgrade_count': 0, 'score': 0, 'catalyst_type': None}
             self.analyst_ratings_cache[ticker] = result
+            return result
+
+    def get_earnings_surprises(self, ticker):
+        """
+        Check for recent earnings beats (Tier 2 catalyst)
+
+        Returns: Dict with earnings surprise data
+        """
+        if not self.finnhub_key:
+            return {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None}
+
+        # Check cache first
+        if ticker in self.earnings_surprises_cache:
+            return self.earnings_surprises_cache[ticker]
+
+        try:
+            # Get earnings surprises from last 30 days
+            url = f'https://finnhub.io/api/v1/stock/earnings'
+            params = {
+                'symbol': ticker,
+                'token': self.finnhub_key
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            earnings = response.json()
+
+            if not isinstance(earnings, list) or not earnings:
+                result = {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None}
+                self.earnings_surprises_cache[ticker] = result
+                return result
+
+            # Look at most recent earnings (last 30 days)
+            recent_beat = None
+            for earning in earnings:
+                period = earning.get('period', '')
+                actual = earning.get('actual', None)
+                estimate = earning.get('estimate', None)
+
+                if not period or actual is None or estimate is None:
+                    continue
+
+                try:
+                    # Parse date
+                    earning_date = datetime.strptime(period, '%Y-%m-%d')
+                    days_ago = (datetime.now() - earning_date).days
+
+                    # Only look at earnings from last 30 days
+                    if days_ago > 30 or days_ago < 0:
+                        continue
+
+                    # Calculate surprise percentage
+                    if estimate != 0:
+                        surprise_pct = ((actual - estimate) / abs(estimate)) * 100
+                    else:
+                        surprise_pct = 0
+
+                    # Significant beat = >15% surprise
+                    if surprise_pct >= 15:
+                        recent_beat = {
+                            'period': period,
+                            'days_ago': days_ago,
+                            'actual': actual,
+                            'estimate': estimate,
+                            'surprise_pct': round(surprise_pct, 1)
+                        }
+                        break  # Take most recent
+
+                except:
+                    continue
+
+            # Build result
+            if recent_beat:
+                result = {
+                    'has_beat': True,
+                    'surprise_pct': recent_beat['surprise_pct'],
+                    'days_ago': recent_beat['days_ago'],
+                    'actual': recent_beat['actual'],
+                    'estimate': recent_beat['estimate'],
+                    'score': min(recent_beat['surprise_pct'] * 2, 100),  # 50% beat = 100 score
+                    'catalyst_type': 'earnings_beat'
+                }
+            else:
+                result = {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None}
+
+            self.earnings_surprises_cache[ticker] = result
+            time.sleep(0.1)  # Rate limit
+            return result
+
+        except Exception as e:
+            result = {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None}
+            self.earnings_surprises_cache[ticker] = result
+            return result
+
+    def get_insider_transactions(self, ticker):
+        """
+        Check for clustered insider buying (Tier 1 catalyst)
+
+        Returns: Dict with insider trading data
+        """
+        if not self.finnhub_key:
+            return {'has_cluster': False, 'buy_count': 0, 'score': 0, 'catalyst_type': None}
+
+        # Check cache first
+        if ticker in self.insider_transactions_cache:
+            return self.insider_transactions_cache[ticker]
+
+        try:
+            # Get insider transactions from last 90 days
+            url = f'https://finnhub.io/api/v1/stock/insider-transactions'
+            params = {
+                'symbol': ticker,
+                'from': (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d'),
+                'to': datetime.now().strftime('%Y-%m-%d'),
+                'token': self.finnhub_key
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+
+            # Handle response format
+            if isinstance(data, dict) and 'data' in data:
+                transactions = data['data']
+            elif isinstance(data, list):
+                transactions = data
+            else:
+                transactions = []
+
+            if not transactions:
+                result = {'has_cluster': False, 'buy_count': 0, 'score': 0, 'catalyst_type': None}
+                self.insider_transactions_cache[ticker] = result
+                return result
+
+            # Analyze for clustered buying (last 30 days)
+            recent_buys = 0
+            total_shares_bought = 0
+
+            for txn in transactions:
+                change = txn.get('change', 0)
+                filing_date = txn.get('filingDate', '')
+
+                if not filing_date:
+                    continue
+
+                try:
+                    filing_dt = datetime.strptime(filing_date, '%Y-%m-%d')
+                    days_ago = (datetime.now() - filing_dt).days
+
+                    # Only count buys from last 30 days
+                    if days_ago <= 30 and days_ago >= 0:
+                        # Positive change = buy
+                        if change > 0:
+                            recent_buys += 1
+                            total_shares_bought += change
+                except:
+                    continue
+
+            # Clustered buying = 3+ insiders buying in last 30 days
+            has_cluster = recent_buys >= 3
+
+            result = {
+                'has_cluster': has_cluster,
+                'buy_count': recent_buys,
+                'total_shares': total_shares_bought,
+                'score': min(recent_buys * 25, 100) if has_cluster else 0,
+                'catalyst_type': 'insider_buying' if has_cluster else None
+            }
+
+            self.insider_transactions_cache[ticker] = result
+            time.sleep(0.1)  # Rate limit
+            return result
+
+        except Exception as e:
+            result = {'has_cluster': False, 'buy_count': 0, 'score': 0, 'catalyst_type': None}
+            self.insider_transactions_cache[ticker] = result
             return result
 
     def scan_stock(self, ticker):
@@ -664,10 +840,12 @@ class MarketScreener:
         # Get technical setup
         technical_result = self.get_technical_setup(ticker)
 
-        # Get Finnhub catalyst data (TIER 1 SIGNALS)
+        # Get Finnhub catalyst data (TIER 1 & TIER 2 SIGNALS)
         analyst_result = self.get_analyst_ratings(ticker)
+        insider_result = self.get_insider_transactions(ticker)
+        earnings_surprise_result = self.get_earnings_surprises(ticker)
 
-        # Check earnings calendar
+        # Check earnings calendar (for upcoming earnings only, not a Tier 1 catalyst)
         earnings_calendar = self.earnings_calendar_cache or {}
         earnings_result = earnings_calendar.get(ticker, {})
 
@@ -680,39 +858,53 @@ class MarketScreener:
             technical_result['score'] * 0.05      # Reduced from 0.10
         )
 
-        # Tier 1 catalyst weights (40% total - HIGHEST PRIORITY)
+        # Catalyst weights (40% total - HIGHEST PRIORITY)
         catalyst_score = 0
 
-        # Analyst upgrade = 25% boost (MAJOR TIER 1 CATALYST)
+        # TIER 1 CATALYSTS (TRUE CATALYSTS)
+        # Analyst upgrade = 20% boost
         if analyst_result.get('catalyst_type') == 'analyst_upgrade':
-            catalyst_score += 25
+            catalyst_score += 20
 
-        # Upcoming earnings (3-7 days) = 15% boost (PRE-EARNINGS MOMENTUM)
+        # Clustered insider buying = 20% boost
+        if insider_result.get('catalyst_type') == 'insider_buying':
+            catalyst_score += 20
+
+        # TIER 2 CATALYSTS (CONFIRMED EVENTS)
+        # Recent earnings beat = 15% boost
+        if earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
+            catalyst_score += 15
+
+        # NOTE: Pre-earnings speculation is NO LONGER a Tier 1 catalyst
+        # Upcoming earnings only gets small momentum boost (5%)
         if earnings_result.get('has_upcoming_earnings'):
             days_until = earnings_result.get('days_until', 999)
             if 3 <= days_until <= 7:
-                catalyst_score += 15
-            elif 1 <= days_until <= 2:
-                catalyst_score += 10  # Too close, less time to ride momentum
-            elif 8 <= days_until <= 14:
-                catalyst_score += 5   # Earlier notice, less urgent
+                catalyst_score += 5  # Minor boost for near-term catalyst
 
         composite_score = base_score + catalyst_score
 
-        # Build why_selected string with Tier 1 catalysts first
+        # Build why_selected string with catalysts first
         why_parts = []
-        tier_1_catalysts = []
+        catalyst_reasons = []
 
         # TIER 1 CATALYSTS (show first)
         if analyst_result.get('catalyst_type') == 'analyst_upgrade':
             upgrades = analyst_result.get('recent_upgrades', [])
             if upgrades:
                 firm = upgrades[0].get('firm', 'Analyst')
-                tier_1_catalysts.append(f"UPGRADE: {firm}")
+                days = upgrades[0].get('days_ago', 0)
+                catalyst_reasons.append(f"UPGRADE: {firm} ({days}d ago)")
 
-        if earnings_result.get('has_upcoming_earnings'):
-            days_until = earnings_result.get('days_until', 0)
-            tier_1_catalysts.append(f"Earnings in {days_until}d")
+        if insider_result.get('catalyst_type') == 'insider_buying':
+            buy_count = insider_result.get('buy_count', 0)
+            catalyst_reasons.append(f"INSIDER BUY: {buy_count} transactions")
+
+        # TIER 2 CATALYSTS
+        if earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
+            surprise = earnings_surprise_result.get('surprise_pct', 0)
+            days = earnings_surprise_result.get('days_ago', 0)
+            catalyst_reasons.append(f"BEAT: +{surprise}% ({days}d ago)")
 
         # Technical/momentum signals
         if rs_result['rs_pct'] >= 5:
@@ -726,16 +918,18 @@ class MarketScreener:
         if technical_result['is_near_high']:
             why_parts.append(f"Near 52w high")
 
-        # Combine: Tier 1 first, then other signals
-        all_reasons = tier_1_catalysts + why_parts
+        # Combine: Catalysts first, then technical signals
+        all_reasons = catalyst_reasons + why_parts
         why_selected = ', '.join(all_reasons) if all_reasons else 'Meets baseline criteria'
 
-        # Determine overall catalyst tier
+        # Determine overall catalyst tier (only TRUE catalysts are Tier 1)
         catalyst_tier = None
         if analyst_result.get('catalyst_type') == 'analyst_upgrade':
             catalyst_tier = 'Tier 1 - Analyst Upgrade'
-        elif earnings_result.get('has_upcoming_earnings') and 3 <= earnings_result.get('days_until', 999) <= 7:
-            catalyst_tier = 'Tier 1 - Pre-Earnings Momentum'
+        elif insider_result.get('catalyst_type') == 'insider_buying':
+            catalyst_tier = 'Tier 1 - Insider Buying'
+        elif earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
+            catalyst_tier = 'Tier 2 - Earnings Beat'
 
         return {
             'ticker': ticker,
@@ -747,6 +941,8 @@ class MarketScreener:
             'volume_analysis': volume_result,
             'technical_setup': technical_result,
             'analyst_ratings': analyst_result,
+            'insider_transactions': insider_result,
+            'earnings_surprises': earnings_surprise_result,
             'earnings_data': earnings_result,
             'catalyst_tier': catalyst_tier,
             'why_selected': why_selected
