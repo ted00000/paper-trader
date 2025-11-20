@@ -48,12 +48,34 @@ if [ ! -f "venv/bin/activate" ]; then
 fi
 source venv/bin/activate
 
-# Load environment variables
+# Load and EXPORT environment variables (including FINNHUB_API_KEY)
 if [ ! -f "/root/.env" ]; then
     update_status "FAILED" "Environment file not found at /root/.env"
     exit 1
 fi
-source /root/.env
+
+# Export all variables from .env (same method as start_dashboard.sh)
+while IFS= read -r line; do
+    # Skip comments and empty lines
+    [[ $line =~ ^#.*$ ]] && continue
+    [[ -z $line ]] && continue
+
+    # Remove leading 'export ' if present
+    line="${line#export }"
+
+    # Split on first '=' only
+    if [[ $line =~ ^([^=]+)=(.*)$ ]]; then
+        key="${BASH_REMATCH[1]}"
+        value="${BASH_REMATCH[2]}"
+
+        # Remove quotes if present
+        value="${value%\"}"
+        value="${value#\"}"
+
+        # Export without shell expansion
+        export "$key=$value"
+    fi
+done < /root/.env
 
 # Verify screener script exists
 if [ ! -f "$SCREENER_SCRIPT" ]; then

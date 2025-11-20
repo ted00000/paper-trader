@@ -26,6 +26,7 @@ import time
 # Configuration
 PROJECT_DIR = Path(__file__).parent
 POLYGON_API_KEY = os.environ.get('POLYGON_API_KEY', '')
+FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', '')
 
 # S&P 1500 Sector ETF Mapping (same as agent)
 SECTOR_ETF_MAP = {
@@ -53,11 +54,20 @@ class MarketScreener:
 
     def __init__(self):
         self.api_key = POLYGON_API_KEY
+        self.finnhub_key = FINNHUB_API_KEY
         self.today = datetime.now().strftime('%Y-%m-%d')
         self.scan_results = []
 
+        # Cache for Finnhub data (reduce API calls)
+        self.earnings_calendar_cache = None
+        self.analyst_ratings_cache = {}
+
         if not self.api_key:
             raise ValueError("POLYGON_API_KEY not set in environment")
+
+        if not self.finnhub_key:
+            print("   ⚠️ WARNING: FINNHUB_API_KEY not set - Tier 1 catalyst detection disabled")
+            print("   Sign up at https://finnhub.io/register for free API key\n")
 
     def get_sp1500_tickers(self):
         """
@@ -479,6 +489,155 @@ class MarketScreener:
         except Exception:
             return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'score': 0}
 
+    def get_earnings_calendar(self):
+        """
+        Fetch upcoming earnings calendar from Finnhub (cached for session)
+
+        Returns: Dict mapping ticker -> earnings data
+        """
+        if not self.finnhub_key:
+            return {}
+
+        # Use cache if already loaded
+        if self.earnings_calendar_cache is not None:
+            return self.earnings_calendar_cache
+
+        try:
+            # Get earnings calendar for next 30 days
+            url = f'https://finnhub.io/api/v1/calendar/earnings'
+            params = {
+                'from': datetime.now().strftime('%Y-%m-%d'),
+                'to': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d'),
+                'token': self.finnhub_key
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+
+            # Build ticker -> earnings data mapping
+            earnings_map = {}
+
+            if 'earningsCalendar' in data:
+                for event in data['earningsCalendar']:
+                    ticker = event.get('symbol', '')
+                    date_str = event.get('date', '')
+                    eps_estimate = event.get('epsEstimate', None)
+
+                    if ticker and date_str:
+                        try:
+                            earnings_date = datetime.strptime(date_str, '%Y-%m-%d')
+                            days_until = (earnings_date - datetime.now()).days
+
+                            earnings_map[ticker] = {
+                                'date': date_str,
+                                'days_until': days_until,
+                                'eps_estimate': eps_estimate,
+                                'has_upcoming_earnings': True
+                            }
+                        except:
+                            pass
+
+            # Cache results
+            self.earnings_calendar_cache = earnings_map
+            return earnings_map
+
+        except Exception as e:
+            print(f"   ⚠️ Error fetching earnings calendar: {e}")
+            self.earnings_calendar_cache = {}
+            return {}
+
+    def get_analyst_ratings(self, ticker):
+        """
+        Fetch recent analyst ratings/upgrades for a ticker
+
+        Returns: Dict with catalyst data
+        """
+        if not self.finnhub_key:
+            return {'has_upgrade': False, 'upgrade_count': 0, 'score': 0, 'catalyst_type': None}
+
+        # Check cache first
+        if ticker in self.analyst_ratings_cache:
+            return self.analyst_ratings_cache[ticker]
+
+        try:
+            # Get analyst ratings/upgrades from last 30 days
+            url = f'https://finnhub.io/api/v1/stock/upgrade-downgrade'
+            params = {
+                'symbol': ticker,
+                'from': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
+                'to': datetime.now().strftime('%Y-%m-%d'),
+                'token': self.finnhub_key
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            ratings = response.json()
+
+            if not isinstance(ratings, list):
+                ratings = []
+
+            # Analyze ratings for upgrades
+            upgrade_count = 0
+            downgrade_count = 0
+            recent_upgrades = []
+
+            for rating in ratings:
+                action = rating.get('action', '').lower()
+                from_grade = rating.get('fromGrade', '').lower()
+                to_grade = rating.get('toGrade', '').lower()
+                date_str = rating.get('time', '')
+
+                # Detect upgrades
+                if 'upgrade' in action or (from_grade and to_grade and
+                    ('buy' in to_grade or 'outperform' in to_grade or 'overweight' in to_grade)):
+                    upgrade_count += 1
+                    try:
+                        days_ago = (datetime.now() - datetime.fromisoformat(date_str.replace('Z', '+00:00'))).days
+                        recent_upgrades.append({
+                            'firm': rating.get('company', 'Unknown'),
+                            'action': action,
+                            'to_grade': to_grade,
+                            'days_ago': days_ago
+                        })
+                    except:
+                        pass
+
+                # Detect downgrades
+                elif 'downgrade' in action or (from_grade and to_grade and
+                    ('sell' in to_grade or 'underperform' in to_grade or 'underweight' in to_grade)):
+                    downgrade_count += 1
+
+            # Calculate score and determine catalyst type
+            has_upgrade = upgrade_count > 0
+            net_upgrades = upgrade_count - downgrade_count
+
+            # Tier 1 catalyst if upgraded in last 7 days
+            catalyst_type = None
+            if recent_upgrades:
+                recent_count = sum(1 for u in recent_upgrades if u['days_ago'] <= 7)
+                if recent_count > 0:
+                    catalyst_type = 'analyst_upgrade'
+
+            result = {
+                'has_upgrade': has_upgrade,
+                'upgrade_count': upgrade_count,
+                'downgrade_count': downgrade_count,
+                'net_upgrades': net_upgrades,
+                'recent_upgrades': recent_upgrades[:3],  # Top 3 most recent
+                'score': min(net_upgrades * 50, 100) if net_upgrades > 0 else 0,
+                'catalyst_type': catalyst_type
+            }
+
+            # Cache result
+            self.analyst_ratings_cache[ticker] = result
+            time.sleep(0.1)  # Rate limit: 60 calls/minute = 1 per second safe
+
+            return result
+
+        except Exception as e:
+            result = {'has_upgrade': False, 'upgrade_count': 0, 'score': 0, 'catalyst_type': None}
+            self.analyst_ratings_cache[ticker] = result
+            return result
+
     def scan_stock(self, ticker):
         """
         Complete analysis of a single stock
@@ -505,33 +664,78 @@ class MarketScreener:
         # Get technical setup
         technical_result = self.get_technical_setup(ticker)
 
-        # Calculate composite score
-        composite_score = (
-            rs_result['score'] * 0.40 +
-            news_result['scaled_score'] * 0.30 +
-            volume_result['score'] * 0.20 +
-            technical_result['score'] * 0.10
+        # Get Finnhub catalyst data (TIER 1 SIGNALS)
+        analyst_result = self.get_analyst_ratings(ticker)
+
+        # Check earnings calendar
+        earnings_calendar = self.earnings_calendar_cache or {}
+        earnings_result = earnings_calendar.get(ticker, {})
+
+        # Calculate composite score with Tier 1 catalyst boost
+        # Base weights (60% total for non-Tier 1 signals)
+        base_score = (
+            rs_result['score'] * 0.30 +          # Reduced from 0.40
+            news_result['scaled_score'] * 0.15 + # Reduced from 0.30
+            volume_result['score'] * 0.10 +       # Reduced from 0.20
+            technical_result['score'] * 0.05      # Reduced from 0.10
         )
 
-        # Build why_selected string
+        # Tier 1 catalyst weights (40% total - HIGHEST PRIORITY)
+        catalyst_score = 0
+
+        # Analyst upgrade = 25% boost (MAJOR TIER 1 CATALYST)
+        if analyst_result.get('catalyst_type') == 'analyst_upgrade':
+            catalyst_score += 25
+
+        # Upcoming earnings (3-7 days) = 15% boost (PRE-EARNINGS MOMENTUM)
+        if earnings_result.get('has_upcoming_earnings'):
+            days_until = earnings_result.get('days_until', 999)
+            if 3 <= days_until <= 7:
+                catalyst_score += 15
+            elif 1 <= days_until <= 2:
+                catalyst_score += 10  # Too close, less time to ride momentum
+            elif 8 <= days_until <= 14:
+                catalyst_score += 5   # Earlier notice, less urgent
+
+        composite_score = base_score + catalyst_score
+
+        # Build why_selected string with Tier 1 catalysts first
         why_parts = []
+        tier_1_catalysts = []
+
+        # TIER 1 CATALYSTS (show first)
+        if analyst_result.get('catalyst_type') == 'analyst_upgrade':
+            upgrades = analyst_result.get('recent_upgrades', [])
+            if upgrades:
+                firm = upgrades[0].get('firm', 'Analyst')
+                tier_1_catalysts.append(f"UPGRADE: {firm}")
+
+        if earnings_result.get('has_upcoming_earnings'):
+            days_until = earnings_result.get('days_until', 0)
+            tier_1_catalysts.append(f"Earnings in {days_until}d")
+
+        # Technical/momentum signals
         if rs_result['rs_pct'] >= 5:
             why_parts.append(f"Strong RS (+{rs_result['rs_pct']}%)")
         elif rs_result['rs_pct'] >= 3:
             why_parts.append(f"RS +{rs_result['rs_pct']}%")
 
-        if news_result['score'] >= 10:
-            why_parts.append(f"High news ({news_result['score']}/20)")
-        elif news_result['score'] >= 5:
-            why_parts.append(f"News score {news_result['score']}/20")
-
         if volume_result['volume_ratio'] >= 2.0:
-            why_parts.append(f"{volume_result['volume_ratio']:.1f}x volume surge")
+            why_parts.append(f"{volume_result['volume_ratio']:.1f}x volume")
 
         if technical_result['is_near_high']:
-            why_parts.append(f"Near 52w high ({technical_result['distance_from_52w_high_pct']:.1f}%)")
+            why_parts.append(f"Near 52w high")
 
-        why_selected = ', '.join(why_parts) if why_parts else 'Meets baseline criteria'
+        # Combine: Tier 1 first, then other signals
+        all_reasons = tier_1_catalysts + why_parts
+        why_selected = ', '.join(all_reasons) if all_reasons else 'Meets baseline criteria'
+
+        # Determine overall catalyst tier
+        catalyst_tier = None
+        if analyst_result.get('catalyst_type') == 'analyst_upgrade':
+            catalyst_tier = 'Tier 1 - Analyst Upgrade'
+        elif earnings_result.get('has_upcoming_earnings') and 3 <= earnings_result.get('days_until', 999) <= 7:
+            catalyst_tier = 'Tier 1 - Pre-Earnings Momentum'
 
         return {
             'ticker': ticker,
@@ -542,6 +746,9 @@ class MarketScreener:
             'catalyst_signals': news_result,
             'volume_analysis': volume_result,
             'technical_setup': technical_result,
+            'analyst_ratings': analyst_result,
+            'earnings_data': earnings_result,
+            'catalyst_tier': catalyst_tier,
             'why_selected': why_selected
         }
 
@@ -557,6 +764,15 @@ class MarketScreener:
         print(f"Date: {self.today}")
         print(f"Time: {datetime.now().strftime('%H:%M:%S')} ET")
         print(f"Filters: RS ≥{MIN_RS_PCT}%, Price ≥${MIN_PRICE}, MCap ≥${MIN_MARKET_CAP:,}\n")
+
+        # Load Finnhub earnings calendar (TIER 1 CATALYST DATA)
+        if self.finnhub_key:
+            print("Loading Finnhub earnings calendar...")
+            earnings_cal = self.get_earnings_calendar()
+            earnings_count = len(earnings_cal)
+            print(f"   ✓ Loaded {earnings_count} upcoming earnings events (next 30 days)\n")
+        else:
+            print("   ⚠️ Finnhub disabled - Tier 1 catalyst detection limited\n")
 
         # Get universe
         tickers = self.get_sp1500_tickers()
@@ -622,25 +838,28 @@ class MarketScreener:
 
         print(f"✓ Saved {scan_output['candidates_found']} candidates to screener_candidates.json")
 
+        # Count Tier 1 catalysts
+        tier1_count = sum(1 for c in scan_output['candidates'] if c.get('catalyst_tier'))
+
         # Print top 10 summary
-        print("\n" + "=" * 60)
+        print("\n" + "=" * 80)
         print("TOP 10 CANDIDATES")
-        print("=" * 60)
-        print(f"{'Rank':<5} {'Ticker':<7} {'Score':<7} {'RS%':<7} {'News':<7} {'Vol':<7} Why")
-        print("-" * 60)
+        print("=" * 80)
+        print(f"Total candidates: {len(scan_output['candidates'])} | Tier 1 catalysts: {tier1_count}\n")
+        print(f"{'Rank':<5} {'Ticker':<7} {'Score':<7} {'Catalyst':<30} {'RS%':<7} Why")
+        print("-" * 80)
 
         for candidate in scan_output['candidates'][:10]:
             rank = candidate['rank']
             ticker = candidate['ticker']
             score = candidate['composite_score']
             rs = candidate['relative_strength']['rs_pct']
-            news = candidate['catalyst_signals']['score']
-            vol = candidate['volume_analysis']['volume_ratio']
-            why = candidate['why_selected'][:40]  # Truncate
+            catalyst = candidate.get('catalyst_tier', 'None')[:29]  # Truncate
+            why = candidate['why_selected'][:30]  # Truncate
 
-            print(f"{rank:<5} {ticker:<7} {score:<7.1f} {rs:<7.1f} {news:<7} {vol:<7.1f} {why}")
+            print(f"{rank:<5} {ticker:<7} {score:<7.1f} {catalyst:<30} {rs:<7.1f} {why}")
 
-        print("=" * 60)
+        print("=" * 80)
 
 def main():
     """Main execution"""

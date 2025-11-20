@@ -5,10 +5,28 @@ set -e
 
 cd /root/paper_trading_lab
 
-# Load and EXPORT environment variables
-set -a  # Mark all variables for export
-source /root/.env
-set +a  # Stop exporting
+# Load environment variables WITHOUT shell expansion (preserves $ in password hash)
+while IFS= read -r line; do
+    # Skip comments and empty lines
+    [[ $line =~ ^#.*$ ]] && continue
+    [[ -z $line ]] && continue
+
+    # Remove leading 'export ' if present
+    line="${line#export }"
+
+    # Split on first '=' only
+    if [[ $line =~ ^([^=]+)=(.*)$ ]]; then
+        key="${BASH_REMATCH[1]}"
+        value="${BASH_REMATCH[2]}"
+
+        # Remove quotes if present
+        value="${value%\"}"
+        value="${value#\"}"
+
+        # Export without shell expansion
+        export "$key=$value"
+    fi
+done < /root/.env
 
 # Set dashboard-specific variables
 export DASHBOARD_SECRET_KEY=$(cat .secret_key)
