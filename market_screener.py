@@ -513,7 +513,7 @@ class MarketScreener:
                 'token': self.finnhub_key
             }
 
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=30)
             data = response.json()
 
             # Build ticker -> earnings data mapping
@@ -571,7 +571,7 @@ class MarketScreener:
                 'token': self.finnhub_key
             }
 
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=30)
             ratings = response.json()
 
             if not isinstance(ratings, list):
@@ -661,7 +661,7 @@ class MarketScreener:
                 'token': self.finnhub_key
             }
 
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=30)
             earnings = response.json()
 
             if not isinstance(earnings, list) or not earnings:
@@ -754,7 +754,7 @@ class MarketScreener:
                 'token': self.finnhub_key
             }
 
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=30)
             data = response.json()
 
             # Handle response format
