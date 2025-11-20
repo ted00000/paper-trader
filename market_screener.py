@@ -350,7 +350,7 @@ class MarketScreener:
             if not articles:
                 return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0, 'top_articles': []}
 
-            # Score news articles with TIER 1 catalyst detection
+            # Score news articles with TIER 1 catalyst detection + RECENCY FILTERING
             # Tier 1 catalysts get MUCH higher weight
             tier1_keywords = {
                 'acquisition': 8,      # M&A = Tier 1
@@ -378,33 +378,80 @@ class MarketScreener:
                 'new high': 2
             }
 
+            # NEGATIVE sentiment keywords (filter these out)
+            negative_keywords = [
+                'investigation',
+                'lawsuit',
+                'legal action',
+                'sec filing',
+                'dilutive offering',
+                'public offering',
+                'share offering',
+                'secondary offering',
+                'reduces stake',
+                'sells shares',
+                'cutting',
+                'downgrade',
+                'misses',
+                'disappoints',
+                'concern',
+                'warning'
+            ]
+
             score = 0
             found_keywords = set()
             catalyst_type_news = None
+            catalyst_news_age_days = None
 
-            # Check for Tier 1 catalysts in news first
+            # Check for Tier 1 catalysts in news first (with recency and sentiment filtering)
             for article in articles[:20]:
                 title = article.get('title', '').lower()
                 description = article.get('description', '').lower()
                 text = f"{title} {description}"
 
-                # Check Tier 1 keywords (M&A, FDA, contracts)
+                # Get article age
+                published = article.get('published_utc', '')
+                try:
+                    pub_date = datetime.fromisoformat(published.replace('Z', '+00:00'))
+                    days_ago = (datetime.now(pub_date.tzinfo) - pub_date).days
+                except:
+                    days_ago = 999  # Unknown date = reject
+
+                # NEGATIVE SENTIMENT FILTER
+                is_negative = any(neg_word in text for neg_word in negative_keywords)
+                if is_negative:
+                    continue  # Skip negative news entirely
+
+                # Check Tier 1 keywords (M&A, FDA, contracts) with SAME-DAY RECENCY
                 for keyword, points in tier1_keywords.items():
                     if keyword in text:
-                        score += points
-                        found_keywords.add(keyword)
-                        # Mark as potential Tier 1 catalyst if found in news
-                        if not catalyst_type_news:
-                            if 'acquisition' in keyword or 'merger' in keyword or 'acquire' in keyword:
-                                catalyst_type_news = 'M&A_news'
-                            elif 'FDA' in keyword or 'drug' in keyword:
-                                catalyst_type_news = 'FDA_news'
-                            elif 'contract' in keyword:
-                                catalyst_type_news = 'contract_news'
-                            elif 'upgrade' in keyword:
-                                catalyst_type_news = 'upgrade_news'
+                        # CRITICAL: Only accept M&A/FDA/contract news from SAME DAY (0-1 days old)
+                        if 'acquisition' in keyword or 'merger' in keyword or 'acquire' in keyword:
+                            if days_ago <= 1:  # Same day or yesterday only
+                                score += points
+                                found_keywords.add(keyword)
+                                if not catalyst_type_news:
+                                    catalyst_type_news = 'M&A_news'
+                                    catalyst_news_age_days = days_ago
+                        elif 'FDA' in keyword or 'drug' in keyword:
+                            if days_ago <= 1:  # Same day or yesterday only
+                                score += points
+                                found_keywords.add(keyword)
+                                if not catalyst_type_news:
+                                    catalyst_type_news = 'FDA_news'
+                                    catalyst_news_age_days = days_ago
+                        elif 'contract' in keyword:
+                            if days_ago <= 2:  # Give contracts 2 days (sometimes delayed reporting)
+                                score += points
+                                found_keywords.add(keyword)
+                                if not catalyst_type_news:
+                                    catalyst_type_news = 'contract_news'
+                                    catalyst_news_age_days = days_ago
+                        else:  # Other Tier 1 keywords (upgrades, etc.)
+                            score += points
+                            found_keywords.add(keyword)
 
-                # Check Tier 2 keywords
+                # Check Tier 2 keywords (no strict recency requirement)
                 for keyword, points in tier2_keywords.items():
                     if keyword in text:
                         score += points
@@ -437,6 +484,7 @@ class MarketScreener:
                 'keywords': list(found_keywords),
                 'scaled_score': (score / 30) * 100,  # Updated denominator to 30
                 'catalyst_type_news': catalyst_type_news,  # M&A, FDA, contracts detected in news
+                'catalyst_news_age_days': catalyst_news_age_days,  # How fresh is the catalyst
                 'top_articles': top_articles  # Actual article content for Claude
             }
 
@@ -996,14 +1044,27 @@ class MarketScreener:
             buy_count = insider_result.get('buy_count', 0)
             catalyst_reasons.append(f"INSIDER BUY: {buy_count} transactions")
 
-        # M&A, FDA, Contract news from Polygon
+        # M&A, FDA, Contract news from Polygon (with age)
         catalyst_type_news = news_result.get('catalyst_type_news')
+        news_age = news_result.get('catalyst_news_age_days')
         if catalyst_type_news == 'M&A_news':
-            catalyst_reasons.append(f"M&A NEWS: Acquisition/merger")
+            if news_age is not None:
+                if news_age == 0:
+                    catalyst_reasons.append(f"M&A NEWS: TODAY - Acquisition/merger")
+                else:
+                    catalyst_reasons.append(f"M&A NEWS: {news_age}d ago")
+            else:
+                catalyst_reasons.append(f"M&A NEWS: Acquisition/merger")
         elif catalyst_type_news == 'FDA_news':
-            catalyst_reasons.append(f"FDA NEWS: Drug approval")
+            if news_age is not None and news_age == 0:
+                catalyst_reasons.append(f"FDA NEWS: TODAY - Drug approval")
+            else:
+                catalyst_reasons.append(f"FDA NEWS: Drug approval")
         elif catalyst_type_news == 'contract_news':
-            catalyst_reasons.append(f"CONTRACT NEWS: Major win")
+            if news_age is not None and news_age <= 1:
+                catalyst_reasons.append(f"CONTRACT NEWS: {news_age}d ago")
+            else:
+                catalyst_reasons.append(f"CONTRACT NEWS: Major win")
 
         # TIER 2 CATALYSTS
         if earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
