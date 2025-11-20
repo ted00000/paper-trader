@@ -854,7 +854,7 @@ class MarketScreener:
             ticker = candidate['ticker']
             score = candidate['composite_score']
             rs = candidate['relative_strength']['rs_pct']
-            catalyst = candidate.get('catalyst_tier', 'None')[:29]  # Truncate
+            catalyst = (candidate.get('catalyst_tier') or 'None')[:29]  # Truncate, handle None
             why = candidate['why_selected'][:30]  # Truncate
 
             print(f"{rank:<5} {ticker:<7} {score:<7.1f} {catalyst:<30} {rs:<7.1f} {why}")
