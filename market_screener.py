@@ -350,39 +350,68 @@ class MarketScreener:
             if not articles:
                 return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0, 'top_articles': []}
 
-            # Score news articles
-            catalyst_keywords = {
-                'earnings': 3,
-                'beat': 3,
-                'raises': 2,
-                'guidance': 2,
-                'upgrade': 3,
+            # Score news articles with TIER 1 catalyst detection
+            # Tier 1 catalysts get MUCH higher weight
+            tier1_keywords = {
+                'acquisition': 8,      # M&A = Tier 1
+                'merger': 8,           # M&A = Tier 1
+                'acquires': 8,         # M&A = Tier 1
+                'to acquire': 8,       # M&A = Tier 1
+                'FDA approval': 8,     # FDA approval = Tier 1
+                'drug approval': 8,    # FDA approval = Tier 1
+                'contract win': 6,     # Major contract = Tier 1
+                'awarded contract': 6, # Major contract = Tier 1
+                'signs contract': 6,   # Major contract = Tier 1
+                'upgrade': 5,          # Analyst upgrade = Tier 1
+            }
+
+            # Tier 2 and momentum keywords
+            tier2_keywords = {
+                'earnings beat': 4,
+                'beat estimates': 4,
+                'beat expectations': 4,
+                'raises guidance': 3,
+                'guidance raised': 3,
                 'analyst': 1,
                 'price target': 2,
-                'FDA': 3,
-                'approval': 3,
-                'contract': 2,
-                'acquisition': 2,
-                'merger': 2,
                 'breakout': 1,
-                'high': 1
+                'new high': 2
             }
 
             score = 0
             found_keywords = set()
+            catalyst_type_news = None
 
+            # Check for Tier 1 catalysts in news first
             for article in articles[:20]:
                 title = article.get('title', '').lower()
                 description = article.get('description', '').lower()
                 text = f"{title} {description}"
 
-                for keyword, points in catalyst_keywords.items():
+                # Check Tier 1 keywords (M&A, FDA, contracts)
+                for keyword, points in tier1_keywords.items():
+                    if keyword in text:
+                        score += points
+                        found_keywords.add(keyword)
+                        # Mark as potential Tier 1 catalyst if found in news
+                        if not catalyst_type_news:
+                            if 'acquisition' in keyword or 'merger' in keyword or 'acquire' in keyword:
+                                catalyst_type_news = 'M&A_news'
+                            elif 'FDA' in keyword or 'drug' in keyword:
+                                catalyst_type_news = 'FDA_news'
+                            elif 'contract' in keyword:
+                                catalyst_type_news = 'contract_news'
+                            elif 'upgrade' in keyword:
+                                catalyst_type_news = 'upgrade_news'
+
+                # Check Tier 2 keywords
+                for keyword, points in tier2_keywords.items():
                     if keyword in text:
                         score += points
                         found_keywords.add(keyword)
 
-            # Cap at 20
-            score = min(score, 20)
+            # Cap at 30 (increased from 20 to account for higher Tier 1 weights)
+            score = min(score, 30)
 
             # Extract top 5 most relevant articles for Claude to review
             top_articles = []
@@ -406,8 +435,9 @@ class MarketScreener:
                 'score': score,
                 'count': len(articles),
                 'keywords': list(found_keywords),
-                'scaled_score': (score / 20) * 100,
-                'top_articles': top_articles  # NEW: Actual article content for Claude
+                'scaled_score': (score / 30) * 100,  # Updated denominator to 30
+                'catalyst_type_news': catalyst_type_news,  # M&A, FDA, contracts detected in news
+                'top_articles': top_articles  # Actual article content for Claude
             }
 
         except Exception:
@@ -644,10 +674,12 @@ class MarketScreener:
         """
         Check for recent earnings beats (Tier 2 catalyst)
 
+        PRIORITY: Same-day beats (0-3 days) >>> older beats (4-30 days)
+
         Returns: Dict with earnings surprise data
         """
         if not self.finnhub_key:
-            return {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None}
+            return {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None, 'recency_tier': None}
 
         # Check cache first
         if ticker in self.earnings_surprises_cache:
@@ -665,7 +697,7 @@ class MarketScreener:
             earnings = response.json()
 
             if not isinstance(earnings, list) or not earnings:
-                result = {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None}
+                result = {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None, 'recency_tier': None}
                 self.earnings_surprises_cache[ticker] = result
                 return result
 
@@ -708,19 +740,37 @@ class MarketScreener:
                 except:
                     continue
 
-            # Build result
+            # Build result with recency tiers
             if recent_beat:
+                days = recent_beat['days_ago']
+
+                # Determine recency tier
+                if days <= 3:
+                    recency_tier = 'FRESH'  # 0-3 days = caught it early!
+                    recency_boost = 1.5  # 50% boost for fresh beats
+                elif days <= 7:
+                    recency_tier = 'RECENT'  # 4-7 days = still good
+                    recency_boost = 1.2  # 20% boost
+                else:
+                    recency_tier = 'OLDER'  # 8-30 days = older news
+                    recency_boost = 1.0  # No boost
+
+                # Apply recency boost to score
+                base_score = min(recent_beat['surprise_pct'] * 2, 100)
+                boosted_score = min(base_score * recency_boost, 100)
+
                 result = {
                     'has_beat': True,
                     'surprise_pct': recent_beat['surprise_pct'],
                     'days_ago': recent_beat['days_ago'],
                     'actual': recent_beat['actual'],
                     'estimate': recent_beat['estimate'],
-                    'score': min(recent_beat['surprise_pct'] * 2, 100),  # 50% beat = 100 score
+                    'score': boosted_score,
+                    'recency_tier': recency_tier,
                     'catalyst_type': 'earnings_beat'
                 }
             else:
-                result = {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None}
+                result = {'has_beat': False, 'surprise_pct': 0, 'score': 0, 'catalyst_type': None, 'recency_tier': None}
 
             self.earnings_surprises_cache[ticker] = result
             time.sleep(0.1)  # Rate limit
@@ -818,36 +868,64 @@ class MarketScreener:
         """
         Complete analysis of a single stock
 
+        NEW FLOW: Catalyst-first approach
+        1. RS filter (quick technical rejection)
+        2. Check for Tier 1 catalysts (analyst upgrades, M&A, FDA, contracts, insider buying)
+        3. Check for Tier 2 catalysts (earnings beats)
+        4. If any catalyst found -> Full technical analysis
+        5. If no catalyst but strong RS -> Still include (momentum play)
+
         Returns: Dict with all metrics, or None if rejected
         """
         # Get sector
         sector = self.get_stock_sector(ticker)
 
-        # Calculate relative strength (CRITICAL FILTER)
+        # STEP 1: Calculate relative strength (CRITICAL FILTER)
         rs_result = self.calculate_relative_strength(ticker, sector)
 
         # REJECT if fails RS filter
         if not rs_result['passed_filter']:
             return None
 
-        # Get catalyst signals
-        news_result = self.get_news_score(ticker)
-
-        # Get volume analysis (rate limit: small delay)
-        time.sleep(0.1)  # 10 requests/second
-        volume_result = self.get_volume_analysis(ticker)
-
-        # Get technical setup
-        technical_result = self.get_technical_setup(ticker)
-
-        # Get Finnhub catalyst data (TIER 1 & TIER 2 SIGNALS)
+        # STEP 2: Check for Tier 1 & Tier 2 catalysts FIRST (before expensive technical analysis)
         analyst_result = self.get_analyst_ratings(ticker)
         insider_result = self.get_insider_transactions(ticker)
         earnings_surprise_result = self.get_earnings_surprises(ticker)
 
+        # Quick news check for M&A, FDA, major contracts
+        news_result = self.get_news_score(ticker)
+
         # Check earnings calendar (for upcoming earnings only, not a Tier 1 catalyst)
         earnings_calendar = self.earnings_calendar_cache or {}
         earnings_result = earnings_calendar.get(ticker, {})
+
+        # Determine if stock has ANY catalyst (Tier 1 or Tier 2)
+        has_tier1_catalyst = (
+            analyst_result.get('catalyst_type') == 'analyst_upgrade' or
+            insider_result.get('catalyst_type') == 'insider_buying' or
+            news_result.get('catalyst_type_news') in ['M&A_news', 'FDA_news', 'contract_news']
+        )
+
+        has_tier2_catalyst = (
+            earnings_surprise_result.get('catalyst_type') == 'earnings_beat'
+        )
+
+        # CATALYST FILTER LOGIC:
+        # - If has Tier 1 catalyst -> Continue to full analysis
+        # - If has Tier 2 catalyst -> Continue to full analysis
+        # - If strong RS (>7%) -> Continue (pure momentum play)
+        # - Otherwise -> REJECT (no catalyst + weak momentum)
+
+        has_any_catalyst = has_tier1_catalyst or has_tier2_catalyst
+        strong_momentum = rs_result['rs_pct'] >= 7.0
+
+        if not has_any_catalyst and not strong_momentum:
+            return None  # REJECT: No catalyst and weak momentum
+
+        # STEP 3: Full technical analysis (only for catalyst stocks or strong momentum)
+        time.sleep(0.1)  # Rate limit
+        volume_result = self.get_volume_analysis(ticker)
+        technical_result = self.get_technical_setup(ticker)
 
         # Calculate composite score with Tier 1 catalyst boost
         # Base weights (60% total for non-Tier 1 signals)
@@ -866,14 +944,32 @@ class MarketScreener:
         if analyst_result.get('catalyst_type') == 'analyst_upgrade':
             catalyst_score += 20
 
-        # Clustered insider buying = 20% boost
-        if insider_result.get('catalyst_type') == 'insider_buying':
+        # M&A news = 25% boost (HIGHEST PRIORITY - confirmed material event)
+        if news_result.get('catalyst_type_news') == 'M&A_news':
+            catalyst_score += 25
+
+        # FDA approval news = 25% boost (HIGHEST PRIORITY - confirmed material event)
+        elif news_result.get('catalyst_type_news') == 'FDA_news':
+            catalyst_score += 25
+
+        # Major contract news = 20% boost
+        elif news_result.get('catalyst_type_news') == 'contract_news':
             catalyst_score += 20
 
-        # TIER 2 CATALYSTS (CONFIRMED EVENTS)
-        # Recent earnings beat = 15% boost
-        if earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
+        # Clustered insider buying = 15% boost (downgraded from 20 - leading indicator)
+        if insider_result.get('catalyst_type') == 'insider_buying':
             catalyst_score += 15
+
+        # TIER 2 CATALYSTS (CONFIRMED EVENTS)
+        # Recent earnings beat with recency bonus
+        if earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
+            recency = earnings_surprise_result.get('recency_tier', 'OLDER')
+            if recency == 'FRESH':
+                catalyst_score += 20  # Fresh beat (0-3 days) = 20% boost
+            elif recency == 'RECENT':
+                catalyst_score += 17  # Recent beat (4-7 days) = 17% boost
+            else:
+                catalyst_score += 15  # Older beat (8-30 days) = 15% boost
 
         # NOTE: Pre-earnings speculation is NO LONGER a Tier 1 catalyst
         # Upcoming earnings only gets small momentum boost (5%)
@@ -900,11 +996,24 @@ class MarketScreener:
             buy_count = insider_result.get('buy_count', 0)
             catalyst_reasons.append(f"INSIDER BUY: {buy_count} transactions")
 
+        # M&A, FDA, Contract news from Polygon
+        catalyst_type_news = news_result.get('catalyst_type_news')
+        if catalyst_type_news == 'M&A_news':
+            catalyst_reasons.append(f"M&A NEWS: Acquisition/merger")
+        elif catalyst_type_news == 'FDA_news':
+            catalyst_reasons.append(f"FDA NEWS: Drug approval")
+        elif catalyst_type_news == 'contract_news':
+            catalyst_reasons.append(f"CONTRACT NEWS: Major win")
+
         # TIER 2 CATALYSTS
         if earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
             surprise = earnings_surprise_result.get('surprise_pct', 0)
             days = earnings_surprise_result.get('days_ago', 0)
-            catalyst_reasons.append(f"BEAT: +{surprise}% ({days}d ago)")
+            recency = earnings_surprise_result.get('recency_tier', '')
+            if recency == 'FRESH':
+                catalyst_reasons.append(f"FRESH BEAT: +{surprise}% ({days}d ago)")
+            else:
+                catalyst_reasons.append(f"BEAT: +{surprise}% ({days}d ago)")
 
         # Technical/momentum signals
         if rs_result['rs_pct'] >= 5:
@@ -926,10 +1035,20 @@ class MarketScreener:
         catalyst_tier = None
         if analyst_result.get('catalyst_type') == 'analyst_upgrade':
             catalyst_tier = 'Tier 1 - Analyst Upgrade'
+        elif catalyst_type_news == 'M&A_news':
+            catalyst_tier = 'Tier 1 - M&A News'
+        elif catalyst_type_news == 'FDA_news':
+            catalyst_tier = 'Tier 1 - FDA News'
+        elif catalyst_type_news == 'contract_news':
+            catalyst_tier = 'Tier 1 - Contract News'
         elif insider_result.get('catalyst_type') == 'insider_buying':
             catalyst_tier = 'Tier 1 - Insider Buying'
         elif earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
-            catalyst_tier = 'Tier 2 - Earnings Beat'
+            recency = earnings_surprise_result.get('recency_tier', '')
+            if recency == 'FRESH':
+                catalyst_tier = 'Tier 2 - Fresh Earnings Beat'
+            else:
+                catalyst_tier = 'Tier 2 - Earnings Beat'
 
         return {
             'ticker': ticker,
