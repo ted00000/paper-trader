@@ -912,36 +912,137 @@ class MarketScreener:
             self.insider_transactions_cache[ticker] = result
             return result
 
+    def get_sec_8k_filings(self, ticker):
+        """
+        Check for recent SEC 8-K filings indicating M&A or major contracts
+
+        8-K filings are legally required immediate disclosures for material events:
+        - Item 1.01: Material Agreement (major contracts)
+        - Item 2.01: Completion of Acquisition or Disposition of Assets (M&A)
+
+        Benefit: Catch M&A/contracts 1-2 hours earlier than news sources
+
+        Returns: Dict with 8-K filing data
+        """
+        try:
+            # SEC EDGAR API endpoint
+            # Format: https://data.sec.gov/submissions/CIK##########.json
+
+            # First, get the CIK (Central Index Key) for the ticker
+            # Use SEC ticker lookup
+            headers = {
+                'User-Agent': 'Paper Trading Lab tednunes@example.com'  # SEC requires identification
+            }
+
+            # Get company CIK from ticker
+            cik_url = f'https://www.sec.gov/cgi-bin/browse-edgar'
+            params = {
+                'action': 'getcompany',
+                'ticker': ticker,
+                'type': '8-K',
+                'dateb': '',
+                'owner': 'exclude',
+                'count': 10,
+                'output': 'atom'
+            }
+
+            response = requests.get(cik_url, params=params, headers=headers, timeout=10)
+
+            # Parse for recent 8-K filings
+            # Look for Item 1.01 (Material Agreement) or Item 2.01 (M&A completion)
+            content = response.text.lower()
+
+            # Check if any 8-K filed in last 2 days
+            has_recent_8k = False
+            catalyst_type_8k = None
+            filing_date = None
+
+            # Simple regex to detect filing dates and items
+            import re
+
+            # Look for dates in format YYYY-MM-DD
+            date_pattern = r'(\d{4}-\d{2}-\d{2})'
+            dates = re.findall(date_pattern, content)
+
+            if dates:
+                # Check most recent filing
+                most_recent = dates[0] if dates else None
+                if most_recent:
+                    try:
+                        filing_dt = datetime.strptime(most_recent, '%Y-%m-%d')
+                        days_ago = (datetime.now() - filing_dt).days
+
+                        if days_ago <= 2:  # Filed in last 2 days
+                            has_recent_8k = True
+                            filing_date = most_recent
+
+                            # Check for material agreement or M&A
+                            if 'item 1.01' in content or 'material agreement' in content:
+                                catalyst_type_8k = 'contract_8k'
+                            elif 'item 2.01' in content or 'acquisition' in content or 'merger' in content:
+                                catalyst_type_8k = 'M&A_8k'
+                    except:
+                        pass
+
+            return {
+                'has_recent_8k': has_recent_8k,
+                'catalyst_type_8k': catalyst_type_8k,
+                'filing_date': filing_date,
+                'score': 100 if has_recent_8k else 0
+            }
+
+        except Exception as e:
+            # SEC API failures should not break the scan
+            return {
+                'has_recent_8k': False,
+                'catalyst_type_8k': None,
+                'filing_date': None,
+                'score': 0
+            }
+
     def scan_stock(self, ticker):
         """
         Complete analysis of a single stock
 
-        NEW FLOW: Catalyst-first approach
-        1. RS filter (quick technical rejection)
-        2. Check for Tier 1 catalysts (analyst upgrades, M&A, FDA, contracts, insider buying)
-        3. Check for Tier 2 catalysts (earnings beats)
-        4. If any catalyst found -> Full technical analysis
-        5. If no catalyst but strong RS -> Still include (momentum play)
+        V4 FLOW: Fresh catalyst bypass
+        1. Calculate RS
+        2. Quick pre-check for FRESH M&A/FDA news (0-1 days old)
+        3. If fresh catalyst → Bypass RS filter
+        4. Otherwise → Apply RS ≥3% filter
+        5. Check for other Tier 1 & Tier 2 catalysts
+        6. Full technical analysis if passed
 
         Returns: Dict with all metrics, or None if rejected
         """
         # Get sector
         sector = self.get_stock_sector(ticker)
 
-        # STEP 1: Calculate relative strength (CRITICAL FILTER)
+        # STEP 1: Calculate relative strength
         rs_result = self.calculate_relative_strength(ticker, sector)
 
-        # REJECT if fails RS filter
-        if not rs_result['passed_filter']:
-            return None
+        # STEP 1.5: Quick pre-check for FRESH M&A/FDA news (0-1 days old) OR SEC 8-K filings
+        # Do lightweight news check BEFORE applying RS filter
+        news_result = self.get_news_score(ticker)
+        sec_8k_result = self.get_sec_8k_filings(ticker)  # Check SEC filings
 
-        # STEP 2: Check for Tier 1 & Tier 2 catalysts FIRST (before expensive technical analysis)
+        has_fresh_tier1 = (
+            (news_result.get('catalyst_type_news') in ['M&A_news', 'FDA_news'] and
+             news_result.get('catalyst_news_age_days') is not None and
+             news_result.get('catalyst_news_age_days') <= 1) or
+            sec_8k_result.get('catalyst_type_8k') in ['M&A_8k', 'contract_8k']  # 8-K filings
+        )
+
+        # BYPASS RS filter if has TODAY's/yesterday's M&A/FDA news OR recent 8-K filing
+        # Otherwise apply normal RS ≥3% filter
+        if not rs_result['passed_filter'] and not has_fresh_tier1:
+            return None  # Reject only if no fresh catalyst AND weak RS
+
+        # STEP 2: Check for other Tier 1 & Tier 2 catalysts (now that RS check passed or was bypassed)
         analyst_result = self.get_analyst_ratings(ticker)
         insider_result = self.get_insider_transactions(ticker)
         earnings_surprise_result = self.get_earnings_surprises(ticker)
 
-        # Quick news check for M&A, FDA, major contracts
-        news_result = self.get_news_score(ticker)
+        # NOTE: news_result and sec_8k_result already fetched in STEP 1.5 for fresh catalyst check
 
         # Check earnings calendar (for upcoming earnings only, not a Tier 1 catalyst)
         earnings_calendar = self.earnings_calendar_cache or {}
@@ -951,7 +1052,8 @@ class MarketScreener:
         has_tier1_catalyst = (
             analyst_result.get('catalyst_type') == 'analyst_upgrade' or
             insider_result.get('catalyst_type') == 'insider_buying' or
-            news_result.get('catalyst_type_news') in ['M&A_news', 'FDA_news', 'contract_news']
+            news_result.get('catalyst_type_news') in ['M&A_news', 'FDA_news', 'contract_news'] or
+            sec_8k_result.get('catalyst_type_8k') in ['M&A_8k', 'contract_8k']  # SEC 8-K filings
         )
 
         has_tier2_catalyst = (
@@ -1002,6 +1104,14 @@ class MarketScreener:
 
         # Major contract news = 20% boost
         elif news_result.get('catalyst_type_news') == 'contract_news':
+            catalyst_score += 20
+
+        # SEC 8-K filings (HIGHEST PRIORITY - direct from source)
+        # 8-K M&A filing = 25% boost (same as M&A news)
+        if sec_8k_result.get('catalyst_type_8k') == 'M&A_8k':
+            catalyst_score += 25
+        # 8-K contract filing = 20% boost (same as contract news)
+        elif sec_8k_result.get('catalyst_type_8k') == 'contract_8k':
             catalyst_score += 20
 
         # Clustered insider buying = 15% boost (downgraded from 20 - leading indicator)
@@ -1066,6 +1176,20 @@ class MarketScreener:
             else:
                 catalyst_reasons.append(f"CONTRACT NEWS: Major win")
 
+        # SEC 8-K filings (HIGHEST PRIORITY - direct from SEC)
+        catalyst_type_8k = sec_8k_result.get('catalyst_type_8k')
+        filing_date = sec_8k_result.get('filing_date')
+        if catalyst_type_8k == 'M&A_8k':
+            if filing_date:
+                catalyst_reasons.append(f"SEC 8-K M&A: Filed {filing_date}")
+            else:
+                catalyst_reasons.append(f"SEC 8-K M&A: Recent filing")
+        elif catalyst_type_8k == 'contract_8k':
+            if filing_date:
+                catalyst_reasons.append(f"SEC 8-K CONTRACT: Filed {filing_date}")
+            else:
+                catalyst_reasons.append(f"SEC 8-K CONTRACT: Recent filing")
+
         # TIER 2 CATALYSTS
         if earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
             surprise = earnings_surprise_result.get('surprise_pct', 0)
@@ -1096,10 +1220,14 @@ class MarketScreener:
         catalyst_tier = None
         if analyst_result.get('catalyst_type') == 'analyst_upgrade':
             catalyst_tier = 'Tier 1 - Analyst Upgrade'
+        elif catalyst_type_8k == 'M&A_8k':
+            catalyst_tier = 'Tier 1 - SEC 8-K M&A'  # Prioritize 8-K over news
         elif catalyst_type_news == 'M&A_news':
             catalyst_tier = 'Tier 1 - M&A News'
         elif catalyst_type_news == 'FDA_news':
             catalyst_tier = 'Tier 1 - FDA News'
+        elif catalyst_type_8k == 'contract_8k':
+            catalyst_tier = 'Tier 1 - SEC 8-K Contract'  # Prioritize 8-K over news
         elif catalyst_type_news == 'contract_news':
             catalyst_tier = 'Tier 1 - Contract News'
         elif insider_result.get('catalyst_type') == 'insider_buying':
@@ -1118,6 +1246,7 @@ class MarketScreener:
             'price': technical_result['current_price'],
             'relative_strength': rs_result,
             'catalyst_signals': news_result,
+            'sec_8k_filings': sec_8k_result,  # SEC 8-K filing data
             'volume_analysis': volume_result,
             'technical_setup': technical_result,
             'analyst_ratings': analyst_result,
