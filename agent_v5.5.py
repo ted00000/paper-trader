@@ -2255,25 +2255,39 @@ POSITION {i}: {ticker}
         """
         screener_file = self.project_dir / 'screener_candidates.json'
 
+        print(f"\n🔍 DEBUG: Checking for screener file: {screener_file}")
+
         if not screener_file.exists():
+            print(f"   ❌ DEBUG: File does not exist")
             return None
+
+        print(f"   ✅ DEBUG: File exists")
 
         try:
             with open(screener_file, 'r') as f:
                 data = json.load(f)
 
+            print(f"   ✅ DEBUG: JSON loaded successfully")
+
             # Check if screener ran today
             scan_date = data.get('scan_date', '')
             today = datetime.now().strftime('%Y-%m-%d')
+
+            print(f"   📅 DEBUG: scan_date={scan_date}, today={today}")
 
             if scan_date != today:
                 print(f"   ⚠️ Screener data is stale (from {scan_date})")
                 return None
 
+            candidate_count = len(data.get('candidates', []))
+            print(f"   ✅ DEBUG: Date matches, returning data with {candidate_count} candidates")
+
             return data
 
         except Exception as e:
             print(f"   ⚠️ Error loading screener results: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def format_screener_candidates(self, screener_data):
@@ -2283,6 +2297,7 @@ POSITION {i}: {ticker}
         Returns: String with formatted candidate list INCLUDING NEWS CONTENT
         """
         if not screener_data or not screener_data.get('candidates'):
+            print(f"   ⚠️ DEBUG: format_screener_candidates returning None (no data or no candidates)")
             return None
 
         candidates = screener_data['candidates']
@@ -2368,10 +2383,22 @@ POSITION {i}: {ticker}
                 screener_section = ""
                 vacant_slots = 10 - len(premarket_data)
 
+                print(f"\n🔍 DEBUG: screener_data={'LOADED' if screener_data else 'NONE'}")
+                print(f"   Vacant slots: {vacant_slots}")
+
                 if screener_data and vacant_slots > 0:
+                    print(f"   ✅ DEBUG: Building screener section...")
                     screener_section = f"\n\n{'='*70}\nAVAILABLE OPPORTUNITIES FOR {vacant_slots} VACANT SLOTS:\n{'='*70}\n\n"
-                    screener_section += self.format_screener_candidates(screener_data)
+                    formatted_candidates = self.format_screener_candidates(screener_data)
+                    print(f"   ✅ DEBUG: Formatted candidates length: {len(formatted_candidates) if formatted_candidates else 0}")
+                    screener_section += formatted_candidates
                     screener_section += f"\n\n{'='*70}\n"
+                    print(f"   ✅ DEBUG: Final screener section length: {len(screener_section)}")
+                else:
+                    if not screener_data:
+                        print(f"   ❌ DEBUG: No screener_data")
+                    if vacant_slots <= 0:
+                        print(f"   ❌ DEBUG: No vacant slots (portfolio full)")
 
                 user_message = f"""PORTFOLIO REVIEW - {today_date} @ 8:45 AM (Pre-market)
 
