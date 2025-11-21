@@ -398,6 +398,49 @@ class MarketScreener:
                 'warning'
             ]
 
+            # LAW FIRM SPAM FILTERS (V5 - filter out shareholder alerts)
+            law_firm_spam_keywords = [
+                'shareholder alert',
+                'shareholder notice',
+                'law firm',
+                'class action',
+                'investigating',
+                'investigation continues',
+                'monteverde',
+                'halper sadeh',
+                'rosen law',
+                'bragar eagel',
+                'levi & korsinsky',
+                'contact the firm',
+                'shareholders who',
+                'encourages shareholders'
+            ]
+
+            # M&A ACQUIRER FILTERS (V5 - reject if stock is buying, not being bought)
+            acquirer_keywords = [
+                'to acquire',
+                'acquires',
+                'acquiring',
+                'announces acquisition of',
+                'completed acquisition of',
+                'agreement to acquire',
+                'will acquire',
+                'has acquired'
+            ]
+
+            # M&A TARGET KEYWORDS (stock being bought - THESE ARE GOOD)
+            target_keywords = [
+                'to be acquired',
+                'acquired by',
+                'acquisition offer',
+                'buyout offer',
+                'takeover offer',
+                'merger agreement',
+                'received offer',
+                'unsolicited proposal',
+                'acquisition proposal'
+            ]
+
             score = 0
             found_keywords = set()
             catalyst_type_news = None
@@ -422,11 +465,24 @@ class MarketScreener:
                 if is_negative:
                     continue  # Skip negative news entirely
 
+                # V5: LAW FIRM SPAM FILTER
+                is_law_firm_spam = any(spam_word in text for spam_word in law_firm_spam_keywords)
+                if is_law_firm_spam:
+                    continue  # Skip law firm investigation alerts entirely
+
+                # V5: M&A DIRECTION DETECTION (only keep targets, reject acquirers)
+                is_acquirer = any(acq_word in text for acq_word in acquirer_keywords)
+                is_target = any(tgt_word in text for tgt_word in target_keywords)
+
                 # Check Tier 1 keywords (M&A, FDA, contracts) with SAME-DAY RECENCY
                 for keyword, points in tier1_keywords.items():
                     if keyword in text:
                         # CRITICAL: Only accept M&A/FDA/contract news from SAME DAY (0-1 days old)
                         if 'acquisition' in keyword or 'merger' in keyword or 'acquire' in keyword:
+                            # V5: Only accept if stock is TARGET (being bought), not acquirer (buying)
+                            if is_acquirer and not is_target:
+                                continue  # Skip - stock is buying, not being bought
+
                             if days_ago <= 1:  # Same day or yesterday only
                                 score += points
                                 found_keywords.add(keyword)
