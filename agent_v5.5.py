@@ -354,6 +354,77 @@ POSITION {i}: {ticker}
 """)
         return "\n".join(lines)
 
+    def analyze_premarket_gap(self, ticker, current_price, previous_close):
+        """
+        Enhancement 0.1: Analyze premarket gap and determine entry/exit strategy
+
+        BIIB Lesson: Stock gapped +11.7% premarket, then faded to +7.3% at open.
+        Large gaps often fade intraday - need smart entry timing.
+
+        Gap Classifications:
+        - EXHAUSTION GAP (≥8%): Likely to fade, wait or skip
+        - BREAKAWAY GAP (5-7.9%): Strong but wait for consolidation
+        - CONTINUATION GAP (2-4.9%): Tradeable, wait 15min
+        - NORMAL (<2%): Enter at open
+        """
+        gap_pct = ((current_price - previous_close) / previous_close) * 100 if previous_close > 0 else 0
+
+        if gap_pct >= 8.0:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'EXHAUSTION_GAP',
+                'entry_strategy': 'WAIT_FOR_PULLBACK_OR_SKIP',
+                'reasoning': f'Gap {gap_pct:+.1f}% too large, high fade risk',
+                'recommended_action': 'Wait for gap fill to support or skip entirely',
+                'should_enter_at_open': False,
+                'should_exit_at_open': False,  # Let it consolidate
+                'risk_level': 'HIGH'
+            }
+        elif gap_pct >= 5.0:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'BREAKAWAY_GAP',
+                'entry_strategy': 'WAIT_30MIN_THEN_PULLBACK',
+                'reasoning': f'Gap {gap_pct:+.1f}% strong, let it consolidate first',
+                'recommended_action': 'First pullback to VWAP or gap support after 30min',
+                'should_enter_at_open': False,
+                'should_exit_at_open': False,  # Wait for consolidation
+                'risk_level': 'MEDIUM'
+            }
+        elif gap_pct >= 2.0:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'CONTINUATION_GAP',
+                'entry_strategy': 'ENTER_AT_945AM',
+                'reasoning': f'Gap {gap_pct:+.1f}% reasonable, wait for opening volatility',
+                'recommended_action': 'Enter at 9:45 AM after opening rush',
+                'should_enter_at_open': False,  # Wait 15min
+                'should_exit_at_open': True,  # Can exit normally
+                'risk_level': 'LOW'
+            }
+        elif gap_pct <= -3.0:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'GAP_DOWN',
+                'entry_strategy': 'ENTER_AT_OPEN_BUYING_WEAKNESS',
+                'reasoning': f'Gap {gap_pct:+.1f}% down, buying weakness',
+                'recommended_action': 'Enter at open if thesis intact',
+                'should_enter_at_open': True,
+                'should_exit_at_open': True,
+                'risk_level': 'MEDIUM'
+            }
+        else:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'NORMAL',
+                'entry_strategy': 'ENTER_AT_OPEN',
+                'reasoning': f'Gap {gap_pct:+.1f}% minimal',
+                'recommended_action': 'Normal entry at market open',
+                'should_enter_at_open': True,
+                'should_exit_at_open': True,
+                'risk_level': 'LOW'
+            }
+
     def _close_position(self, position, exit_price, reason):
         """Close a position and return trade data for CSV logging"""
         entry_price = position.get('entry_price', 0)
@@ -3937,11 +4008,30 @@ RECENT LESSONS LEARNED:
                     price_target = position.get('price_target', entry_price * 1.10)
                     stop_loss = position.get('stop_loss', entry_price * 0.93)
 
+                    # Enhancement 0.1: Gap-aware exit logic
+                    # Check if stock gapped significantly (need previous close)
+                    previous_close = position.get('current_price', entry_price)  # Yesterday's close
+                    gap_analysis = self.analyze_premarket_gap(ticker, exit_price, previous_close)
+
                     # Bug #2 & #4 fix: Validate exit conditions
                     should_execute_exit = True
                     rejection_reason = None
 
+                    # Enhancement 0.1: Large gap-up to target - DON'T exit yet (BIIB lesson)
+                    if (gap_analysis['gap_pct'] >= 5.0 and
+                        exit_price >= price_target and
+                        not gap_analysis['should_exit_at_open']):
+                        should_execute_exit = False
+                        rejection_reason = f"Large gap to target ({gap_analysis['gap_pct']:+.1f}%), wait for consolidation"
+                        print(f"      ⚠️ {ticker}: {gap_analysis['classification']} detected")
+                        print(f"         {gap_analysis['reasoning']}")
+                        print(f"         Recommended: {gap_analysis['recommended_action']}")
+                        print(f"         → HOLDING instead of exiting (let position consolidate)")
+
                     # Check if this is a conditional exit (Bug #4)
+                    elif gap_analysis['gap_pct'] >= 5.0:
+                        # Log gap but don't block exit if stop/other reason
+                        print(f"      ℹ️  {ticker}: {gap_analysis['classification']} ({gap_analysis['gap_pct']:+.1f}%)")
                     if execution_timing and ('if price' in execution_timing.lower() or '≥' in execution_timing or '>=' in execution_timing):
                         # Extract price condition if present (e.g., "if price ≥$181.50")
                         print(f"      ⚠️ Conditional exit detected: {execution_timing}")
@@ -4039,10 +4129,40 @@ RECENT LESSONS LEARNED:
             buy_tickers = [p['ticker'] for p in buy_positions]
             market_prices = self.fetch_current_prices(buy_tickers)
 
+            # Enhancement 0.1: Fetch previous closes for gap analysis
+            # Need to get yesterday's close for all buy candidates
+            previous_closes = {}
+            for ticker in buy_tickers:
+                try:
+                    # Fetch 2-day history to get previous close
+                    bars = requests.get(
+                        f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")}/{datetime.now().strftime("%Y-%m-%d")}',
+                        params={'apiKey': self.polygon_api_key}
+                    ).json()
+                    if bars.get('results') and len(bars['results']) >= 2:
+                        previous_closes[ticker] = bars['results'][-2]['c']  # Previous day close
+                except:
+                    previous_closes[ticker] = None
+
             for pos in buy_positions:
                 ticker = pos['ticker']
                 if ticker in market_prices:
                     entry_price = market_prices[ticker]
+                    previous_close = previous_closes.get(ticker, entry_price * 0.98)  # Fallback estimate
+
+                    # Enhancement 0.1: Gap-aware entry logic
+                    gap_analysis = self.analyze_premarket_gap(ticker, entry_price, previous_close)
+
+                    # Check if we should skip entry due to large gap
+                    if not gap_analysis['should_enter_at_open']:
+                        print(f"   ⚠️ SKIPPED {ticker}: {gap_analysis['classification']} detected ({gap_analysis['gap_pct']:+.1f}%)")
+                        print(f"      {gap_analysis['reasoning']}")
+                        print(f"      Recommended: {gap_analysis['recommended_action']}")
+                        continue  # Skip this entry
+
+                    # Log gap info for awareness
+                    if abs(gap_analysis['gap_pct']) >= 2.0:
+                        print(f"   ℹ️  {ticker}: {gap_analysis['classification']} ({gap_analysis['gap_pct']:+.1f}%) - {gap_analysis['entry_strategy']}")
 
                     # COMPOUND GROWTH: Calculate position size based on CURRENT account value
                     position_size_pct = pos.get('position_size_pct', 10.0)
