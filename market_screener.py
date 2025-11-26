@@ -1133,64 +1133,130 @@ class MarketScreener:
         volume_result = self.get_volume_analysis(ticker)
         technical_result = self.get_technical_setup(ticker)
 
-        # Calculate composite score with Tier 1 catalyst boost
-        # Base weights (60% total for non-Tier 1 signals)
-        base_score = (
-            rs_result['score'] * 0.30 +          # Reduced from 0.40
-            news_result['scaled_score'] * 0.15 + # Reduced from 0.30
-            volume_result['score'] * 0.10 +       # Reduced from 0.20
-            technical_result['score'] * 0.05      # Reduced from 0.10
-        )
+        # Calculate composite score with TIER-AWARE WEIGHTING (Enhancement 0.2)
+        # Determine catalyst tier for intelligent weighting
+        catalyst_tier = 'None'
+        has_tier1_catalyst = False
+        has_tier2_catalyst = False
+        has_tier3_catalyst = False
 
-        # Catalyst weights (40% total - HIGHEST PRIORITY)
+        # Tier 1: M&A, FDA, Earnings Beats, Major Contracts
+        if (news_result.get('catalyst_type_news') in ['M&A_news', 'FDA_news'] or
+            sec_8k_result.get('catalyst_type_8k') in ['M&A_8k'] or
+            earnings_surprise_result.get('catalyst_type') == 'earnings_beat'):
+            catalyst_tier = 'Tier 1'
+            has_tier1_catalyst = True
+
+        # Tier 2: Analyst Upgrades, Contracts
+        elif (analyst_result.get('catalyst_type') == 'analyst_upgrade' or
+              news_result.get('catalyst_type_news') == 'contract_news' or
+              sec_8k_result.get('catalyst_type_8k') == 'contract_8k'):
+            catalyst_tier = 'Tier 2'
+            has_tier2_catalyst = True
+
+        # Tier 3: Insider Buying (leading indicator, not immediate catalyst)
+        elif insider_result.get('catalyst_type') == 'insider_buying':
+            catalyst_tier = 'Tier 3'
+            has_tier3_catalyst = True
+
+        # Tier-aware base score weighting
+        if catalyst_tier == 'Tier 1':
+            # Tier 1: Catalyst is KING (40% weight)
+            base_score = (
+                rs_result['score'] * 0.20 +          # RS important but secondary
+                news_result['scaled_score'] * 0.20 + # News sentiment
+                volume_result['score'] * 0.10 +      # Volume confirmation
+                technical_result['score'] * 0.10     # Technical setup
+            )
+            catalyst_weight_multiplier = 1.0  # Full catalyst boost
+
+        elif catalyst_tier == 'Tier 2':
+            # Tier 2: Balanced weighting
+            base_score = (
+                rs_result['score'] * 0.25 +
+                news_result['scaled_score'] * 0.20 +
+                volume_result['score'] * 0.10 +
+                technical_result['score'] * 0.05
+            )
+            catalyst_weight_multiplier = 0.75  # 75% of catalyst boost
+
+        elif catalyst_tier == 'Tier 3':
+            # Tier 3: RS and Technical become MORE important (prove momentum exists)
+            base_score = (
+                rs_result['score'] * 0.40 +          # RS critical for Tier 3
+                news_result['scaled_score'] * 0.10 +
+                volume_result['score'] * 0.05 +
+                technical_result['score'] * 0.05
+            )
+            catalyst_weight_multiplier = 0.40  # Only 40% of catalyst boost
+
+        else:
+            # No catalyst: Pure technical/momentum play
+            base_score = (
+                rs_result['score'] * 0.45 +
+                news_result['scaled_score'] * 0.10 +
+                volume_result['score'] * 0.05 +
+                technical_result['score'] * 0.00
+            )
+            catalyst_weight_multiplier = 0.0
+
+        # Catalyst scoring with tier-aware multiplier
         catalyst_score = 0
 
         # TIER 1 CATALYSTS (TRUE CATALYSTS)
-        # Analyst upgrade = 20% boost
-        if analyst_result.get('catalyst_type') == 'analyst_upgrade':
-            catalyst_score += 20
-
-        # M&A news = 25% boost (HIGHEST PRIORITY - confirmed material event)
+        # M&A news = 25 points
         if news_result.get('catalyst_type_news') == 'M&A_news':
-            catalyst_score += 25
+            catalyst_score += 25 * catalyst_weight_multiplier
 
-        # FDA approval news = 25% boost (HIGHEST PRIORITY - confirmed material event)
+        # FDA approval news = 25 points
         elif news_result.get('catalyst_type_news') == 'FDA_news':
-            catalyst_score += 25
+            catalyst_score += 25 * catalyst_weight_multiplier
 
-        # Major contract news = 20% boost
-        elif news_result.get('catalyst_type_news') == 'contract_news':
-            catalyst_score += 20
-
-        # SEC 8-K filings (HIGHEST PRIORITY - direct from source)
-        # 8-K M&A filing = 25% boost (same as M&A news)
+        # SEC 8-K M&A filing = 25 points
         if sec_8k_result.get('catalyst_type_8k') == 'M&A_8k':
-            catalyst_score += 25
-        # 8-K contract filing = 20% boost (same as contract news)
-        elif sec_8k_result.get('catalyst_type_8k') == 'contract_8k':
-            catalyst_score += 20
+            catalyst_score += 25 * catalyst_weight_multiplier
 
-        # Clustered insider buying = 15% boost (downgraded from 20 - leading indicator)
-        if insider_result.get('catalyst_type') == 'insider_buying':
-            catalyst_score += 15
-
-        # TIER 2 CATALYSTS (CONFIRMED EVENTS)
         # Recent earnings beat with recency bonus
         if earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
             recency = earnings_surprise_result.get('recency_tier', 'OLDER')
             if recency == 'FRESH':
-                catalyst_score += 20  # Fresh beat (0-3 days) = 20% boost
+                catalyst_score += 20 * catalyst_weight_multiplier  # Fresh beat (0-3 days)
             elif recency == 'RECENT':
-                catalyst_score += 17  # Recent beat (4-7 days) = 17% boost
+                catalyst_score += 17 * catalyst_weight_multiplier  # Recent beat (4-7 days)
             else:
-                catalyst_score += 15  # Older beat (8-30 days) = 15% boost
+                catalyst_score += 15 * catalyst_weight_multiplier  # Older beat (8-30 days)
 
-        # NOTE: Pre-earnings speculation is NO LONGER a Tier 1 catalyst
-        # Upcoming earnings only gets small momentum boost (5%)
+        # TIER 2 CATALYSTS
+        # Analyst upgrade = 20 points
+        if analyst_result.get('catalyst_type') == 'analyst_upgrade':
+            catalyst_score += 20 * catalyst_weight_multiplier
+
+        # Major contract news = 20 points
+        if news_result.get('catalyst_type_news') == 'contract_news':
+            catalyst_score += 20 * catalyst_weight_multiplier
+
+        # SEC 8-K contract filing = 20 points
+        elif sec_8k_result.get('catalyst_type_8k') == 'contract_8k':
+            catalyst_score += 20 * catalyst_weight_multiplier
+
+        # TIER 3 CATALYSTS (LEADING INDICATORS)
+        # Insider buying = 15 points (but heavily discounted if Tier 3 only)
+        if insider_result.get('catalyst_type') == 'insider_buying':
+            catalyst_score += 15 * catalyst_weight_multiplier
+
+        # Upcoming earnings = small boost
         if earnings_result.get('has_upcoming_earnings'):
             days_until = earnings_result.get('days_until', 999)
             if 3 <= days_until <= 7:
-                catalyst_score += 5  # Minor boost for near-term catalyst
+                catalyst_score += 5 * catalyst_weight_multiplier
+
+        # PENALTY: Insider buying ONLY (no other catalyst + weak news)
+        # This prevents AEO, A, BFLY from ranking high on insider alone
+        if (catalyst_tier == 'Tier 3' and
+            news_result['scaled_score'] < 10 and
+            rs_result['score'] < 60):
+            catalyst_score -= 20  # Heavy penalty for weak insider-only picks
+            # print(f"   ⚠️ {ticker}: Insider-only penalty applied (weak news + weak RS)")
 
         composite_score = base_score + catalyst_score
 
@@ -1272,28 +1338,38 @@ class MarketScreener:
         all_reasons = catalyst_reasons + why_parts
         why_selected = ', '.join(all_reasons) if all_reasons else 'Meets baseline criteria'
 
-        # Determine overall catalyst tier (only TRUE catalysts are Tier 1)
-        catalyst_tier = None
-        if analyst_result.get('catalyst_type') == 'analyst_upgrade':
-            catalyst_tier = 'Tier 1 - Analyst Upgrade'
-        elif catalyst_type_8k == 'M&A_8k':
-            catalyst_tier = 'Tier 1 - SEC 8-K M&A'  # Prioritize 8-K over news
-        elif catalyst_type_news == 'M&A_news':
-            catalyst_tier = 'Tier 1 - M&A News'
-        elif catalyst_type_news == 'FDA_news':
-            catalyst_tier = 'Tier 1 - FDA News'
-        elif catalyst_type_8k == 'contract_8k':
-            catalyst_tier = 'Tier 1 - SEC 8-K Contract'  # Prioritize 8-K over news
-        elif catalyst_type_news == 'contract_news':
-            catalyst_tier = 'Tier 1 - Contract News'
-        elif insider_result.get('catalyst_type') == 'insider_buying':
-            catalyst_tier = 'Tier 1 - Insider Buying'
-        elif earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
-            recency = earnings_surprise_result.get('recency_tier', '')
-            if recency == 'FRESH':
-                catalyst_tier = 'Tier 2 - Fresh Earnings Beat'
-            else:
-                catalyst_tier = 'Tier 2 - Earnings Beat'
+        # Update catalyst_tier_display to match new scoring logic (Enhancement 0.2)
+        catalyst_tier_display = catalyst_tier  # Use the tier from scoring logic
+
+        # Add specific catalyst description
+        if catalyst_tier == 'Tier 1':
+            if catalyst_type_8k == 'M&A_8k':
+                catalyst_tier_display = 'Tier 1 - SEC 8-K M&A'
+            elif catalyst_type_news == 'M&A_news':
+                catalyst_tier_display = 'Tier 1 - M&A News'
+            elif catalyst_type_news == 'FDA_news':
+                catalyst_tier_display = 'Tier 1 - FDA News'
+            elif earnings_surprise_result.get('catalyst_type') == 'earnings_beat':
+                recency = earnings_surprise_result.get('recency_tier', '')
+                if recency == 'FRESH':
+                    catalyst_tier_display = 'Tier 1 - Fresh Earnings Beat (0-3d)'
+                elif recency == 'RECENT':
+                    catalyst_tier_display = 'Tier 1 - Recent Earnings Beat (4-7d)'
+                else:
+                    catalyst_tier_display = 'Tier 1 - Earnings Beat (8-30d)'
+        elif catalyst_tier == 'Tier 2':
+            if analyst_result.get('catalyst_type') == 'analyst_upgrade':
+                catalyst_tier_display = 'Tier 2 - Analyst Upgrade'
+            elif catalyst_type_news == 'contract_news':
+                catalyst_tier_display = 'Tier 2 - Contract News'
+            elif catalyst_type_8k == 'contract_8k':
+                catalyst_tier_display = 'Tier 2 - SEC 8-K Contract'
+        elif catalyst_tier == 'Tier 3':
+            if insider_result.get('catalyst_type') == 'insider_buying':
+                buy_count = insider_result.get('buy_count', 0)
+                catalyst_tier_display = f'Tier 3 - Insider Buying ({buy_count}x)'
+        else:
+            catalyst_tier_display = 'No Catalyst'
 
         return {
             'ticker': ticker,
@@ -1309,7 +1385,7 @@ class MarketScreener:
             'insider_transactions': insider_result,
             'earnings_surprises': earnings_surprise_result,
             'earnings_data': earnings_result,
-            'catalyst_tier': catalyst_tier,
+            'catalyst_tier': catalyst_tier_display,
             'why_selected': why_selected
         }
 
