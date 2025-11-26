@@ -296,6 +296,7 @@ class TradingAgent:
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
+                    'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Sector', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -2227,8 +2228,27 @@ POSITION {i}: {ticker}
         # Relative strength = stock return - sector return
         relative_strength = stock_return - sector_return
 
+        # Enhancement 2.1: RS Rank Percentile (0-100 scale)
+        # Map RS to percentile-style rating
+        if relative_strength >= 15:
+            rs_rating = 95
+        elif relative_strength >= 10:
+            rs_rating = 85
+        elif relative_strength >= 7:
+            rs_rating = 75
+        elif relative_strength >= 5:
+            rs_rating = 65
+        elif relative_strength >= 3:
+            rs_rating = 55  # Minimum acceptable
+        elif relative_strength >= 0:
+            rs_rating = 40
+        else:
+            # Underperforming sector
+            rs_rating = max(0, 30 + relative_strength * 2)  # -15% RS = 0 rating
+
         return {
             'relative_strength': round(relative_strength, 2),
+            'rs_rating': int(rs_rating),  # 0-100 percentile-style score
             'stock_return_3m': stock_return,
             'sector_return_3m': sector_return,
             'sector_etf': sector_etf,
@@ -2440,14 +2460,36 @@ POSITION {i}: {ticker}
             adx = self.calculate_adx(bars, period=14)
             trend_strong = adx > 20 if adx else False
 
-            # 4. VOLUME CONFIRMATION
+            # 4. VOLUME CONFIRMATION (Enhancement 2.2)
             if len(bars) >= 20:
                 avg_volume = sum([bar['volume'] for bar in bars[-20:]]) / 20
                 current_volume = bars[-1]['volume']
                 volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
+
+                # Enhancement 2.2: Volume quality rating
+                if volume_ratio >= 3.0:
+                    volume_quality = 'EXCELLENT'  # Institutional surge
+                elif volume_ratio >= 2.0:
+                    volume_quality = 'STRONG'     # High conviction
+                elif volume_ratio >= 1.5:
+                    volume_quality = 'GOOD'       # Acceptable
+                else:
+                    volume_quality = 'WEAK'       # Below threshold
+
+                # Enhancement 2.2: Volume trend (increasing over 5 days?)
+                if len(bars) >= 5:
+                    recent_volumes = [bar['volume'] for bar in bars[-5:]]
+                    avg_recent = sum(recent_volumes) / 5
+                    avg_prior = sum([bar['volume'] for bar in bars[-25:-5]]) / 20 if len(bars) >= 25 else avg_volume
+                    volume_trending_up = avg_recent > avg_prior * 1.2 if avg_prior > 0 else False
+                else:
+                    volume_trending_up = False
+
                 volume_confirmed = volume_ratio >= 1.5
             else:
                 volume_ratio = 0
+                volume_quality = 'WEAK'
+                volume_trending_up = False
                 volume_confirmed = False
 
             # BUILD SCORE (0-25 points possible)
@@ -2488,6 +2530,8 @@ POSITION {i}: {ticker}
                 'ema20': round(ema20, 2) if ema20 else None,
                 'adx': round(adx, 2) if adx else None,
                 'volume_ratio': round(volume_ratio, 2),
+                'volume_quality': volume_quality,           # Enhancement 2.2
+                'volume_trending_up': volume_trending_up,   # Enhancement 2.2
                 'above_50ma': above_50ma,
                 'ema_bullish': ema_bullish,
                 'trend_strong': trend_strong,
@@ -2495,10 +2539,12 @@ POSITION {i}: {ticker}
             }
 
             if passed:
+                # Enhancement 2.2: Show volume quality in reason
+                vol_indicator = '↑' if volume_trending_up else ''
                 return {
                     'passed': True,
                     'score': 25,
-                    'reason': f'All technical filters passed (${current_price:.2f}, ADX {adx:.1f}, {volume_ratio:.1f}x vol)',
+                    'reason': f'All technical filters passed (${current_price:.2f}, ADX {adx:.1f}, {volume_ratio:.1f}x {volume_quality}{vol_indicator})',
                     'details': details
                 }
             else:
@@ -2618,7 +2664,8 @@ POSITION {i}: {ticker}
 
     def analyze_performance_metrics(self, days=30):
         """
-        Analyze performance across Phases 1-4 dimensions
+        Analyze performance across Phases 0-4 dimensions
+        Enhancement 2.4: Added Phase 0-2 enhancement tracking
 
         Returns comprehensive analysis of:
         - Conviction accuracy (HIGH vs MEDIUM win rates)
@@ -2627,6 +2674,7 @@ POSITION {i}: {ticker}
         - News score correlation with returns
         - Relative strength effectiveness
         - Macro event impact
+        - Phase 0-2 enhancement effectiveness (NEW)
 
         Args:
             days: Number of days to analyze (default 30)
@@ -2759,6 +2807,77 @@ POSITION {i}: {ticker}
                 'avg_return': without_macro['Return_Percent'].mean() if len(without_macro) > 0 else 0
             }
         }
+
+        # Enhancement 2.4: PHASE 0-2 ENHANCEMENT TRACKING
+        enhancement_tracking = {}
+
+        # Enhancement 2.1: RS Rating effectiveness
+        if 'RS_Rating' in df_recent.columns:
+            rs_elite = df_recent[df_recent['RS_Rating'] >= 85]  # Elite
+            rs_good = df_recent[(df_recent['RS_Rating'] >= 65) & (df_recent['RS_Rating'] < 85)]  # Good
+            rs_weak = df_recent[df_recent['RS_Rating'] < 65]  # Weak
+
+            enhancement_tracking['rs_rating'] = {
+                'elite_85plus': {
+                    'count': len(rs_elite),
+                    'win_rate': (rs_elite['Return_Percent'] > 0).sum() / len(rs_elite) * 100 if len(rs_elite) > 0 else 0,
+                    'avg_return': rs_elite['Return_Percent'].mean() if len(rs_elite) > 0 else 0
+                },
+                'good_65to85': {
+                    'count': len(rs_good),
+                    'win_rate': (rs_good['Return_Percent'] > 0).sum() / len(rs_good) * 100 if len(rs_good) > 0 else 0,
+                    'avg_return': rs_good['Return_Percent'].mean() if len(rs_good) > 0 else 0
+                },
+                'weak_below65': {
+                    'count': len(rs_weak),
+                    'win_rate': (rs_weak['Return_Percent'] > 0).sum() / len(rs_weak) * 100 if len(rs_weak) > 0 else 0,
+                    'avg_return': rs_weak['Return_Percent'].mean() if len(rs_weak) > 0 else 0
+                }
+            }
+
+        # Enhancement 2.2: Volume Quality effectiveness
+        if 'Volume_Quality' in df_recent.columns:
+            vol_excellent = df_recent[df_recent['Volume_Quality'] == 'EXCELLENT']
+            vol_strong = df_recent[df_recent['Volume_Quality'] == 'STRONG']
+            vol_good = df_recent[df_recent['Volume_Quality'] == 'GOOD']
+
+            enhancement_tracking['volume_quality'] = {
+                'excellent_3x': {
+                    'count': len(vol_excellent),
+                    'win_rate': (vol_excellent['Return_Percent'] > 0).sum() / len(vol_excellent) * 100 if len(vol_excellent) > 0 else 0,
+                    'avg_return': vol_excellent['Return_Percent'].mean() if len(vol_excellent) > 0 else 0
+                },
+                'strong_2x': {
+                    'count': len(vol_strong),
+                    'win_rate': (vol_strong['Return_Percent'] > 0).sum() / len(vol_strong) * 100 if len(vol_strong) > 0 else 0,
+                    'avg_return': vol_strong['Return_Percent'].mean() if len(vol_strong) > 0 else 0
+                },
+                'good_1.5x': {
+                    'count': len(vol_good),
+                    'win_rate': (vol_good['Return_Percent'] > 0).sum() / len(vol_good) * 100 if len(vol_good) > 0 else 0,
+                    'avg_return': vol_good['Return_Percent'].mean() if len(vol_good) > 0 else 0
+                }
+            }
+
+        # Volume trending up effectiveness
+        if 'Volume_Trending_Up' in df_recent.columns:
+            vol_trending = df_recent[df_recent['Volume_Trending_Up'] == True]
+            vol_flat = df_recent[df_recent['Volume_Trending_Up'] == False]
+
+            enhancement_tracking['volume_trending'] = {
+                'trending_up': {
+                    'count': len(vol_trending),
+                    'win_rate': (vol_trending['Return_Percent'] > 0).sum() / len(vol_trending) * 100 if len(vol_trending) > 0 else 0,
+                    'avg_return': vol_trending['Return_Percent'].mean() if len(vol_trending) > 0 else 0
+                },
+                'flat_declining': {
+                    'count': len(vol_flat),
+                    'win_rate': (vol_flat['Return_Percent'] > 0).sum() / len(vol_flat) * 100 if len(vol_flat) > 0 else 0,
+                    'avg_return': vol_flat['Return_Percent'].mean() if len(vol_flat) > 0 else 0
+                }
+            }
+
+        analysis['enhancement_tracking'] = enhancement_tracking
 
         # RECOMMENDATIONS
         recommendations = []
@@ -3714,6 +3833,7 @@ RECENT LESSONS LEARNED:
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
+                    'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Sector', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -3769,6 +3889,8 @@ RECENT LESSONS LEARNED:
                 trade_data.get('technical_ema20', 0.0),
                 trade_data.get('technical_adx', 0.0),
                 trade_data.get('technical_volume_ratio', 0.0),
+                trade_data.get('volume_quality', ''),  # Enhancement 2.2
+                trade_data.get('volume_trending_up', False),  # Enhancement 2.2
                 trade_data.get('sector', ''),
                 trade_data.get('stop_loss', 0),
                 trade_data.get('price_target', 0),
@@ -3888,6 +4010,7 @@ RECENT LESSONS LEARNED:
     def evaluate_portfolio_rotation(self, hold_positions, new_opportunities, premarket_data):
         """
         Phase 4: Evaluate strategic rotation opportunities when portfolio is full
+        Enhancement 2.3: Added quantitative rotation scoring
 
         Args:
             hold_positions: List of current positions being held
@@ -3908,8 +4031,18 @@ RECENT LESSONS LEARNED:
         print(f"New Opportunities: {len(new_opportunities)} strong signals identified")
         print()
 
+        # Enhancement 2.3: Quantitative rotation scoring
+        rotation_candidates = self._score_rotation_candidates(hold_positions, new_opportunities)
+
+        if len(rotation_candidates) == 0:
+            print("   ✓ No quantitative rotation candidates identified\n")
+            return {'rotations': []}
+
+        print(f"   → {len(rotation_candidates)} candidate rotation(s) identified by quantitative scoring")
+        print()
+
         # Build context for Claude with detailed position analysis
-        context = self._build_rotation_context(hold_positions, new_opportunities, premarket_data)
+        context = self._build_rotation_context(hold_positions, new_opportunities, premarket_data, rotation_candidates)
 
         # Ask Claude to evaluate rotation opportunities
         print("Calling Claude to evaluate rotation opportunities...")
@@ -3933,7 +4066,102 @@ RECENT LESSONS LEARNED:
 
         return decisions
 
-    def _build_rotation_context(self, hold_positions, new_opportunities, premarket_data):
+    def _score_rotation_candidates(self, hold_positions, new_opportunities):
+        """
+        Enhancement 2.3: Quantitative rotation scoring
+
+        Scores each hold position as a rotation candidate based on:
+        - Weak momentum (<0.3%/day)
+        - Stalling (days > 5 and unrealized < +3%)
+        - Catalyst aging (>3 days)
+
+        Returns list of dicts with rotation recommendations
+        """
+        candidates = []
+
+        for pos in hold_positions:
+            ticker = pos['ticker']
+            days_held = pos.get('days_held', 0)
+            unrealized_pct = pos.get('unrealized_gain_pct', 0)
+            catalyst_tier = pos.get('catalyst_tier', 'Unknown')
+
+            # Calculate momentum velocity
+            momentum = unrealized_pct / max(days_held, 1)
+
+            # Rotation score (0-100, higher = better candidate to exit)
+            rotation_score = 0
+            rotation_reasons = []
+
+            # Weak momentum (<0.3%/day): +30 points
+            if momentum < 0.3:
+                rotation_score += 30
+                rotation_reasons.append(f'Weak momentum {momentum:+.2f}%/day')
+
+            # Stalling position (>5 days, <+3%): +25 points
+            if days_held > 5 and unrealized_pct < 3.0:
+                rotation_score += 25
+                rotation_reasons.append(f'Stalling at {unrealized_pct:+.1f}% after {days_held} days')
+
+            # Losing position: +40 points
+            if unrealized_pct < -2.0:
+                rotation_score += 40
+                rotation_reasons.append(f'Underwater {unrealized_pct:+.1f}%')
+
+            # Low tier catalyst (Tier 2/3): +15 points
+            if 'Tier2' in catalyst_tier or 'Tier3' in catalyst_tier or 'Tier 2' in catalyst_tier or 'Tier 3' in catalyst_tier:
+                rotation_score += 15
+                rotation_reasons.append(f'Lower tier catalyst ({catalyst_tier})')
+
+            # Only recommend rotation if score >= 50
+            if rotation_score >= 50:
+                # Find best replacement opportunity
+                best_opp = None
+                best_opp_score = 0
+
+                for opp in new_opportunities:
+                    opp_score = 0
+                    opp_tier = opp.get('catalyst_tier', '')
+                    opp_news = opp.get('news_validation_score', 0)
+                    opp_age = opp.get('catalyst_age_hours', 999)
+
+                    # Tier 1 catalyst: +40 points
+                    if 'Tier1' in opp_tier or 'Tier 1' in opp_tier:
+                        opp_score += 40
+
+                    # Fresh catalyst (<24hrs): +30 points
+                    if opp_age < 24:
+                        opp_score += 30
+
+                    # High news validation (>80): +20 points
+                    if opp_news > 80:
+                        opp_score += 20
+
+                    # Strong RS rating (>75): +10 points
+                    if opp.get('rs_rating', 0) > 75:
+                        opp_score += 10
+
+                    if opp_score > best_opp_score:
+                        best_opp_score = opp_score
+                        best_opp = opp
+
+                # Only recommend if new opportunity is significantly better (score >60)
+                if best_opp and best_opp_score >= 60:
+                    candidates.append({
+                        'exit_ticker': ticker,
+                        'exit_score': rotation_score,
+                        'exit_reasons': rotation_reasons,
+                        'enter_ticker': best_opp['ticker'],
+                        'enter_score': best_opp_score,
+                        'enter_catalyst': best_opp.get('catalyst', 'Unknown'),
+                        'net_score': best_opp_score - (100 - rotation_score)  # Positive = good swap
+                    })
+
+        # Sort by net_score (best rotations first)
+        candidates.sort(key=lambda x: x['net_score'], reverse=True)
+
+        return candidates
+
+    def _build_rotation_context(self, hold_positions, new_opportunities, premarket_data, rotation_candidates=None):
         """Build detailed context string for rotation evaluation"""
 
         context = "PORTFOLIO ROTATION EVALUATION\n\n"
@@ -3961,6 +4189,20 @@ RECENT LESSONS LEARNED:
             context += f"  Catalyst: {catalyst} ({catalyst_tier})\n"
             context += f"  Entry: {pos.get('entry_date', 'Unknown')}\n"
             context += "\n"
+
+        # Enhancement 2.3: Quantitative rotation candidates
+        if rotation_candidates:
+            context += "\n" + "="*70 + "\n\n"
+            context += f"QUANTITATIVE ROTATION CANDIDATES ({len(rotation_candidates)}):\n"
+            context += "-"*70 + "\n\n"
+
+            for cand in rotation_candidates:
+                context += f"EXIT: {cand['exit_ticker']} (Score: {cand['exit_score']}/100)\n"
+                context += f"  Reasons: {', '.join(cand['exit_reasons'])}\n"
+                context += f"ENTER: {cand['enter_ticker']} (Score: {cand['enter_score']}/100)\n"
+                context += f"  Catalyst: {cand['enter_catalyst']}\n"
+                context += f"  Net Score: {cand['net_score']:+d} (Positive = favorable swap)\n"
+                context += "\n"
 
         # New opportunities analysis
         context += "\n" + "="*70 + "\n\n"
@@ -4445,6 +4687,7 @@ RECENT LESSONS LEARNED:
                         buy_pos['market_regime'] = vix_result['regime']
                         buy_pos['macro_event_near'] = macro_result['event_type'] or 'None'
                         buy_pos['relative_strength'] = rs_result['relative_strength']
+                        buy_pos['rs_rating'] = rs_result['rs_rating']  # Enhancement 2.1
                         buy_pos['stock_return_3m'] = rs_result['stock_return_3m']
                         buy_pos['sector_etf'] = rs_result['sector_etf']
                         buy_pos['conviction_level'] = conviction_result['conviction']
@@ -4459,6 +4702,8 @@ RECENT LESSONS LEARNED:
                         buy_pos['technical_ema20'] = tech_result['details'].get('ema20')
                         buy_pos['technical_adx'] = tech_result['details'].get('adx')
                         buy_pos['technical_volume_ratio'] = tech_result['details'].get('volume_ratio')
+                        buy_pos['volume_quality'] = tech_result['details'].get('volume_quality')  # Enhancement 2.2
+                        buy_pos['volume_trending_up'] = tech_result['details'].get('volume_trending_up')  # Enhancement 2.2
 
                         validated_buys.append(buy_pos)
 
@@ -4479,9 +4724,9 @@ RECENT LESSONS LEARNED:
                             'rejection_reasons': []
                         })
 
-                        print(f"   ✓ {ticker}: {conviction_result['conviction']} - {rs_result['relative_strength']:+.1f}% RS")
+                        print(f"   ✓ {ticker}: {conviction_result['conviction']} - {rs_result['relative_strength']:+.1f}% RS (Rating: {rs_result['rs_rating']})")
                         print(f"      Catalyst: {tier_result['tier_name']}")
-                        print(f"      News: {news_result['score']}/20, RS: {rs_result['relative_strength']:+.1f}%, VIX: {vix_result['vix']}")
+                        print(f"      News: {news_result['score']}/20, RS: {rs_result['relative_strength']:+.1f}% (Rating: {rs_result['rs_rating']}/100), VIX: {vix_result['vix']}")
                         print(f"      Position Size: {conviction_result['position_size_pct']}% ({conviction_result['conviction']})")
                         print(f"      Reasoning: {conviction_result['reasoning']}")
                     else:
