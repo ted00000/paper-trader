@@ -2664,7 +2664,8 @@ POSITION {i}: {ticker}
 
     def analyze_performance_metrics(self, days=30):
         """
-        Analyze performance across Phases 1-4 dimensions
+        Analyze performance across Phases 0-4 dimensions
+        Enhancement 2.4: Added Phase 0-2 enhancement tracking
 
         Returns comprehensive analysis of:
         - Conviction accuracy (HIGH vs MEDIUM win rates)
@@ -2673,6 +2674,7 @@ POSITION {i}: {ticker}
         - News score correlation with returns
         - Relative strength effectiveness
         - Macro event impact
+        - Phase 0-2 enhancement effectiveness (NEW)
 
         Args:
             days: Number of days to analyze (default 30)
@@ -2805,6 +2807,77 @@ POSITION {i}: {ticker}
                 'avg_return': without_macro['Return_Percent'].mean() if len(without_macro) > 0 else 0
             }
         }
+
+        # Enhancement 2.4: PHASE 0-2 ENHANCEMENT TRACKING
+        enhancement_tracking = {}
+
+        # Enhancement 2.1: RS Rating effectiveness
+        if 'RS_Rating' in df_recent.columns:
+            rs_elite = df_recent[df_recent['RS_Rating'] >= 85]  # Elite
+            rs_good = df_recent[(df_recent['RS_Rating'] >= 65) & (df_recent['RS_Rating'] < 85)]  # Good
+            rs_weak = df_recent[df_recent['RS_Rating'] < 65]  # Weak
+
+            enhancement_tracking['rs_rating'] = {
+                'elite_85plus': {
+                    'count': len(rs_elite),
+                    'win_rate': (rs_elite['Return_Percent'] > 0).sum() / len(rs_elite) * 100 if len(rs_elite) > 0 else 0,
+                    'avg_return': rs_elite['Return_Percent'].mean() if len(rs_elite) > 0 else 0
+                },
+                'good_65to85': {
+                    'count': len(rs_good),
+                    'win_rate': (rs_good['Return_Percent'] > 0).sum() / len(rs_good) * 100 if len(rs_good) > 0 else 0,
+                    'avg_return': rs_good['Return_Percent'].mean() if len(rs_good) > 0 else 0
+                },
+                'weak_below65': {
+                    'count': len(rs_weak),
+                    'win_rate': (rs_weak['Return_Percent'] > 0).sum() / len(rs_weak) * 100 if len(rs_weak) > 0 else 0,
+                    'avg_return': rs_weak['Return_Percent'].mean() if len(rs_weak) > 0 else 0
+                }
+            }
+
+        # Enhancement 2.2: Volume Quality effectiveness
+        if 'Volume_Quality' in df_recent.columns:
+            vol_excellent = df_recent[df_recent['Volume_Quality'] == 'EXCELLENT']
+            vol_strong = df_recent[df_recent['Volume_Quality'] == 'STRONG']
+            vol_good = df_recent[df_recent['Volume_Quality'] == 'GOOD']
+
+            enhancement_tracking['volume_quality'] = {
+                'excellent_3x': {
+                    'count': len(vol_excellent),
+                    'win_rate': (vol_excellent['Return_Percent'] > 0).sum() / len(vol_excellent) * 100 if len(vol_excellent) > 0 else 0,
+                    'avg_return': vol_excellent['Return_Percent'].mean() if len(vol_excellent) > 0 else 0
+                },
+                'strong_2x': {
+                    'count': len(vol_strong),
+                    'win_rate': (vol_strong['Return_Percent'] > 0).sum() / len(vol_strong) * 100 if len(vol_strong) > 0 else 0,
+                    'avg_return': vol_strong['Return_Percent'].mean() if len(vol_strong) > 0 else 0
+                },
+                'good_1.5x': {
+                    'count': len(vol_good),
+                    'win_rate': (vol_good['Return_Percent'] > 0).sum() / len(vol_good) * 100 if len(vol_good) > 0 else 0,
+                    'avg_return': vol_good['Return_Percent'].mean() if len(vol_good) > 0 else 0
+                }
+            }
+
+        # Volume trending up effectiveness
+        if 'Volume_Trending_Up' in df_recent.columns:
+            vol_trending = df_recent[df_recent['Volume_Trending_Up'] == True]
+            vol_flat = df_recent[df_recent['Volume_Trending_Up'] == False]
+
+            enhancement_tracking['volume_trending'] = {
+                'trending_up': {
+                    'count': len(vol_trending),
+                    'win_rate': (vol_trending['Return_Percent'] > 0).sum() / len(vol_trending) * 100 if len(vol_trending) > 0 else 0,
+                    'avg_return': vol_trending['Return_Percent'].mean() if len(vol_trending) > 0 else 0
+                },
+                'flat_declining': {
+                    'count': len(vol_flat),
+                    'win_rate': (vol_flat['Return_Percent'] > 0).sum() / len(vol_flat) * 100 if len(vol_flat) > 0 else 0,
+                    'avg_return': vol_flat['Return_Percent'].mean() if len(vol_flat) > 0 else 0
+                }
+            }
+
+        analysis['enhancement_tracking'] = enhancement_tracking
 
         # RECOMMENDATIONS
         recommendations = []
