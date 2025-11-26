@@ -2787,7 +2787,7 @@ RECENT LESSONS LEARNED:
         """
 
         # Starting capital (constant)
-        STARTING_CAPITAL = 1000.00
+        STARTING_CAPITAL = 10000.00
 
         # Calculate current portfolio value (sum of all position sizes)
         portfolio_value = 0.00
