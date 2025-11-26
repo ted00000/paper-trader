@@ -425,6 +425,86 @@ POSITION {i}: {ticker}
                 'risk_level': 'LOW'
             }
 
+    def enforce_sector_concentration(self, new_positions, current_portfolio):
+        """
+        Enhancement 1.3: Enforce sector concentration limits to reduce correlation risk
+
+        Prevents scenarios like 3 tech stocks (NVDA, AMD, AVGO) crashing together
+        causing 20%+ portfolio loss.
+
+        Rules:
+        - Maximum 3 positions per sector (30% of portfolio)
+        - Maximum 2 positions per industry (20% of portfolio)
+        - Alert if 2+ positions in same sub-sector (high correlation warning)
+
+        Returns:
+        - accepted_positions: List of positions that passed validation
+        - rejected_positions: List of positions with rejection reasons
+        """
+        MAX_PER_SECTOR = 3  # 30% max per sector (e.g., Technology, Healthcare)
+        MAX_PER_INDUSTRY = 2  # 20% max per industry (e.g., Semiconductors, Biotech)
+
+        # Count current holdings by sector and industry
+        sector_counts = {}
+        industry_counts = {}
+
+        for position in current_portfolio:
+            sector = position.get('sector', 'Unknown')
+            industry = position.get('industry', 'Unknown')
+
+            sector_counts[sector] = sector_counts.get(sector, 0) + 1
+            industry_counts[industry] = industry_counts.get(industry, 0) + 1
+
+        print(f"\n   Current sector distribution:")
+        for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True):
+            print(f"      {sector}: {count} positions ({count*10}%)")
+
+        # Validate new positions
+        accepted_positions = []
+        rejected_positions = []
+
+        for new_pos in new_positions:
+            ticker = new_pos.get('ticker')
+            sector = new_pos.get('sector', 'Unknown')
+            industry = new_pos.get('industry', 'Unknown')
+
+            # Check sector limit
+            if sector_counts.get(sector, 0) >= MAX_PER_SECTOR:
+                rejected_positions.append({
+                    'ticker': ticker,
+                    'reason': f'Sector concentration: Already have {sector_counts[sector]} {sector} positions (max {MAX_PER_SECTOR})',
+                    'sector': sector,
+                    'industry': industry
+                })
+                print(f"   ⚠️ REJECTED {ticker}: Sector limit reached ({sector}: {sector_counts[sector]}/{MAX_PER_SECTOR})")
+                continue
+
+            # Check industry limit
+            if industry_counts.get(industry, 0) >= MAX_PER_INDUSTRY:
+                rejected_positions.append({
+                    'ticker': ticker,
+                    'reason': f'Industry concentration: Already have {industry_counts[industry]} {industry} positions (max {MAX_PER_INDUSTRY})',
+                    'sector': sector,
+                    'industry': industry
+                })
+                print(f"   ⚠️ REJECTED {ticker}: Industry limit reached ({industry}: {industry_counts[industry]}/{MAX_PER_INDUSTRY})")
+                continue
+
+            # Position accepted
+            accepted_positions.append(new_pos)
+            sector_counts[sector] = sector_counts.get(sector, 0) + 1
+            industry_counts[industry] = industry_counts.get(industry, 0) + 1
+
+            # Warn if high concentration in industry (not rejected, just flagged)
+            if industry_counts[industry] == MAX_PER_INDUSTRY:
+                print(f"   ⚠️ WARNING: {ticker} accepted, but {industry} now at max ({MAX_PER_INDUSTRY}/{MAX_PER_INDUSTRY})")
+
+        print(f"\n   Sector enforcement results:")
+        print(f"      ✓ Accepted: {len(accepted_positions)} positions")
+        print(f"      ✗ Rejected: {len(rejected_positions)} positions (concentration limits)")
+
+        return accepted_positions, rejected_positions
+
     def _close_position(self, position, exit_price, reason):
         """Close a position and return trade data for CSV logging"""
         entry_price = position.get('entry_price', 0)
@@ -3912,6 +3992,45 @@ RECENT LESSONS LEARNED:
             # Replace buy_positions with validated list
             buy_positions = validated_buys
             print(f"   ✓ Validated: {len(validated_buys)} BUY positions passed checks\n")
+
+        # Step 5.6: Enhancement 1.3 - Enforce Sector Concentration Limits
+        if buy_positions:
+            print("5.6 Enforcing sector concentration limits (Enhancement 1.3)...")
+
+            # Get current portfolio for sector analysis
+            accepted_buys, rejected_buys = self.enforce_sector_concentration(
+                new_positions=buy_positions,
+                current_portfolio=existing_positions + hold_positions  # Include HOLD positions
+            )
+
+            # Log rejections
+            if rejected_buys:
+                print(f"\n   Sector/Industry rejections:")
+                for reject in rejected_buys:
+                    print(f"      ✗ {reject['ticker']}: {reject['reason']}")
+
+                    # Track rejected picks for dashboard accountability
+                    all_picks.append({
+                        'ticker': reject['ticker'],
+                        'status': 'REJECTED',
+                        'conviction': 'N/A',
+                        'position_size_pct': 0,
+                        'catalyst': 'Unknown',
+                        'catalyst_tier': 'Unknown',
+                        'tier_name': 'Unknown',
+                        'news_score': 0,
+                        'relative_strength': 0,
+                        'vix': vix_result.get('vix', 0),
+                        'supporting_factors': 0,
+                        'reasoning': reject['reason'],
+                        'rejection_reasons': [reject['reason']],
+                        'sector': reject['sector'],
+                        'industry': reject['industry']
+                    })
+
+            # Update buy_positions with concentration-filtered list
+            buy_positions = accepted_buys
+            print(f"   ✓ Final BUY list: {len(buy_positions)} positions (after concentration enforcement)\n")
 
         # Save daily picks for dashboard visibility (ALWAYS save, even if 0 picks)
         self.save_daily_picks(all_picks, vix_result, macro_result)
