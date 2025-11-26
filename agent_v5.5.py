@@ -3937,6 +3937,7 @@ RECENT LESSONS LEARNED:
     def evaluate_portfolio_rotation(self, hold_positions, new_opportunities, premarket_data):
         """
         Phase 4: Evaluate strategic rotation opportunities when portfolio is full
+        Enhancement 2.3: Added quantitative rotation scoring
 
         Args:
             hold_positions: List of current positions being held
@@ -3957,8 +3958,18 @@ RECENT LESSONS LEARNED:
         print(f"New Opportunities: {len(new_opportunities)} strong signals identified")
         print()
 
+        # Enhancement 2.3: Quantitative rotation scoring
+        rotation_candidates = self._score_rotation_candidates(hold_positions, new_opportunities)
+
+        if len(rotation_candidates) == 0:
+            print("   ✓ No quantitative rotation candidates identified\n")
+            return {'rotations': []}
+
+        print(f"   → {len(rotation_candidates)} candidate rotation(s) identified by quantitative scoring")
+        print()
+
         # Build context for Claude with detailed position analysis
-        context = self._build_rotation_context(hold_positions, new_opportunities, premarket_data)
+        context = self._build_rotation_context(hold_positions, new_opportunities, premarket_data, rotation_candidates)
 
         # Ask Claude to evaluate rotation opportunities
         print("Calling Claude to evaluate rotation opportunities...")
@@ -3982,7 +3993,102 @@ RECENT LESSONS LEARNED:
 
         return decisions
 
-    def _build_rotation_context(self, hold_positions, new_opportunities, premarket_data):
+    def _score_rotation_candidates(self, hold_positions, new_opportunities):
+        """
+        Enhancement 2.3: Quantitative rotation scoring
+
+        Scores each hold position as a rotation candidate based on:
+        - Weak momentum (<0.3%/day)
+        - Stalling (days > 5 and unrealized < +3%)
+        - Catalyst aging (>3 days)
+
+        Returns list of dicts with rotation recommendations
+        """
+        candidates = []
+
+        for pos in hold_positions:
+            ticker = pos['ticker']
+            days_held = pos.get('days_held', 0)
+            unrealized_pct = pos.get('unrealized_gain_pct', 0)
+            catalyst_tier = pos.get('catalyst_tier', 'Unknown')
+
+            # Calculate momentum velocity
+            momentum = unrealized_pct / max(days_held, 1)
+
+            # Rotation score (0-100, higher = better candidate to exit)
+            rotation_score = 0
+            rotation_reasons = []
+
+            # Weak momentum (<0.3%/day): +30 points
+            if momentum < 0.3:
+                rotation_score += 30
+                rotation_reasons.append(f'Weak momentum {momentum:+.2f}%/day')
+
+            # Stalling position (>5 days, <+3%): +25 points
+            if days_held > 5 and unrealized_pct < 3.0:
+                rotation_score += 25
+                rotation_reasons.append(f'Stalling at {unrealized_pct:+.1f}% after {days_held} days')
+
+            # Losing position: +40 points
+            if unrealized_pct < -2.0:
+                rotation_score += 40
+                rotation_reasons.append(f'Underwater {unrealized_pct:+.1f}%')
+
+            # Low tier catalyst (Tier 2/3): +15 points
+            if 'Tier2' in catalyst_tier or 'Tier3' in catalyst_tier or 'Tier 2' in catalyst_tier or 'Tier 3' in catalyst_tier:
+                rotation_score += 15
+                rotation_reasons.append(f'Lower tier catalyst ({catalyst_tier})')
+
+            # Only recommend rotation if score >= 50
+            if rotation_score >= 50:
+                # Find best replacement opportunity
+                best_opp = None
+                best_opp_score = 0
+
+                for opp in new_opportunities:
+                    opp_score = 0
+                    opp_tier = opp.get('catalyst_tier', '')
+                    opp_news = opp.get('news_validation_score', 0)
+                    opp_age = opp.get('catalyst_age_hours', 999)
+
+                    # Tier 1 catalyst: +40 points
+                    if 'Tier1' in opp_tier or 'Tier 1' in opp_tier:
+                        opp_score += 40
+
+                    # Fresh catalyst (<24hrs): +30 points
+                    if opp_age < 24:
+                        opp_score += 30
+
+                    # High news validation (>80): +20 points
+                    if opp_news > 80:
+                        opp_score += 20
+
+                    # Strong RS rating (>75): +10 points
+                    if opp.get('rs_rating', 0) > 75:
+                        opp_score += 10
+
+                    if opp_score > best_opp_score:
+                        best_opp_score = opp_score
+                        best_opp = opp
+
+                # Only recommend if new opportunity is significantly better (score >60)
+                if best_opp and best_opp_score >= 60:
+                    candidates.append({
+                        'exit_ticker': ticker,
+                        'exit_score': rotation_score,
+                        'exit_reasons': rotation_reasons,
+                        'enter_ticker': best_opp['ticker'],
+                        'enter_score': best_opp_score,
+                        'enter_catalyst': best_opp.get('catalyst', 'Unknown'),
+                        'net_score': best_opp_score - (100 - rotation_score)  # Positive = good swap
+                    })
+
+        # Sort by net_score (best rotations first)
+        candidates.sort(key=lambda x: x['net_score'], reverse=True)
+
+        return candidates
+
+    def _build_rotation_context(self, hold_positions, new_opportunities, premarket_data, rotation_candidates=None):
         """Build detailed context string for rotation evaluation"""
 
         context = "PORTFOLIO ROTATION EVALUATION\n\n"
@@ -4010,6 +4116,20 @@ RECENT LESSONS LEARNED:
             context += f"  Catalyst: {catalyst} ({catalyst_tier})\n"
             context += f"  Entry: {pos.get('entry_date', 'Unknown')}\n"
             context += "\n"
+
+        # Enhancement 2.3: Quantitative rotation candidates
+        if rotation_candidates:
+            context += "\n" + "="*70 + "\n\n"
+            context += f"QUANTITATIVE ROTATION CANDIDATES ({len(rotation_candidates)}):\n"
+            context += "-"*70 + "\n\n"
+
+            for cand in rotation_candidates:
+                context += f"EXIT: {cand['exit_ticker']} (Score: {cand['exit_score']}/100)\n"
+                context += f"  Reasons: {', '.join(cand['exit_reasons'])}\n"
+                context += f"ENTER: {cand['enter_ticker']} (Score: {cand['enter_score']}/100)\n"
+                context += f"  Catalyst: {cand['enter_catalyst']}\n"
+                context += f"  Net Score: {cand['net_score']:+d} (Positive = favorable swap)\n"
+                context += "\n"
 
         # New opportunities analysis
         context += "\n" + "="*70 + "\n\n"
