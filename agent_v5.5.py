@@ -719,6 +719,144 @@ POSITION {i}: {ticker}
 
         return accepted_positions, rejected_positions
 
+    def check_entry_timing(self, ticker, current_price):
+        """
+        Enhancement 1.6: Entry timing refinement - avoid chasing extended moves
+
+        Checks:
+        - Not extended >5% above 20-day MA (wait for pullback)
+        - Volume not 3x+ average (climax volume, reversal risk)
+        - Not up >10% in last 3 days (overheated)
+        - RSI not >70 (overbought)
+
+        Returns:
+        - entry_quality: 'GOOD', 'CAUTION', or 'POOR'
+        - wait_for_pullback: Boolean
+        - reasons: List of timing issues
+        """
+        try:
+            # Fetch 30 days of data (20-day MA + buffer)
+            end_date = datetime.datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.datetime.now() - datetime.timedelta(days=45)).strftime('%Y-%m-%d')
+
+            response = requests.get(
+                f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
+                params={'apiKey': self.polygon_api_key, 'limit': 50}
+            )
+
+            if response.status_code != 200 or 'results' not in response.json():
+                return {
+                    'entry_quality': 'UNKNOWN',
+                    'wait_for_pullback': False,
+                    'reasons': ['Insufficient data for entry timing check']
+                }
+
+            results = response.json()['results']
+            if len(results) < 20:
+                return {
+                    'entry_quality': 'UNKNOWN',
+                    'wait_for_pullback': False,
+                    'reasons': ['Insufficient price history (<20 days)']
+                }
+
+            # Extract prices and volumes
+            prices = [r['c'] for r in results]
+            volumes = [r['v'] for r in results]
+
+            # Calculate 20-day MA
+            ma_20 = sum(prices[-20:]) / 20
+
+            # Calculate average volume (exclude today)
+            avg_volume = sum(volumes[-20:-1]) / 19 if len(volumes) > 1 else volumes[-1]
+
+            # Current metrics
+            current_volume = volumes[-1]
+            volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1.0
+
+            # Distance from 20-day MA
+            distance_from_ma20_pct = ((current_price - ma_20) / ma_20) * 100
+
+            # 3-day change
+            if len(prices) >= 4:
+                price_3d_ago = prices[-4]
+                change_3d_pct = ((current_price - price_3d_ago) / price_3d_ago) * 100
+            else:
+                change_3d_pct = 0
+
+            # Calculate RSI (14-period)
+            rsi = self._calculate_rsi(prices, period=14)
+
+            # Entry timing checks
+            timing_issues = []
+            too_extended = distance_from_ma20_pct > 5.0
+            climax_volume = volume_ratio > 3.0
+            too_hot = change_3d_pct > 10.0
+            overbought = rsi > 70
+
+            if too_extended:
+                timing_issues.append(f'Extended {distance_from_ma20_pct:+.1f}% above 20-day MA (wait for pullback)')
+            if climax_volume:
+                timing_issues.append(f'Climax volume {volume_ratio:.1f}x average (reversal risk)')
+            if too_hot:
+                timing_issues.append(f'Up {change_3d_pct:+.1f}% in 3 days (overheated)')
+            if overbought:
+                timing_issues.append(f'RSI {rsi:.0f} overbought (>70)')
+
+            # Determine entry quality
+            issue_count = len(timing_issues)
+            if issue_count == 0:
+                entry_quality = 'GOOD'
+                wait_for_pullback = False
+            elif issue_count <= 2:
+                entry_quality = 'CAUTION'
+                wait_for_pullback = too_extended or too_hot  # Wait if extended or overheated
+            else:
+                entry_quality = 'POOR'
+                wait_for_pullback = True
+
+            return {
+                'entry_quality': entry_quality,
+                'wait_for_pullback': wait_for_pullback,
+                'reasons': timing_issues,
+                'distance_from_ma20_pct': distance_from_ma20_pct,
+                'volume_ratio': volume_ratio,
+                'change_3d_pct': change_3d_pct,
+                'rsi': rsi,
+                'ma_20': ma_20
+            }
+
+        except Exception as e:
+            print(f"⚠️ Entry timing check failed for {ticker}: {e}")
+            return {
+                'entry_quality': 'UNKNOWN',
+                'wait_for_pullback': False,
+                'reasons': [f'Error: {str(e)}']
+            }
+
+    def _calculate_rsi(self, prices, period=14):
+        """Calculate RSI (Relative Strength Index)"""
+        if len(prices) < period + 1:
+            return 50.0  # Neutral if insufficient data
+
+        # Calculate price changes
+        deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+
+        # Separate gains and losses
+        gains = [d if d > 0 else 0 for d in deltas[-period:]]
+        losses = [-d if d < 0 else 0 for d in deltas[-period:]]
+
+        # Calculate average gain and loss
+        avg_gain = sum(gains) / period
+        avg_loss = sum(losses) / period
+
+        if avg_loss == 0:
+            return 100.0  # All gains
+
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+
+        return rsi
+
     def _close_position(self, position, exit_price, reason):
         """Close a position and return trade data for CSV logging"""
         entry_price = position.get('entry_price', 0)
@@ -4168,6 +4306,27 @@ RECENT LESSONS LEARNED:
                         print(f"   ✓ Stage 2: Confirmed uptrend ({distance_52w:+.0f}% from 52W high)")
                         # Store Stage 2 data for position metadata
                         buy_pos['stage2_data'] = stage2_result
+
+                    # Enhancement 1.6: Entry Timing Check
+                    print(f"   ⏱️  Checking entry timing for {ticker}...")
+                    timing_result = self.check_entry_timing(ticker, current_price)
+
+                    if timing_result['wait_for_pullback']:
+                        validation_passed = False
+                        reason = f"Poor entry timing: {', '.join(timing_result['reasons'])}"
+                        rejection_reasons.append(reason)
+                        print(f"   ✗ Entry Timing: WAIT - {timing_result['entry_quality']}")
+                        for timing_reason in timing_result['reasons']:
+                            print(f"      - {timing_reason}")
+                    elif timing_result['entry_quality'] == 'CAUTION':
+                        print(f"   ⚠️  Entry Timing: CAUTION - {timing_result['entry_quality']}")
+                        for timing_reason in timing_result['reasons']:
+                            print(f"      - {timing_reason}")
+                        # Store timing data but don't reject
+                        buy_pos['timing_data'] = timing_result
+                    else:
+                        print(f"   ✓ Entry Timing: {timing_result['entry_quality']} (RSI: {timing_result.get('rsi', 0):.0f}, {timing_result.get('distance_from_ma20_pct', 0):+.1f}% from 20MA)")
+                        buy_pos['timing_data'] = timing_result
 
                     # Calculate conviction level (determines final position size)
                     multi_catalyst = catalyst_type == 'Multi_Catalyst' or catalyst_details.get('multi_catalyst', False)
