@@ -546,6 +546,99 @@ POSITION {i}: {ticker}
             'expected_hold_days': '5-7 days'
         }
 
+    def check_stage2_alignment(self, ticker):
+        """
+        Enhancement 1.5: Mark Minervini Stage 2 alignment check
+
+        Stage 2 = Confirmed uptrend. Only trade stocks in Stage 2 to avoid:
+        - Stage 1: Basing (no trend)
+        - Stage 3: Topping (uptrend ending)
+        - Stage 4: Declining (downtrend)
+
+        Stage 2 Criteria (SEPA methodology):
+        1. Stock above 150-day MA and 200-day MA
+        2. 150-day MA above 200-day MA (trend alignment)
+        3. 200-day MA trending up (not declining)
+        4. Stock within 25% of 52-week high (near leadership)
+        5. 50-day MA above 150-day and 200-day (short-term strength)
+
+        Returns:
+        - stage2: Boolean (True if all criteria met)
+        - details: Dict with all metrics for logging
+        """
+        try:
+            # Fetch 260 trading days (~52 weeks + buffer)
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')
+
+            response = requests.get(
+                f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
+                params={'apiKey': self.polygon_api_key, 'limit': 50000}
+            )
+
+            if response.status_code != 200:
+                return {'stage2': False, 'error': 'API error', 'ticker': ticker}
+
+            data = response.json()
+
+            if not data.get('results') or len(data['results']) < 200:
+                return {'stage2': False, 'error': 'Insufficient data', 'ticker': ticker}
+
+            # Extract closing prices
+            prices = [bar['c'] for bar in data['results']]
+
+            if len(prices) < 200:
+                return {'stage2': False, 'error': f'Only {len(prices)} days of data', 'ticker': ticker}
+
+            current_price = prices[-1]
+
+            # Calculate moving averages
+            ma_50 = sum(prices[-50:]) / 50 if len(prices) >= 50 else None
+            ma_150 = sum(prices[-150:]) / 150 if len(prices) >= 150 else None
+            ma_200 = sum(prices[-200:]) / 200
+
+            # Calculate 200 MA trend (compare current 200 MA to 20 days ago)
+            ma_200_20d_ago = sum(prices[-220:-20]) / 200 if len(prices) >= 220 else ma_200
+            ma_200_rising = ma_200 > ma_200_20d_ago
+
+            # 52-week high
+            week_52_high = max(prices[-252:]) if len(prices) >= 252 else max(prices)
+
+            # Stage 2 checks
+            above_150_200 = current_price > ma_150 and current_price > ma_200
+            ma_alignment = ma_150 > ma_200 if ma_150 else False
+            ma_50_strong = ma_50 > ma_150 and ma_50 > ma_200 if ma_50 else False
+            near_highs = current_price >= week_52_high * 0.75  # Within 25% of 52W high
+
+            # All criteria must pass for Stage 2
+            stage2 = all([
+                above_150_200,
+                ma_alignment,
+                ma_200_rising,
+                near_highs,
+                ma_50_strong
+            ])
+
+            return {
+                'stage2': stage2,
+                'ticker': ticker,
+                'current_price': current_price,
+                'ma_50': ma_50,
+                'ma_150': ma_150,
+                'ma_200': ma_200,
+                'ma_200_rising': ma_200_rising,
+                'week_52_high': week_52_high,
+                'distance_from_52w_high_pct': round(((current_price / week_52_high) - 1) * 100, 1),
+                'above_150_200': above_150_200,
+                'ma_alignment': ma_alignment,
+                'ma_50_strong': ma_50_strong,
+                'near_highs': near_highs,
+                'checks_passed': sum([above_150_200, ma_alignment, ma_200_rising, near_highs, ma_50_strong])
+            }
+
+        except Exception as e:
+            return {'stage2': False, 'error': str(e), 'ticker': ticker}
+
     def enforce_sector_concentration(self, new_positions, current_portfolio):
         """
         Enhancement 1.3: Enforce sector concentration limits to reduce correlation risk
@@ -4057,6 +4150,24 @@ RECENT LESSONS LEARNED:
                         print(f"   ✗ Technical rejected: {tech_result['reason']}")
                     else:
                         print(f"   ✓ Technical passed: {tech_result['reason']}")
+
+                    # Enhancement 1.5: Stage 2 Alignment Check (Minervini)
+                    print(f"   📈 Checking Stage 2 alignment for {ticker}...")
+                    stage2_result = self.check_stage2_alignment(ticker)
+
+                    if not stage2_result['stage2']:
+                        validation_passed = False
+                        if 'error' in stage2_result:
+                            reason = f"Stage 2 check failed: {stage2_result['error']}"
+                        else:
+                            reason = f"Not in Stage 2 ({stage2_result['checks_passed']}/5 checks passed)"
+                        rejection_reasons.append(reason)
+                        print(f"   ✗ Stage 2: {reason}")
+                    else:
+                        distance_52w = stage2_result['distance_from_52w_high_pct']
+                        print(f"   ✓ Stage 2: Confirmed uptrend ({distance_52w:+.0f}% from 52W high)")
+                        # Store Stage 2 data for position metadata
+                        buy_pos['stage2_data'] = stage2_result
 
                     # Calculate conviction level (determines final position size)
                     multi_catalyst = catalyst_type == 'Multi_Catalyst' or catalyst_details.get('multi_catalyst', False)
