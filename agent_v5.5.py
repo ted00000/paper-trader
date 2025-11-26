@@ -354,6 +354,576 @@ POSITION {i}: {ticker}
 """)
         return "\n".join(lines)
 
+    def analyze_premarket_gap(self, ticker, current_price, previous_close):
+        """
+        Enhancement 0.1: Analyze premarket gap and determine entry/exit strategy
+
+        BIIB Lesson: Stock gapped +11.7% premarket, then faded to +7.3% at open.
+        Large gaps often fade intraday - need smart entry timing.
+
+        Gap Classifications:
+        - EXHAUSTION GAP (≥8%): Likely to fade, wait or skip
+        - BREAKAWAY GAP (5-7.9%): Strong but wait for consolidation
+        - CONTINUATION GAP (2-4.9%): Tradeable, wait 15min
+        - NORMAL (<2%): Enter at open
+        """
+        gap_pct = ((current_price - previous_close) / previous_close) * 100 if previous_close > 0 else 0
+
+        if gap_pct >= 8.0:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'EXHAUSTION_GAP',
+                'entry_strategy': 'WAIT_FOR_PULLBACK_OR_SKIP',
+                'reasoning': f'Gap {gap_pct:+.1f}% too large, high fade risk',
+                'recommended_action': 'Wait for gap fill to support or skip entirely',
+                'should_enter_at_open': False,
+                'should_exit_at_open': False,  # Let it consolidate
+                'risk_level': 'HIGH'
+            }
+        elif gap_pct >= 5.0:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'BREAKAWAY_GAP',
+                'entry_strategy': 'WAIT_30MIN_THEN_PULLBACK',
+                'reasoning': f'Gap {gap_pct:+.1f}% strong, let it consolidate first',
+                'recommended_action': 'First pullback to VWAP or gap support after 30min',
+                'should_enter_at_open': False,
+                'should_exit_at_open': False,  # Wait for consolidation
+                'risk_level': 'MEDIUM'
+            }
+        elif gap_pct >= 2.0:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'CONTINUATION_GAP',
+                'entry_strategy': 'ENTER_AT_945AM',
+                'reasoning': f'Gap {gap_pct:+.1f}% reasonable, wait for opening volatility',
+                'recommended_action': 'Enter at 9:45 AM after opening rush',
+                'should_enter_at_open': False,  # Wait 15min
+                'should_exit_at_open': True,  # Can exit normally
+                'risk_level': 'LOW'
+            }
+        elif gap_pct <= -3.0:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'GAP_DOWN',
+                'entry_strategy': 'ENTER_AT_OPEN_BUYING_WEAKNESS',
+                'reasoning': f'Gap {gap_pct:+.1f}% down, buying weakness',
+                'recommended_action': 'Enter at open if thesis intact',
+                'should_enter_at_open': True,
+                'should_exit_at_open': True,
+                'risk_level': 'MEDIUM'
+            }
+        else:
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'NORMAL',
+                'entry_strategy': 'ENTER_AT_OPEN',
+                'reasoning': f'Gap {gap_pct:+.1f}% minimal',
+                'recommended_action': 'Normal entry at market open',
+                'should_enter_at_open': True,
+                'should_exit_at_open': True,
+                'risk_level': 'LOW'
+            }
+
+    def get_dynamic_profit_target(self, catalyst_tier, catalyst_type, catalyst_details=None):
+        """
+        Enhancement 1.2: Calculate catalyst-specific profit targets backed by historical data
+
+        Research-backed targets:
+        - M&A targets: Average gain +15-25% from announcement to close (4-6 months)
+        - FDA approvals: Average +12-18% in first 5-10 days
+        - Earnings beats (>15%): Average +8-10% in post-earnings drift (5-10 days)
+        - Analyst upgrades: Average +6-8% in 5-7 days
+
+        Returns dict with target_pct, optional stretch_target, and rationale
+        """
+        catalyst_type_str = catalyst_type.lower() if isinstance(catalyst_type, str) else ''
+
+        if catalyst_tier == 'Tier1' or catalyst_tier == 'Tier 1':
+            # M&A Catalyst
+            if 'm&a' in catalyst_type_str or 'merger' in catalyst_type_str or 'acquisition' in catalyst_type_str:
+                is_target = catalyst_details.get('is_target', False) if catalyst_details else False
+                if is_target:
+                    return {
+                        'target_pct': 15.0,  # Conservative for 5-10 day hold
+                        'stretch_target': 20.0,  # Full deal premium
+                        'rationale': 'M&A target, deal premium capture',
+                        'expected_hold_days': '5-10 days (or until deal close)'
+                    }
+                else:
+                    return {
+                        'target_pct': 8.0,  # Acquirer typically doesn't run as much
+                        'stretch_target': None,
+                        'rationale': 'M&A acquirer (not target)',
+                        'expected_hold_days': '3-5 days'
+                    }
+
+            # FDA Approval
+            elif 'fda' in catalyst_type_str or 'approval' in catalyst_type_str:
+                return {
+                    'target_pct': 15.0,
+                    'stretch_target': 25.0,  # Blockbuster approvals
+                    'rationale': 'FDA approval, major catalyst',
+                    'expected_hold_days': '5-10 days'
+                }
+
+            # Earnings Beat / Post-Earnings Drift
+            elif 'earnings' in catalyst_type_str or 'post_earnings_drift' in catalyst_type_str:
+                surprise_pct = catalyst_details.get('surprise_pct', 0) if catalyst_details else 0
+                if surprise_pct >= 20:
+                    return {
+                        'target_pct': 12.0,  # Big beats get higher targets
+                        'stretch_target': 15.0,
+                        'rationale': f'Earnings beat +{surprise_pct:.0f}%, strong drift expected',
+                        'expected_hold_days': '5-10 days (post-earnings drift)'
+                    }
+                else:
+                    return {
+                        'target_pct': 10.0,
+                        'stretch_target': None,
+                        'rationale': f'Earnings beat +{surprise_pct:.0f}%',
+                        'expected_hold_days': '5-7 days'
+                    }
+
+            # Major Contract
+            elif 'contract' in catalyst_type_str:
+                return {
+                    'target_pct': 12.0,
+                    'stretch_target': None,
+                    'rationale': 'Major contract announcement',
+                    'expected_hold_days': '5-7 days'
+                }
+
+            # Analyst Upgrade (Tier 1 only if from top firms)
+            elif 'analyst' in catalyst_type_str or 'upgrade' in catalyst_type_str:
+                firm = catalyst_details.get('firm', '') if catalyst_details else ''
+                if firm in ['Goldman Sachs', 'Morgan Stanley', 'JP Morgan', 'BofA']:
+                    return {
+                        'target_pct': 12.0,
+                        'stretch_target': None,
+                        'rationale': f'Top-tier upgrade from {firm}',
+                        'expected_hold_days': '5-7 days'
+                    }
+                else:
+                    return {
+                        'target_pct': 8.0,
+                        'stretch_target': None,
+                        'rationale': 'Analyst upgrade',
+                        'expected_hold_days': '3-5 days'
+                    }
+
+            # Default Tier 1
+            return {
+                'target_pct': 10.0,
+                'stretch_target': None,
+                'rationale': 'Tier 1 catalyst',
+                'expected_hold_days': '5-7 days'
+            }
+
+        elif catalyst_tier == 'Tier2' or catalyst_tier == 'Tier 2':
+            # Tier 2 catalysts - less powerful
+            return {
+                'target_pct': 8.0,
+                'stretch_target': None,
+                'rationale': 'Tier 2 catalyst',
+                'expected_hold_days': '3-5 days'
+            }
+
+        elif catalyst_tier == 'Tier3' or catalyst_tier == 'Tier 3':
+            # Insider buying - longer timeframe, standard target
+            return {
+                'target_pct': 10.0,  # But over longer period (10-20 days)
+                'stretch_target': None,
+                'rationale': 'Insider buying (leading indicator)',
+                'expected_hold_days': '10-20 days (longer hold)'
+            }
+
+        # Default fallback
+        return {
+            'target_pct': 10.0,
+            'stretch_target': None,
+            'rationale': 'Standard target',
+            'expected_hold_days': '5-7 days'
+        }
+
+    def check_stage2_alignment(self, ticker):
+        """
+        Enhancement 1.5: Mark Minervini Stage 2 alignment check
+
+        Stage 2 = Confirmed uptrend. Only trade stocks in Stage 2 to avoid:
+        - Stage 1: Basing (no trend)
+        - Stage 3: Topping (uptrend ending)
+        - Stage 4: Declining (downtrend)
+
+        Stage 2 Criteria (SEPA methodology):
+        1. Stock above 150-day MA and 200-day MA
+        2. 150-day MA above 200-day MA (trend alignment)
+        3. 200-day MA trending up (not declining)
+        4. Stock within 25% of 52-week high (near leadership)
+        5. 50-day MA above 150-day and 200-day (short-term strength)
+
+        Returns:
+        - stage2: Boolean (True if all criteria met)
+        - details: Dict with all metrics for logging
+        """
+        try:
+            # Fetch 260 trading days (~52 weeks + buffer)
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')
+
+            response = requests.get(
+                f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
+                params={'apiKey': self.polygon_api_key, 'limit': 50000}
+            )
+
+            if response.status_code != 200:
+                return {'stage2': False, 'error': 'API error', 'ticker': ticker}
+
+            data = response.json()
+
+            if not data.get('results') or len(data['results']) < 200:
+                return {'stage2': False, 'error': 'Insufficient data', 'ticker': ticker}
+
+            # Extract closing prices
+            prices = [bar['c'] for bar in data['results']]
+
+            if len(prices) < 200:
+                return {'stage2': False, 'error': f'Only {len(prices)} days of data', 'ticker': ticker}
+
+            current_price = prices[-1]
+
+            # Calculate moving averages
+            ma_50 = sum(prices[-50:]) / 50 if len(prices) >= 50 else None
+            ma_150 = sum(prices[-150:]) / 150 if len(prices) >= 150 else None
+            ma_200 = sum(prices[-200:]) / 200
+
+            # Calculate 200 MA trend (compare current 200 MA to 20 days ago)
+            ma_200_20d_ago = sum(prices[-220:-20]) / 200 if len(prices) >= 220 else ma_200
+            ma_200_rising = ma_200 > ma_200_20d_ago
+
+            # 52-week high
+            week_52_high = max(prices[-252:]) if len(prices) >= 252 else max(prices)
+
+            # Stage 2 checks
+            above_150_200 = current_price > ma_150 and current_price > ma_200
+            ma_alignment = ma_150 > ma_200 if ma_150 else False
+            ma_50_strong = ma_50 > ma_150 and ma_50 > ma_200 if ma_50 else False
+            near_highs = current_price >= week_52_high * 0.75  # Within 25% of 52W high
+
+            # All criteria must pass for Stage 2
+            stage2 = all([
+                above_150_200,
+                ma_alignment,
+                ma_200_rising,
+                near_highs,
+                ma_50_strong
+            ])
+
+            return {
+                'stage2': stage2,
+                'ticker': ticker,
+                'current_price': current_price,
+                'ma_50': ma_50,
+                'ma_150': ma_150,
+                'ma_200': ma_200,
+                'ma_200_rising': ma_200_rising,
+                'week_52_high': week_52_high,
+                'distance_from_52w_high_pct': round(((current_price / week_52_high) - 1) * 100, 1),
+                'above_150_200': above_150_200,
+                'ma_alignment': ma_alignment,
+                'ma_50_strong': ma_50_strong,
+                'near_highs': near_highs,
+                'checks_passed': sum([above_150_200, ma_alignment, ma_200_rising, near_highs, ma_50_strong])
+            }
+
+        except Exception as e:
+            return {'stage2': False, 'error': str(e), 'ticker': ticker}
+
+    def enforce_sector_concentration(self, new_positions, current_portfolio):
+        """
+        Enhancement 1.3: Enforce sector concentration limits to reduce correlation risk
+
+        Prevents scenarios like 3 tech stocks (NVDA, AMD, AVGO) crashing together
+        causing 20%+ portfolio loss.
+
+        Rules:
+        - Maximum 3 positions per sector (30% of portfolio)
+        - Maximum 2 positions per industry (20% of portfolio)
+        - Alert if 2+ positions in same sub-sector (high correlation warning)
+
+        Returns:
+        - accepted_positions: List of positions that passed validation
+        - rejected_positions: List of positions with rejection reasons
+        """
+        MAX_PER_SECTOR = 3  # 30% max per sector (e.g., Technology, Healthcare)
+        MAX_PER_INDUSTRY = 2  # 20% max per industry (e.g., Semiconductors, Biotech)
+
+        # Count current holdings by sector and industry
+        sector_counts = {}
+        industry_counts = {}
+
+        for position in current_portfolio:
+            sector = position.get('sector', 'Unknown')
+            industry = position.get('industry', 'Unknown')
+
+            sector_counts[sector] = sector_counts.get(sector, 0) + 1
+            industry_counts[industry] = industry_counts.get(industry, 0) + 1
+
+        print(f"\n   Current sector distribution:")
+        for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True):
+            print(f"      {sector}: {count} positions ({count*10}%)")
+
+        # Validate new positions
+        accepted_positions = []
+        rejected_positions = []
+
+        for new_pos in new_positions:
+            ticker = new_pos.get('ticker')
+            sector = new_pos.get('sector', 'Unknown')
+            industry = new_pos.get('industry', 'Unknown')
+
+            # Check sector limit
+            if sector_counts.get(sector, 0) >= MAX_PER_SECTOR:
+                rejected_positions.append({
+                    'ticker': ticker,
+                    'reason': f'Sector concentration: Already have {sector_counts[sector]} {sector} positions (max {MAX_PER_SECTOR})',
+                    'sector': sector,
+                    'industry': industry
+                })
+                print(f"   ⚠️ REJECTED {ticker}: Sector limit reached ({sector}: {sector_counts[sector]}/{MAX_PER_SECTOR})")
+                continue
+
+            # Check industry limit
+            if industry_counts.get(industry, 0) >= MAX_PER_INDUSTRY:
+                rejected_positions.append({
+                    'ticker': ticker,
+                    'reason': f'Industry concentration: Already have {industry_counts[industry]} {industry} positions (max {MAX_PER_INDUSTRY})',
+                    'sector': sector,
+                    'industry': industry
+                })
+                print(f"   ⚠️ REJECTED {ticker}: Industry limit reached ({industry}: {industry_counts[industry]}/{MAX_PER_INDUSTRY})")
+                continue
+
+            # Position accepted
+            accepted_positions.append(new_pos)
+            sector_counts[sector] = sector_counts.get(sector, 0) + 1
+            industry_counts[industry] = industry_counts.get(industry, 0) + 1
+
+            # Warn if high concentration in industry (not rejected, just flagged)
+            if industry_counts[industry] == MAX_PER_INDUSTRY:
+                print(f"   ⚠️ WARNING: {ticker} accepted, but {industry} now at max ({MAX_PER_INDUSTRY}/{MAX_PER_INDUSTRY})")
+
+        print(f"\n   Sector enforcement results:")
+        print(f"      ✓ Accepted: {len(accepted_positions)} positions")
+        print(f"      ✗ Rejected: {len(rejected_positions)} positions (concentration limits)")
+
+        return accepted_positions, rejected_positions
+
+    def check_entry_timing(self, ticker, current_price):
+        """
+        Enhancement 1.6: Entry timing refinement - avoid chasing extended moves
+
+        Checks:
+        - Not extended >5% above 20-day MA (wait for pullback)
+        - Volume not 3x+ average (climax volume, reversal risk)
+        - Not up >10% in last 3 days (overheated)
+        - RSI not >70 (overbought)
+
+        Returns:
+        - entry_quality: 'GOOD', 'CAUTION', or 'POOR'
+        - wait_for_pullback: Boolean
+        - reasons: List of timing issues
+        """
+        try:
+            # Fetch 30 days of data (20-day MA + buffer)
+            end_date = datetime.datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.datetime.now() - datetime.timedelta(days=45)).strftime('%Y-%m-%d')
+
+            response = requests.get(
+                f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
+                params={'apiKey': self.polygon_api_key, 'limit': 50}
+            )
+
+            if response.status_code != 200 or 'results' not in response.json():
+                return {
+                    'entry_quality': 'UNKNOWN',
+                    'wait_for_pullback': False,
+                    'reasons': ['Insufficient data for entry timing check']
+                }
+
+            results = response.json()['results']
+            if len(results) < 20:
+                return {
+                    'entry_quality': 'UNKNOWN',
+                    'wait_for_pullback': False,
+                    'reasons': ['Insufficient price history (<20 days)']
+                }
+
+            # Extract prices and volumes
+            prices = [r['c'] for r in results]
+            volumes = [r['v'] for r in results]
+
+            # Calculate 20-day MA
+            ma_20 = sum(prices[-20:]) / 20
+
+            # Calculate average volume (exclude today)
+            avg_volume = sum(volumes[-20:-1]) / 19 if len(volumes) > 1 else volumes[-1]
+
+            # Current metrics
+            current_volume = volumes[-1]
+            volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1.0
+
+            # Distance from 20-day MA
+            distance_from_ma20_pct = ((current_price - ma_20) / ma_20) * 100
+
+            # 3-day change
+            if len(prices) >= 4:
+                price_3d_ago = prices[-4]
+                change_3d_pct = ((current_price - price_3d_ago) / price_3d_ago) * 100
+            else:
+                change_3d_pct = 0
+
+            # Calculate RSI (14-period)
+            rsi = self._calculate_rsi(prices, period=14)
+
+            # Entry timing checks
+            timing_issues = []
+            too_extended = distance_from_ma20_pct > 5.0
+            climax_volume = volume_ratio > 3.0
+            too_hot = change_3d_pct > 10.0
+            overbought = rsi > 70
+
+            if too_extended:
+                timing_issues.append(f'Extended {distance_from_ma20_pct:+.1f}% above 20-day MA (wait for pullback)')
+            if climax_volume:
+                timing_issues.append(f'Climax volume {volume_ratio:.1f}x average (reversal risk)')
+            if too_hot:
+                timing_issues.append(f'Up {change_3d_pct:+.1f}% in 3 days (overheated)')
+            if overbought:
+                timing_issues.append(f'RSI {rsi:.0f} overbought (>70)')
+
+            # Determine entry quality
+            issue_count = len(timing_issues)
+            if issue_count == 0:
+                entry_quality = 'GOOD'
+                wait_for_pullback = False
+            elif issue_count <= 2:
+                entry_quality = 'CAUTION'
+                wait_for_pullback = too_extended or too_hot  # Wait if extended or overheated
+            else:
+                entry_quality = 'POOR'
+                wait_for_pullback = True
+
+            return {
+                'entry_quality': entry_quality,
+                'wait_for_pullback': wait_for_pullback,
+                'reasons': timing_issues,
+                'distance_from_ma20_pct': distance_from_ma20_pct,
+                'volume_ratio': volume_ratio,
+                'change_3d_pct': change_3d_pct,
+                'rsi': rsi,
+                'ma_20': ma_20
+            }
+
+        except Exception as e:
+            print(f"⚠️ Entry timing check failed for {ticker}: {e}")
+            return {
+                'entry_quality': 'UNKNOWN',
+                'wait_for_pullback': False,
+                'reasons': [f'Error: {str(e)}']
+            }
+
+    def _calculate_rsi(self, prices, period=14):
+        """Calculate RSI (Relative Strength Index)"""
+        if len(prices) < period + 1:
+            return 50.0  # Neutral if insufficient data
+
+        # Calculate price changes
+        deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+
+        # Separate gains and losses
+        gains = [d if d > 0 else 0 for d in deltas[-period:]]
+        losses = [-d if d < 0 else 0 for d in deltas[-period:]]
+
+        # Calculate average gain and loss
+        avg_gain = sum(gains) / period
+        avg_loss = sum(losses) / period
+
+        if avg_loss == 0:
+            return 100.0  # All gains
+
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+
+        return rsi
+
+    def detect_post_earnings_drift(self, ticker, catalyst_details):
+        """
+        Enhancement 1.4: Post-Earnings Drift (PED) detection
+
+        Academic research (Bernard & Thomas 1989, Chan et al. 1996) shows:
+        - Earnings surprises >15% lead to 8-12% drift over 30-60 days
+        - Revenue surprises >10% confirm quality beat
+        - Guidance raises signal sustained outperformance
+
+        Returns:
+        - drift_expected: Boolean
+        - target_pct: Higher target for PED positions (12% vs 10%)
+        - hold_period: Extended hold (30-60 days vs 3-7)
+        - confidence: HIGH/MEDIUM/LOW
+        - reasoning: Explanation
+        """
+        # Check if this is an earnings catalyst
+        catalyst_type = catalyst_details.get('catalyst_type', '')
+        if 'earnings' not in catalyst_type.lower():
+            return {
+                'drift_expected': False,
+                'reasoning': 'Not an earnings catalyst'
+            }
+
+        # Get earnings surprise percentage
+        earnings_surprise_pct = catalyst_details.get('earnings_surprise_pct', 0)
+        revenue_surprise_pct = catalyst_details.get('revenue_surprise_pct', 0)
+        guidance_raised = catalyst_details.get('guidance_raised', False)
+
+        # PED Criteria (based on academic research)
+        # Strong PED: Earnings surprise ≥20%, revenue surprise ≥10%, guidance raised
+        # Medium PED: Earnings surprise ≥15%
+        # Weak/None: Earnings surprise <15%
+
+        if earnings_surprise_pct >= 20 and revenue_surprise_pct >= 10 and guidance_raised:
+            return {
+                'drift_expected': True,
+                'target_pct': 12.0,
+                'hold_period': '30-60 days',
+                'confidence': 'HIGH',
+                'reasoning': f'Strong PED: Earnings +{earnings_surprise_pct:.0f}%, Revenue +{revenue_surprise_pct:.0f}%, Guidance raised',
+                'ped_strength': 'STRONG'
+            }
+        elif earnings_surprise_pct >= 20 and revenue_surprise_pct >= 10:
+            return {
+                'drift_expected': True,
+                'target_pct': 12.0,
+                'hold_period': '30-60 days',
+                'confidence': 'HIGH',
+                'reasoning': f'Strong PED: Earnings +{earnings_surprise_pct:.0f}%, Revenue +{revenue_surprise_pct:.0f}%',
+                'ped_strength': 'STRONG'
+            }
+        elif earnings_surprise_pct >= 15:
+            return {
+                'drift_expected': True,
+                'target_pct': 10.0,
+                'hold_period': '20-40 days',
+                'confidence': 'MEDIUM',
+                'reasoning': f'Medium PED: Earnings +{earnings_surprise_pct:.0f}%',
+                'ped_strength': 'MEDIUM'
+            }
+        else:
+            return {
+                'drift_expected': False,
+                'reasoning': f'Earnings surprise {earnings_surprise_pct:.0f}% below PED threshold (15%)'
+            }
+
     def _close_position(self, position, exit_price, reason):
         """Close a position and return trade data for CSV logging"""
         entry_price = position.get('entry_price', 0)
@@ -2991,17 +3561,66 @@ RECENT LESSONS LEARNED:
             standardized_reason = self.standardize_exit_reason(position, current_price, 'stop loss')
             return True, standardized_reason, return_pct
 
-        # PRIORITY 3: Check profit target (+10%)
+        # PRIORITY 3: Check profit target / trailing stop (Enhancement 1.1)
+        # Once position hits target, activate trailing stop to let winners run
         if current_price >= price_target:
-            standardized_reason = self.standardize_exit_reason(position, current_price, 'target')
-            return True, standardized_reason, return_pct
+            # Enhancement 1.1: Trailing stop logic
+            # Check if we should use trailing stop or exit immediately
 
-        # PRIORITY 4: Check time stop (21 days)
+            # Get gap percentage if available (from today's premarket)
+            gap_pct = position.get('gap_percent', 0)
+
+            # Gap-aware trailing stop activation
+            if gap_pct >= 5.0:
+                # Large gap: Wait for consolidation before trailing
+                days_since_gap = position.get('days_since_large_gap', 0)
+
+                if days_since_gap < 2:
+                    # Still in gap volatility period - don't trail yet, just hold
+                    position['days_since_large_gap'] = days_since_gap + 1
+                    print(f"      🎯 {ticker} at +{return_pct:.1f}% after {gap_pct:+.1f}% gap, waiting for consolidation (day {days_since_gap + 1}/2)")
+                    return False, 'Hold (gap consolidation)', return_pct
+
+            # Activate or update trailing stop
+            if not position.get('trailing_stop_active'):
+                # First time hitting target - activate trailing stop
+                position['trailing_stop_active'] = True
+                position['trailing_stop_price'] = entry_price * 1.08  # Lock in +8% minimum
+                position['peak_price'] = current_price
+                position['peak_return_pct'] = return_pct
+                print(f"      🎯 {ticker} hit +{return_pct:.1f}% target, trailing stop activated at +8% (${position['trailing_stop_price']:.2f})")
+                return False, 'Hold (trailing active)', return_pct
+
+            # Trailing stop already active - update peak and trail upward
+            if current_price > position['peak_price']:
+                position['peak_price'] = current_price
+                position['peak_return_pct'] = return_pct
+                # Trail stop 2% below current price
+                position['trailing_stop_price'] = current_price * 0.98
+                print(f"      📈 {ticker} new peak: +{return_pct:.1f}%, trailing stop now at ${position['trailing_stop_price']:.2f}")
+
+            # Check if trailing stop hit
+            if current_price <= position.get('trailing_stop_price', price_target):
+                peak_pct = position.get('peak_return_pct', return_pct)
+                exit_reason = f"Trailing stop at +{return_pct:.1f}% (peak +{peak_pct:.1f}%)"
+                return True, exit_reason, return_pct
+
+            # Still trailing, hold position
+            return False, 'Hold (trailing)', return_pct
+
+        # PRIORITY 4: Check time stop (21 days standard, 90 days for PED)
         entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
         days_held = (datetime.now() - entry_date).days
 
-        if days_held >= 21:
-            standardized_reason = self.standardize_exit_reason(position, current_price, 'time stop')
+        # Enhancement 1.4: Extended hold period for PED positions
+        is_ped = position.get('is_ped_candidate', False)
+        max_hold_days = position.get('max_hold_days', 21)
+
+        if days_held >= max_hold_days:
+            if is_ped:
+                standardized_reason = f"PED time stop ({days_held} days)"
+            else:
+                standardized_reason = self.standardize_exit_reason(position, current_price, 'time stop')
             return True, standardized_reason, return_pct
 
         return False, 'Hold', return_pct
@@ -3744,6 +4363,62 @@ RECENT LESSONS LEARNED:
                     else:
                         print(f"   ✓ Technical passed: {tech_result['reason']}")
 
+                    # Enhancement 1.5: Stage 2 Alignment Check (Minervini)
+                    print(f"   📈 Checking Stage 2 alignment for {ticker}...")
+                    stage2_result = self.check_stage2_alignment(ticker)
+
+                    if not stage2_result['stage2']:
+                        validation_passed = False
+                        if 'error' in stage2_result:
+                            reason = f"Stage 2 check failed: {stage2_result['error']}"
+                        else:
+                            reason = f"Not in Stage 2 ({stage2_result['checks_passed']}/5 checks passed)"
+                        rejection_reasons.append(reason)
+                        print(f"   ✗ Stage 2: {reason}")
+                    else:
+                        distance_52w = stage2_result['distance_from_52w_high_pct']
+                        print(f"   ✓ Stage 2: Confirmed uptrend ({distance_52w:+.0f}% from 52W high)")
+                        # Store Stage 2 data for position metadata
+                        buy_pos['stage2_data'] = stage2_result
+
+                    # Enhancement 1.6: Entry Timing Check
+                    print(f"   ⏱️  Checking entry timing for {ticker}...")
+                    timing_result = self.check_entry_timing(ticker, current_price)
+
+                    if timing_result['wait_for_pullback']:
+                        validation_passed = False
+                        reason = f"Poor entry timing: {', '.join(timing_result['reasons'])}"
+                        rejection_reasons.append(reason)
+                        print(f"   ✗ Entry Timing: WAIT - {timing_result['entry_quality']}")
+                        for timing_reason in timing_result['reasons']:
+                            print(f"      - {timing_reason}")
+                    elif timing_result['entry_quality'] == 'CAUTION':
+                        print(f"   ⚠️  Entry Timing: CAUTION - {timing_result['entry_quality']}")
+                        for timing_reason in timing_result['reasons']:
+                            print(f"      - {timing_reason}")
+                        # Store timing data but don't reject
+                        buy_pos['timing_data'] = timing_result
+                    else:
+                        print(f"   ✓ Entry Timing: {timing_result['entry_quality']} (RSI: {timing_result.get('rsi', 0):.0f}, {timing_result.get('distance_from_ma20_pct', 0):+.1f}% from 20MA)")
+                        buy_pos['timing_data'] = timing_result
+
+                    # Enhancement 1.4: Post-Earnings Drift Check
+                    print(f"   📈 Checking for post-earnings drift potential...")
+                    ped_result = self.detect_post_earnings_drift(ticker, catalyst_details)
+
+                    if ped_result['drift_expected']:
+                        print(f"   ✓ PED Detected: {ped_result['confidence']} confidence")
+                        print(f"      {ped_result['reasoning']}")
+                        print(f"      Target: +{ped_result['target_pct']:.0f}%, Hold: {ped_result['hold_period']}")
+                        # Store PED data for position metadata
+                        buy_pos['ped_data'] = ped_result
+                        buy_pos['is_ped_candidate'] = True
+                        # Override max hold period for PED positions
+                        buy_pos['max_hold_days'] = 90  # Extended hold for drift
+                    else:
+                        print(f"   ℹ️  PED: {ped_result['reasoning']}")
+                        buy_pos['is_ped_candidate'] = False
+
                     # Calculate conviction level (determines final position size)
                     multi_catalyst = catalyst_type == 'Multi_Catalyst' or catalyst_details.get('multi_catalyst', False)
                     conviction_result = self.calculate_conviction_level(
@@ -3842,6 +4517,45 @@ RECENT LESSONS LEARNED:
             buy_positions = validated_buys
             print(f"   ✓ Validated: {len(validated_buys)} BUY positions passed checks\n")
 
+        # Step 5.6: Enhancement 1.3 - Enforce Sector Concentration Limits
+        if buy_positions:
+            print("5.6 Enforcing sector concentration limits (Enhancement 1.3)...")
+
+            # Get current portfolio for sector analysis
+            accepted_buys, rejected_buys = self.enforce_sector_concentration(
+                new_positions=buy_positions,
+                current_portfolio=existing_positions + hold_positions  # Include HOLD positions
+            )
+
+            # Log rejections
+            if rejected_buys:
+                print(f"\n   Sector/Industry rejections:")
+                for reject in rejected_buys:
+                    print(f"      ✗ {reject['ticker']}: {reject['reason']}")
+
+                    # Track rejected picks for dashboard accountability
+                    all_picks.append({
+                        'ticker': reject['ticker'],
+                        'status': 'REJECTED',
+                        'conviction': 'N/A',
+                        'position_size_pct': 0,
+                        'catalyst': 'Unknown',
+                        'catalyst_tier': 'Unknown',
+                        'tier_name': 'Unknown',
+                        'news_score': 0,
+                        'relative_strength': 0,
+                        'vix': vix_result.get('vix', 0),
+                        'supporting_factors': 0,
+                        'reasoning': reject['reason'],
+                        'rejection_reasons': [reject['reason']],
+                        'sector': reject['sector'],
+                        'industry': reject['industry']
+                    })
+
+            # Update buy_positions with concentration-filtered list
+            buy_positions = accepted_buys
+            print(f"   ✓ Final BUY list: {len(buy_positions)} positions (after concentration enforcement)\n")
+
         # Save daily picks for dashboard visibility (ALWAYS save, even if 0 picks)
         self.save_daily_picks(all_picks, vix_result, macro_result)
 
@@ -3937,11 +4651,30 @@ RECENT LESSONS LEARNED:
                     price_target = position.get('price_target', entry_price * 1.10)
                     stop_loss = position.get('stop_loss', entry_price * 0.93)
 
+                    # Enhancement 0.1: Gap-aware exit logic
+                    # Check if stock gapped significantly (need previous close)
+                    previous_close = position.get('current_price', entry_price)  # Yesterday's close
+                    gap_analysis = self.analyze_premarket_gap(ticker, exit_price, previous_close)
+
                     # Bug #2 & #4 fix: Validate exit conditions
                     should_execute_exit = True
                     rejection_reason = None
 
+                    # Enhancement 0.1: Large gap-up to target - DON'T exit yet (BIIB lesson)
+                    if (gap_analysis['gap_pct'] >= 5.0 and
+                        exit_price >= price_target and
+                        not gap_analysis['should_exit_at_open']):
+                        should_execute_exit = False
+                        rejection_reason = f"Large gap to target ({gap_analysis['gap_pct']:+.1f}%), wait for consolidation"
+                        print(f"      ⚠️ {ticker}: {gap_analysis['classification']} detected")
+                        print(f"         {gap_analysis['reasoning']}")
+                        print(f"         Recommended: {gap_analysis['recommended_action']}")
+                        print(f"         → HOLDING instead of exiting (let position consolidate)")
+
                     # Check if this is a conditional exit (Bug #4)
+                    elif gap_analysis['gap_pct'] >= 5.0:
+                        # Log gap but don't block exit if stop/other reason
+                        print(f"      ℹ️  {ticker}: {gap_analysis['classification']} ({gap_analysis['gap_pct']:+.1f}%)")
                     if execution_timing and ('if price' in execution_timing.lower() or '≥' in execution_timing or '>=' in execution_timing):
                         # Extract price condition if present (e.g., "if price ≥$181.50")
                         print(f"      ⚠️ Conditional exit detected: {execution_timing}")
@@ -4039,10 +4772,40 @@ RECENT LESSONS LEARNED:
             buy_tickers = [p['ticker'] for p in buy_positions]
             market_prices = self.fetch_current_prices(buy_tickers)
 
+            # Enhancement 0.1: Fetch previous closes for gap analysis
+            # Need to get yesterday's close for all buy candidates
+            previous_closes = {}
+            for ticker in buy_tickers:
+                try:
+                    # Fetch 2-day history to get previous close
+                    bars = requests.get(
+                        f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")}/{datetime.now().strftime("%Y-%m-%d")}',
+                        params={'apiKey': self.polygon_api_key}
+                    ).json()
+                    if bars.get('results') and len(bars['results']) >= 2:
+                        previous_closes[ticker] = bars['results'][-2]['c']  # Previous day close
+                except:
+                    previous_closes[ticker] = None
+
             for pos in buy_positions:
                 ticker = pos['ticker']
                 if ticker in market_prices:
                     entry_price = market_prices[ticker]
+                    previous_close = previous_closes.get(ticker, entry_price * 0.98)  # Fallback estimate
+
+                    # Enhancement 0.1: Gap-aware entry logic
+                    gap_analysis = self.analyze_premarket_gap(ticker, entry_price, previous_close)
+
+                    # Check if we should skip entry due to large gap
+                    if not gap_analysis['should_enter_at_open']:
+                        print(f"   ⚠️ SKIPPED {ticker}: {gap_analysis['classification']} detected ({gap_analysis['gap_pct']:+.1f}%)")
+                        print(f"      {gap_analysis['reasoning']}")
+                        print(f"      Recommended: {gap_analysis['recommended_action']}")
+                        continue  # Skip this entry
+
+                    # Log gap info for awareness
+                    if abs(gap_analysis['gap_pct']) >= 2.0:
+                        print(f"   ℹ️  {ticker}: {gap_analysis['classification']} ({gap_analysis['gap_pct']:+.1f}%) - {gap_analysis['entry_strategy']}")
 
                     # COMPOUND GROWTH: Calculate position size based on CURRENT account value
                     position_size_pct = pos.get('position_size_pct', 10.0)
@@ -4053,6 +4816,15 @@ RECENT LESSONS LEARNED:
                         position_size_dollars = round(cash_available, 2)
                         print(f"   ⚠️ {ticker}: Reduced size to available cash ${cash_available:.2f}")
 
+                    # Enhancement 1.2: Calculate dynamic profit target based on catalyst
+                    catalyst_tier = pos.get('catalyst_tier', 'Tier2')
+                    catalyst_type = pos.get('catalyst', 'Unknown')
+                    catalyst_details = pos.get('catalyst_details', {})
+
+                    target_info = self.get_dynamic_profit_target(catalyst_tier, catalyst_type, catalyst_details)
+                    dynamic_target_pct = target_info['target_pct']
+                    target_rationale = target_info['rationale']
+
                     pos['entry_price'] = entry_price
                     pos['current_price'] = entry_price
                     pos['entry_date'] = datetime.now().strftime('%Y-%m-%d')
@@ -4060,7 +4832,11 @@ RECENT LESSONS LEARNED:
                     pos['position_size'] = position_size_dollars  # Store actual dollar amount
                     pos['shares'] = position_size_dollars / entry_price
                     pos['stop_loss'] = round(entry_price * 0.93, 2)  # -7%
-                    pos['price_target'] = round(entry_price * 1.10, 2)  # +10%
+                    pos['price_target'] = round(entry_price * (1 + dynamic_target_pct/100), 2)  # Dynamic target
+                    pos['target_pct'] = dynamic_target_pct  # Store for reference
+                    pos['target_rationale'] = target_rationale
+                    pos['stretch_target'] = target_info.get('stretch_target')
+                    pos['expected_hold_days'] = target_info.get('expected_hold_days', '5-7 days')
                     pos['unrealized_gain_pct'] = 0.0
                     pos['unrealized_gain_dollars'] = 0.0
 
@@ -4069,6 +4845,7 @@ RECENT LESSONS LEARNED:
 
                     updated_positions.append(pos)
                     print(f"   ✓ ENTERED {ticker}: ${entry_price:.2f}, {pos['shares']:.2f} shares (${position_size_dollars:.2f} = {position_size_pct}% of ${current_account_value:.2f})")
+                    print(f"      Target: +{dynamic_target_pct}% (${pos['price_target']:.2f}) - {target_rationale}")
                 else:
                     print(f"   ⚠️ {ticker}: Failed to fetch price")
         else:
