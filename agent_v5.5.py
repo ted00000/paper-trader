@@ -2227,8 +2227,27 @@ POSITION {i}: {ticker}
         # Relative strength = stock return - sector return
         relative_strength = stock_return - sector_return
 
+        # Enhancement 2.1: RS Rank Percentile (0-100 scale)
+        # Map RS to percentile-style rating
+        if relative_strength >= 15:
+            rs_rating = 95
+        elif relative_strength >= 10:
+            rs_rating = 85
+        elif relative_strength >= 7:
+            rs_rating = 75
+        elif relative_strength >= 5:
+            rs_rating = 65
+        elif relative_strength >= 3:
+            rs_rating = 55  # Minimum acceptable
+        elif relative_strength >= 0:
+            rs_rating = 40
+        else:
+            # Underperforming sector
+            rs_rating = max(0, 30 + relative_strength * 2)  # -15% RS = 0 rating
+
         return {
             'relative_strength': round(relative_strength, 2),
+            'rs_rating': int(rs_rating),  # 0-100 percentile-style score
             'stock_return_3m': stock_return,
             'sector_return_3m': sector_return,
             'sector_etf': sector_etf,
@@ -4445,6 +4464,7 @@ RECENT LESSONS LEARNED:
                         buy_pos['market_regime'] = vix_result['regime']
                         buy_pos['macro_event_near'] = macro_result['event_type'] or 'None'
                         buy_pos['relative_strength'] = rs_result['relative_strength']
+                        buy_pos['rs_rating'] = rs_result['rs_rating']  # Enhancement 2.1
                         buy_pos['stock_return_3m'] = rs_result['stock_return_3m']
                         buy_pos['sector_etf'] = rs_result['sector_etf']
                         buy_pos['conviction_level'] = conviction_result['conviction']
@@ -4479,9 +4499,9 @@ RECENT LESSONS LEARNED:
                             'rejection_reasons': []
                         })
 
-                        print(f"   ✓ {ticker}: {conviction_result['conviction']} - {rs_result['relative_strength']:+.1f}% RS")
+                        print(f"   ✓ {ticker}: {conviction_result['conviction']} - {rs_result['relative_strength']:+.1f}% RS (Rating: {rs_result['rs_rating']})")
                         print(f"      Catalyst: {tier_result['tier_name']}")
-                        print(f"      News: {news_result['score']}/20, RS: {rs_result['relative_strength']:+.1f}%, VIX: {vix_result['vix']}")
+                        print(f"      News: {news_result['score']}/20, RS: {rs_result['relative_strength']:+.1f}% (Rating: {rs_result['rs_rating']}/100), VIX: {vix_result['vix']}")
                         print(f"      Position Size: {conviction_result['position_size_pct']}% ({conviction_result['conviction']})")
                         print(f"      Reasoning: {conviction_result['reasoning']}")
                     else:
