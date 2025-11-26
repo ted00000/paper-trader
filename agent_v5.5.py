@@ -857,6 +857,73 @@ POSITION {i}: {ticker}
 
         return rsi
 
+    def detect_post_earnings_drift(self, ticker, catalyst_details):
+        """
+        Enhancement 1.4: Post-Earnings Drift (PED) detection
+
+        Academic research (Bernard & Thomas 1989, Chan et al. 1996) shows:
+        - Earnings surprises >15% lead to 8-12% drift over 30-60 days
+        - Revenue surprises >10% confirm quality beat
+        - Guidance raises signal sustained outperformance
+
+        Returns:
+        - drift_expected: Boolean
+        - target_pct: Higher target for PED positions (12% vs 10%)
+        - hold_period: Extended hold (30-60 days vs 3-7)
+        - confidence: HIGH/MEDIUM/LOW
+        - reasoning: Explanation
+        """
+        # Check if this is an earnings catalyst
+        catalyst_type = catalyst_details.get('catalyst_type', '')
+        if 'earnings' not in catalyst_type.lower():
+            return {
+                'drift_expected': False,
+                'reasoning': 'Not an earnings catalyst'
+            }
+
+        # Get earnings surprise percentage
+        earnings_surprise_pct = catalyst_details.get('earnings_surprise_pct', 0)
+        revenue_surprise_pct = catalyst_details.get('revenue_surprise_pct', 0)
+        guidance_raised = catalyst_details.get('guidance_raised', False)
+
+        # PED Criteria (based on academic research)
+        # Strong PED: Earnings surprise ≥20%, revenue surprise ≥10%, guidance raised
+        # Medium PED: Earnings surprise ≥15%
+        # Weak/None: Earnings surprise <15%
+
+        if earnings_surprise_pct >= 20 and revenue_surprise_pct >= 10 and guidance_raised:
+            return {
+                'drift_expected': True,
+                'target_pct': 12.0,
+                'hold_period': '30-60 days',
+                'confidence': 'HIGH',
+                'reasoning': f'Strong PED: Earnings +{earnings_surprise_pct:.0f}%, Revenue +{revenue_surprise_pct:.0f}%, Guidance raised',
+                'ped_strength': 'STRONG'
+            }
+        elif earnings_surprise_pct >= 20 and revenue_surprise_pct >= 10:
+            return {
+                'drift_expected': True,
+                'target_pct': 12.0,
+                'hold_period': '30-60 days',
+                'confidence': 'HIGH',
+                'reasoning': f'Strong PED: Earnings +{earnings_surprise_pct:.0f}%, Revenue +{revenue_surprise_pct:.0f}%',
+                'ped_strength': 'STRONG'
+            }
+        elif earnings_surprise_pct >= 15:
+            return {
+                'drift_expected': True,
+                'target_pct': 10.0,
+                'hold_period': '20-40 days',
+                'confidence': 'MEDIUM',
+                'reasoning': f'Medium PED: Earnings +{earnings_surprise_pct:.0f}%',
+                'ped_strength': 'MEDIUM'
+            }
+        else:
+            return {
+                'drift_expected': False,
+                'reasoning': f'Earnings surprise {earnings_surprise_pct:.0f}% below PED threshold (15%)'
+            }
+
     def _close_position(self, position, exit_price, reason):
         """Close a position and return trade data for CSV logging"""
         entry_price = position.get('entry_price', 0)
@@ -3541,12 +3608,19 @@ RECENT LESSONS LEARNED:
             # Still trailing, hold position
             return False, 'Hold (trailing)', return_pct
 
-        # PRIORITY 4: Check time stop (21 days)
+        # PRIORITY 4: Check time stop (21 days standard, 90 days for PED)
         entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
         days_held = (datetime.now() - entry_date).days
 
-        if days_held >= 21:
-            standardized_reason = self.standardize_exit_reason(position, current_price, 'time stop')
+        # Enhancement 1.4: Extended hold period for PED positions
+        is_ped = position.get('is_ped_candidate', False)
+        max_hold_days = position.get('max_hold_days', 21)
+
+        if days_held >= max_hold_days:
+            if is_ped:
+                standardized_reason = f"PED time stop ({days_held} days)"
+            else:
+                standardized_reason = self.standardize_exit_reason(position, current_price, 'time stop')
             return True, standardized_reason, return_pct
 
         return False, 'Hold', return_pct
@@ -4327,6 +4401,23 @@ RECENT LESSONS LEARNED:
                     else:
                         print(f"   ✓ Entry Timing: {timing_result['entry_quality']} (RSI: {timing_result.get('rsi', 0):.0f}, {timing_result.get('distance_from_ma20_pct', 0):+.1f}% from 20MA)")
                         buy_pos['timing_data'] = timing_result
+
+                    # Enhancement 1.4: Post-Earnings Drift Check
+                    print(f"   📈 Checking for post-earnings drift potential...")
+                    ped_result = self.detect_post_earnings_drift(ticker, catalyst_details)
+
+                    if ped_result['drift_expected']:
+                        print(f"   ✓ PED Detected: {ped_result['confidence']} confidence")
+                        print(f"      {ped_result['reasoning']}")
+                        print(f"      Target: +{ped_result['target_pct']:.0f}%, Hold: {ped_result['hold_period']}")
+                        # Store PED data for position metadata
+                        buy_pos['ped_data'] = ped_result
+                        buy_pos['is_ped_candidate'] = True
+                        # Override max hold period for PED positions
+                        buy_pos['max_hold_days'] = 90  # Extended hold for drift
+                    else:
+                        print(f"   ℹ️  PED: {ped_result['reasoning']}")
+                        buy_pos['is_ped_candidate'] = False
 
                     # Calculate conviction level (determines final position size)
                     multi_catalyst = catalyst_type == 'Multi_Catalyst' or catalyst_details.get('multi_catalyst', False)
