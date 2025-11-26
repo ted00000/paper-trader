@@ -3263,10 +3263,52 @@ RECENT LESSONS LEARNED:
             standardized_reason = self.standardize_exit_reason(position, current_price, 'stop loss')
             return True, standardized_reason, return_pct
 
-        # PRIORITY 3: Check profit target (+10%)
+        # PRIORITY 3: Check profit target / trailing stop (Enhancement 1.1)
+        # Once position hits target, activate trailing stop to let winners run
         if current_price >= price_target:
-            standardized_reason = self.standardize_exit_reason(position, current_price, 'target')
-            return True, standardized_reason, return_pct
+            # Enhancement 1.1: Trailing stop logic
+            # Check if we should use trailing stop or exit immediately
+
+            # Get gap percentage if available (from today's premarket)
+            gap_pct = position.get('gap_percent', 0)
+
+            # Gap-aware trailing stop activation
+            if gap_pct >= 5.0:
+                # Large gap: Wait for consolidation before trailing
+                days_since_gap = position.get('days_since_large_gap', 0)
+
+                if days_since_gap < 2:
+                    # Still in gap volatility period - don't trail yet, just hold
+                    position['days_since_large_gap'] = days_since_gap + 1
+                    print(f"      🎯 {ticker} at +{return_pct:.1f}% after {gap_pct:+.1f}% gap, waiting for consolidation (day {days_since_gap + 1}/2)")
+                    return False, 'Hold (gap consolidation)', return_pct
+
+            # Activate or update trailing stop
+            if not position.get('trailing_stop_active'):
+                # First time hitting target - activate trailing stop
+                position['trailing_stop_active'] = True
+                position['trailing_stop_price'] = entry_price * 1.08  # Lock in +8% minimum
+                position['peak_price'] = current_price
+                position['peak_return_pct'] = return_pct
+                print(f"      🎯 {ticker} hit +{return_pct:.1f}% target, trailing stop activated at +8% (${position['trailing_stop_price']:.2f})")
+                return False, 'Hold (trailing active)', return_pct
+
+            # Trailing stop already active - update peak and trail upward
+            if current_price > position['peak_price']:
+                position['peak_price'] = current_price
+                position['peak_return_pct'] = return_pct
+                # Trail stop 2% below current price
+                position['trailing_stop_price'] = current_price * 0.98
+                print(f"      📈 {ticker} new peak: +{return_pct:.1f}%, trailing stop now at ${position['trailing_stop_price']:.2f}")
+
+            # Check if trailing stop hit
+            if current_price <= position.get('trailing_stop_price', price_target):
+                peak_pct = position.get('peak_return_pct', return_pct)
+                exit_reason = f"Trailing stop at +{return_pct:.1f}% (peak +{peak_pct:.1f}%)"
+                return True, exit_reason, return_pct
+
+            # Still trailing, hold position
+            return False, 'Hold (trailing)', return_pct
 
         # PRIORITY 4: Check time stop (21 days)
         entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
