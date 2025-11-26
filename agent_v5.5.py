@@ -296,6 +296,7 @@ class TradingAgent:
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
+                    'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Sector', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -2459,14 +2460,36 @@ POSITION {i}: {ticker}
             adx = self.calculate_adx(bars, period=14)
             trend_strong = adx > 20 if adx else False
 
-            # 4. VOLUME CONFIRMATION
+            # 4. VOLUME CONFIRMATION (Enhancement 2.2)
             if len(bars) >= 20:
                 avg_volume = sum([bar['volume'] for bar in bars[-20:]]) / 20
                 current_volume = bars[-1]['volume']
                 volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
+
+                # Enhancement 2.2: Volume quality rating
+                if volume_ratio >= 3.0:
+                    volume_quality = 'EXCELLENT'  # Institutional surge
+                elif volume_ratio >= 2.0:
+                    volume_quality = 'STRONG'     # High conviction
+                elif volume_ratio >= 1.5:
+                    volume_quality = 'GOOD'       # Acceptable
+                else:
+                    volume_quality = 'WEAK'       # Below threshold
+
+                # Enhancement 2.2: Volume trend (increasing over 5 days?)
+                if len(bars) >= 5:
+                    recent_volumes = [bar['volume'] for bar in bars[-5:]]
+                    avg_recent = sum(recent_volumes) / 5
+                    avg_prior = sum([bar['volume'] for bar in bars[-25:-5]]) / 20 if len(bars) >= 25 else avg_volume
+                    volume_trending_up = avg_recent > avg_prior * 1.2 if avg_prior > 0 else False
+                else:
+                    volume_trending_up = False
+
                 volume_confirmed = volume_ratio >= 1.5
             else:
                 volume_ratio = 0
+                volume_quality = 'WEAK'
+                volume_trending_up = False
                 volume_confirmed = False
 
             # BUILD SCORE (0-25 points possible)
@@ -2507,6 +2530,8 @@ POSITION {i}: {ticker}
                 'ema20': round(ema20, 2) if ema20 else None,
                 'adx': round(adx, 2) if adx else None,
                 'volume_ratio': round(volume_ratio, 2),
+                'volume_quality': volume_quality,           # Enhancement 2.2
+                'volume_trending_up': volume_trending_up,   # Enhancement 2.2
                 'above_50ma': above_50ma,
                 'ema_bullish': ema_bullish,
                 'trend_strong': trend_strong,
@@ -2514,10 +2539,12 @@ POSITION {i}: {ticker}
             }
 
             if passed:
+                # Enhancement 2.2: Show volume quality in reason
+                vol_indicator = '↑' if volume_trending_up else ''
                 return {
                     'passed': True,
                     'score': 25,
-                    'reason': f'All technical filters passed (${current_price:.2f}, ADX {adx:.1f}, {volume_ratio:.1f}x vol)',
+                    'reason': f'All technical filters passed (${current_price:.2f}, ADX {adx:.1f}, {volume_ratio:.1f}x {volume_quality}{vol_indicator})',
                     'details': details
                 }
             else:
@@ -3733,6 +3760,7 @@ RECENT LESSONS LEARNED:
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
+                    'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Sector', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -3788,6 +3816,8 @@ RECENT LESSONS LEARNED:
                 trade_data.get('technical_ema20', 0.0),
                 trade_data.get('technical_adx', 0.0),
                 trade_data.get('technical_volume_ratio', 0.0),
+                trade_data.get('volume_quality', ''),  # Enhancement 2.2
+                trade_data.get('volume_trending_up', False),  # Enhancement 2.2
                 trade_data.get('sector', ''),
                 trade_data.get('stop_loss', 0),
                 trade_data.get('price_target', 0),
@@ -4479,6 +4509,8 @@ RECENT LESSONS LEARNED:
                         buy_pos['technical_ema20'] = tech_result['details'].get('ema20')
                         buy_pos['technical_adx'] = tech_result['details'].get('adx')
                         buy_pos['technical_volume_ratio'] = tech_result['details'].get('volume_ratio')
+                        buy_pos['volume_quality'] = tech_result['details'].get('volume_quality')  # Enhancement 2.2
+                        buy_pos['volume_trending_up'] = tech_result['details'].get('volume_trending_up')  # Enhancement 2.2
 
                         validated_buys.append(buy_pos)
 
