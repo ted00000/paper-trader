@@ -2457,6 +2457,8 @@ CRITICAL OUTPUT REQUIREMENT - JSON at end:
 }}
 ```
 
+**CRITICAL:** A ticker can ONLY appear in ONE array (hold, exit, or buy). Never put the same ticker in multiple arrays.
+
 Provide full analysis of each position BEFORE the JSON. Justify all exits against the rules above."""
 
             else:
@@ -3078,7 +3080,7 @@ RECENT LESSONS LEARNED:
     
     def log_completed_trade(self, trade_data):
         """Write completed trade to CSV for learning system"""
-        
+
         if not self.trades_csv.exists():
             self.trades_csv.parent.mkdir(parents=True, exist_ok=True)
             with open(self.trades_csv, 'w', newline='') as f:
@@ -3097,6 +3099,18 @@ RECENT LESSONS LEARNED:
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
                 ])
+
+        # Bug #3 fix: Check for duplicate trade_id to prevent duplicate records
+        trade_id = trade_data.get('trade_id', '')
+        if self.trades_csv.exists() and trade_id:
+            with open(self.trades_csv, 'r', newline='') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('Trade_ID') == trade_id:
+                        print(f"   ⚠️ DUPLICATE PREVENTED: Trade {trade_id} already exists in CSV")
+                        print(f"      Existing exit: {row.get('Exit_Date')} at ${row.get('Exit_Price')} ({row.get('Return_Percent')}%)")
+                        print(f"      Attempted: {trade_data.get('exit_date')} at ${trade_data.get('exit_price')} ({trade_data.get('return_percent')}%)")
+                        return  # Don't log duplicate
 
         with open(self.trades_csv, 'a', newline='') as f:
             writer = csv.writer(f)
@@ -3477,6 +3491,40 @@ RECENT LESSONS LEARNED:
         hold_positions = decisions.get('hold', [])
         exit_positions = decisions.get('exit', [])
         buy_positions = decisions.get('buy', [])
+
+        # VALIDATION: Check for ticker exclusivity (Bug #1 fix)
+        hold_tickers = set(hold_positions)
+        exit_tickers = set([e['ticker'] if isinstance(e, dict) else e for e in exit_positions])
+        buy_tickers = set([b['ticker'] if isinstance(b, dict) else b for b in buy_positions])
+
+        # Find duplicates across arrays
+        all_tickers = []
+        for t in hold_tickers: all_tickers.append(('hold', t))
+        for t in exit_tickers: all_tickers.append(('exit', t))
+        for t in buy_tickers: all_tickers.append(('buy', t))
+
+        ticker_counts = {}
+        for array_name, ticker in all_tickers:
+            if ticker not in ticker_counts:
+                ticker_counts[ticker] = []
+            ticker_counts[ticker].append(array_name)
+
+        duplicates = {t: arrays for t, arrays in ticker_counts.items() if len(arrays) > 1}
+
+        if duplicates:
+            print("   ⚠️ VALIDATION ERROR: Tickers in multiple arrays!")
+            for ticker, arrays in duplicates.items():
+                print(f"      {ticker}: {', '.join(arrays)}")
+                # Resolve: If in exit, remove from hold/buy. If in buy, remove from hold.
+                if 'exit' in arrays:
+                    if ticker in hold_tickers:
+                        hold_positions = [t for t in hold_positions if t != ticker]
+                        print(f"      → Removed {ticker} from HOLD (exits take priority)")
+                    buy_positions = [b for b in buy_positions if (b['ticker'] if isinstance(b, dict) else b) != ticker]
+                elif 'buy' in arrays and 'hold' in arrays:
+                    hold_positions = [t for t in hold_positions if t != ticker]
+                    print(f"      → Removed {ticker} from HOLD (buys take priority)")
+            print()
 
         print(f"   ✓ HOLD: {len(hold_positions)} positions")
         print(f"   ✓ EXIT: {len(exit_positions)} positions")
@@ -3870,6 +3918,7 @@ RECENT LESSONS LEARNED:
         # Process EXITS
         print("3. Processing EXITS...")
         closed_trades = []
+        exited_tickers = set()  # Track which tickers were exited (Bug #5 fix)
         if exit_decisions:
             exit_tickers = [e['ticker'] for e in exit_decisions]
             tickers_to_fetch = list(set(exit_tickers + [p['ticker'] for p in current_positions]))
@@ -3878,18 +3927,55 @@ RECENT LESSONS LEARNED:
             for exit_decision in exit_decisions:
                 ticker = exit_decision['ticker']
                 claude_reason = exit_decision.get('reason', 'Portfolio management decision')
+                execution_timing = exit_decision.get('execution_timing', '')
 
                 # Find position in current portfolio
                 position = next((p for p in current_positions if p['ticker'] == ticker), None)
                 if position:
                     exit_price = market_prices.get(ticker, position.get('current_price', 0))
+                    entry_price = position.get('entry_price', 0)
+                    price_target = position.get('price_target', entry_price * 1.10)
+                    stop_loss = position.get('stop_loss', entry_price * 0.93)
 
-                    # Standardize the exit reason (converts Claude's freeform text to consistent format)
-                    standardized_reason = self.standardize_exit_reason(position, exit_price, claude_reason)
+                    # Bug #2 & #4 fix: Validate exit conditions
+                    should_execute_exit = True
+                    rejection_reason = None
 
-                    closed_trade = self._close_position(position, exit_price, standardized_reason)
-                    closed_trades.append(closed_trade)
-                    print(f"   ✓ CLOSED {ticker}: {standardized_reason}")
+                    # Check if this is a conditional exit (Bug #4)
+                    if execution_timing and ('if price' in execution_timing.lower() or '≥' in execution_timing or '>=' in execution_timing):
+                        # Extract price condition if present (e.g., "if price ≥$181.50")
+                        print(f"      ⚠️ Conditional exit detected: {execution_timing}")
+                        # For now, always check if target/stop conditions are met
+
+                    # Bug #2 fix: Validate exit makes sense given actual price
+                    return_pct = ((exit_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+
+                    # Check if claiming target hit but price below target
+                    if 'target' in claude_reason.lower() and exit_price < price_target:
+                        should_execute_exit = False
+                        rejection_reason = f"Target claimed but price ${exit_price:.2f} < target ${price_target:.2f} ({return_pct:+.1f}% < +10%)"
+
+                    # Check if price is between stop and target (no valid exit reason)
+                    elif exit_price > stop_loss and exit_price < price_target:
+                        # Only allow if catalyst invalidated or other valid reason
+                        if 'catalyst' not in claude_reason.lower() and 'time' not in claude_reason.lower() and 'rotation' not in claude_reason.lower():
+                            should_execute_exit = False
+                            rejection_reason = f"Price ${exit_price:.2f} between stop ${stop_loss:.2f} and target ${price_target:.2f} - no valid exit reason"
+
+                    if should_execute_exit:
+                        # Standardize the exit reason (converts Claude's freeform text to consistent format)
+                        standardized_reason = self.standardize_exit_reason(position, exit_price, claude_reason)
+
+                        closed_trade = self._close_position(position, exit_price, standardized_reason)
+                        closed_trades.append(closed_trade)
+                        exited_tickers.add(ticker)  # Track this ticker was exited
+                        print(f"   ✓ CLOSED {ticker}: {standardized_reason}")
+                    else:
+                        print(f"   ✗ REJECTED EXIT for {ticker}: {rejection_reason}")
+                        print(f"      → Moved to HOLD instead")
+                        # Add to hold list instead
+                        if ticker not in hold_tickers:
+                            hold_tickers.append(ticker)
                 else:
                     print(f"   ⚠️ {ticker} not found in portfolio")
         else:
@@ -3903,6 +3989,9 @@ RECENT LESSONS LEARNED:
 
             for position in current_positions:
                 ticker = position['ticker']
+                # Bug #5 fix: Skip tickers that were just exited
+                if ticker in exited_tickers:
+                    continue  # Don't re-add exited positions
                 if ticker in hold_tickers:
                     current_price = hold_prices.get(ticker, position.get('current_price', 0))
 
