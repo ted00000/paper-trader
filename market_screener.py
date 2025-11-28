@@ -1579,6 +1579,71 @@ class MarketScreener:
             catalyst_score -= 20  # Heavy penalty for weak insider-only picks
             # print(f"   ⚠️ {ticker}: Insider-only penalty applied (weak news + weak RS)")
 
+        # ============================================================================
+        # PHASE 2.4: MAGNITUDE-BASED SCORING ADJUSTMENTS
+        # ============================================================================
+        magnitude_bonus = 0
+
+        # M&A Premium Magnitude Bonus
+        if news_result.get('catalyst_type_news') == 'M&A_news':
+            ma_premium = news_result.get('ma_premium')
+            if ma_premium:
+                if ma_premium >= 30:
+                    magnitude_bonus += 10  # Huge premium (30%+)
+                elif ma_premium >= 20:
+                    magnitude_bonus += 7   # Strong premium (20-30%)
+                elif ma_premium >= 10:
+                    magnitude_bonus += 4   # Decent premium (10-20%)
+                # else: < 10% = no bonus (weak deal)
+
+        # FDA Approval Type Magnitude Bonus
+        if news_result.get('catalyst_type_news') == 'FDA_news':
+            fda_type = news_result.get('fda_approval_type')
+            if fda_type == 'BREAKTHROUGH':
+                magnitude_bonus += 12  # Breakthrough = game changer
+            elif fda_type == 'PRIORITY':
+                magnitude_bonus += 8   # Priority review = strong
+            elif fda_type == 'EXPANDED':
+                magnitude_bonus += 5   # Expanded indication = good
+            elif fda_type == 'LIMITED':
+                magnitude_bonus -= 5   # Limited = weak (penalty)
+            # STANDARD = 0 (no bonus)
+
+        # Contract Value Magnitude Bonus
+        if news_result.get('catalyst_type_news') == 'contract_news':
+            contract_value = news_result.get('contract_value')
+            if contract_value:
+                if contract_value >= 1_000_000_000:  # $1B+
+                    magnitude_bonus += 10
+                elif contract_value >= 500_000_000:  # $500M+
+                    magnitude_bonus += 7
+                elif contract_value >= 100_000_000:  # $100M+
+                    magnitude_bonus += 4
+                # else: < $100M = no bonus
+
+        # Guidance Magnitude Bonus/Penalty
+        guidance_magnitude = news_result.get('guidance_magnitude')
+        if guidance_magnitude is not None:
+            if guidance_magnitude >= 20:
+                magnitude_bonus += 8   # Massive raise (+20%+)
+            elif guidance_magnitude >= 15:
+                magnitude_bonus += 6   # Strong raise (+15-20%)
+            elif guidance_magnitude >= 10:
+                magnitude_bonus += 4   # Good raise (+10-15%)
+            elif guidance_magnitude >= 5:
+                magnitude_bonus += 2   # Modest raise (+5-10%)
+            elif guidance_magnitude <= -10:
+                magnitude_bonus -= 10  # Major cut (penalty)
+            elif guidance_magnitude < 0:
+                magnitude_bonus -= 5   # Any cut (penalty)
+
+        # Insider Transaction Dollar Magnitude (already in insider_result score, but verify)
+        # The get_insider_transactions() already applies dollar weighting via multiplier
+        # So no additional bonus needed here
+
+        # Apply magnitude bonus to catalyst score
+        catalyst_score += magnitude_bonus
+
         composite_score = base_score + catalyst_score
 
         # Build why_selected string with catalysts first
