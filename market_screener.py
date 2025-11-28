@@ -19,6 +19,7 @@ import os
 import sys
 import json
 import requests
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 import time
@@ -48,6 +49,150 @@ MIN_RS_PCT = 3.0  # Minimum relative strength
 MIN_PRICE = 5.0   # Minimum stock price
 MIN_MARKET_CAP = 1_000_000_000  # $1B minimum
 TOP_N_CANDIDATES = 50  # Number to output
+
+
+# ============================================================================
+# PHASE 1.3-1.4: NEWS PARSING HELPERS (Contract values, Guidance, M&A premiums)
+# ============================================================================
+
+def parse_contract_value(text):
+    """
+    Extract contract/deal value from news text.
+
+    Examples:
+    - "$500M contract" -> 500000000
+    - "$1.2B deal" -> 1200000000
+    - "contract worth $75 million" -> 75000000
+    - "$10M order" -> 10000000
+
+    Returns: float (dollar amount) or None if not found
+    """
+    # Patterns to match: $500M, $1.2B, $75 million, etc.
+    patterns = [
+        r'\$(\d+(?:\.\d+)?)\s*billion',
+        r'\$(\d+(?:\.\d+)?)\s*B\b',
+        r'\$(\d+(?:\.\d+)?)\s*million',
+        r'\$(\d+(?:\.\d+)?)\s*M\b',
+        r'(\d+(?:\.\d+)?)\s*billion\s*dollar',
+        r'(\d+(?:\.\d+)?)\s*million\s*dollar',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            value = float(match.group(1))
+            # Convert to dollars
+            if 'billion' in pattern.lower() or r'\s*B\b' in pattern:
+                return value * 1_000_000_000
+            else:  # million
+                return value * 1_000_000
+
+    return None
+
+
+def parse_guidance_magnitude(text):
+    """
+    Extract guidance raise/lower percentage from news text.
+
+    Examples:
+    - "raises guidance by 20%" -> 20.0
+    - "guidance raised 15%" -> 15.0
+    - "lowers outlook by 10%" -> -10.0
+    - "cuts guidance 25%" -> -25.0
+
+    Returns: float (percentage) or None if not found
+    """
+    # Patterns for guidance raises
+    raise_patterns = [
+        r'raises?\s+guidance\s+(?:by\s+)?(\d+(?:\.\d+)?)%',
+        r'guidance\s+raised\s+(?:by\s+)?(\d+(?:\.\d+)?)%',
+        r'increases?\s+guidance\s+(?:by\s+)?(\d+(?:\.\d+)?)%',
+        r'lifts?\s+outlook\s+(?:by\s+)?(\d+(?:\.\d+)?)%',
+    ]
+
+    # Patterns for guidance cuts
+    lower_patterns = [
+        r'lowers?\s+guidance\s+(?:by\s+)?(\d+(?:\.\d+)?)%',
+        r'guidance\s+lowered\s+(?:by\s+)?(\d+(?:\.\d+)?)%',
+        r'cuts?\s+guidance\s+(?:by\s+)?(\d+(?:\.\d+)?)%',
+        r'reduces?\s+outlook\s+(?:by\s+)?(\d+(?:\.\d+)?)%',
+    ]
+
+    # Check raises
+    for pattern in raise_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return float(match.group(1))
+
+    # Check cuts (return negative)
+    for pattern in lower_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return -float(match.group(1))
+
+    return None
+
+
+def parse_ma_premium(text):
+    """
+    Extract M&A deal premium percentage from news text.
+
+    Examples:
+    - "acquired for 25% premium" -> 25.0
+    - "buyout at 30% premium to closing price" -> 30.0
+    - "premium of 20%" -> 20.0
+
+    Returns: float (percentage) or None if not found
+    """
+    patterns = [
+        r'(\d+(?:\.\d+)?)%\s+premium',
+        r'premium\s+of\s+(\d+(?:\.\d+)?)%',
+        r'at\s+(?:a\s+)?(\d+(?:\.\d+)?)%\s+premium',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return float(match.group(1))
+
+    return None
+
+
+def classify_fda_approval(text):
+    """
+    Classify FDA approval type from news text.
+
+    Types (priority order):
+    - BREAKTHROUGH: Breakthrough therapy designation (most valuable)
+    - PRIORITY: Priority review or fast track
+    - STANDARD: Standard FDA approval
+    - EXPANDED: Expanded indication (additional use approved)
+    - LIMITED: Limited indication or conditional approval
+
+    Returns: str (approval type) or None if not found
+    """
+    # Breakthrough therapy (highest value)
+    if any(keyword in text for keyword in ['breakthrough therapy', 'breakthrough designation', 'breakthrough status']):
+        return 'BREAKTHROUGH'
+
+    # Priority review / fast track
+    if any(keyword in text for keyword in ['priority review', 'fast track', 'accelerated approval', 'expedited review']):
+        return 'PRIORITY'
+
+    # Expanded indication (additional use)
+    if any(keyword in text for keyword in ['expanded indication', 'additional indication', 'new indication', 'label expansion']):
+        return 'EXPANDED'
+
+    # Limited/conditional
+    if any(keyword in text for keyword in ['limited indication', 'conditional approval', 'restricted use']):
+        return 'LIMITED'
+
+    # Standard approval (generic FDA approval)
+    if any(keyword in text for keyword in ['fda approv', 'fda clearance', 'approved by fda']):
+        return 'STANDARD'
+
+    return None
+
 
 class MarketScreener:
     """Scans S&P 1500 for high-probability swing trade candidates"""
@@ -460,6 +605,12 @@ class MarketScreener:
             catalyst_type_news = None
             catalyst_news_age_days = None
 
+            # PHASE 1.3-1.5: Track magnitude data for contracts, guidance, M&A, FDA
+            contract_value = None
+            guidance_magnitude = None
+            ma_premium = None
+            fda_approval_type = None
+
             # Check for Tier 1 catalysts in news first (with recency and sentiment filtering)
             for article in articles[:20]:
                 title = article.get('title', '').lower()
@@ -503,6 +654,9 @@ class MarketScreener:
                                 if not catalyst_type_news:
                                     catalyst_type_news = 'M&A_news'
                                     catalyst_news_age_days = days_ago
+                                # PHASE 1.3: Extract M&A premium percentage
+                                if ma_premium is None:
+                                    ma_premium = parse_ma_premium(text)
                         elif 'FDA' in keyword or 'drug' in keyword:
                             if days_ago <= 1:  # Same day or yesterday only
                                 score += points
@@ -510,6 +664,9 @@ class MarketScreener:
                                 if not catalyst_type_news:
                                     catalyst_type_news = 'FDA_news'
                                     catalyst_news_age_days = days_ago
+                                # PHASE 1.5: Classify FDA approval type
+                                if fda_approval_type is None:
+                                    fda_approval_type = classify_fda_approval(text)
                         elif 'contract' in keyword:
                             if days_ago <= 2:  # Give contracts 2 days (sometimes delayed reporting)
                                 score += points
@@ -517,9 +674,19 @@ class MarketScreener:
                                 if not catalyst_type_news:
                                     catalyst_type_news = 'contract_news'
                                     catalyst_news_age_days = days_ago
+                                # PHASE 1.3: Extract contract value
+                                if contract_value is None:
+                                    contract_value = parse_contract_value(text)
                         else:  # Other Tier 1 keywords (upgrades, etc.)
                             score += points
                             found_keywords.add(keyword)
+
+                # PHASE 1.4: Check for guidance raises/cuts in Tier 2 keywords
+                for keyword, points in tier2_keywords.items():
+                    if keyword in text and 'guidance' in keyword:
+                        # Extract guidance magnitude
+                        if guidance_magnitude is None:
+                            guidance_magnitude = parse_guidance_magnitude(text)
 
                 # Check Tier 2 keywords (no strict recency requirement)
                 for keyword, points in tier2_keywords.items():
@@ -555,7 +722,12 @@ class MarketScreener:
                 'scaled_score': (score / 30) * 100,  # Updated denominator to 30
                 'catalyst_type_news': catalyst_type_news,  # M&A, FDA, contracts detected in news
                 'catalyst_news_age_days': catalyst_news_age_days,  # How fresh is the catalyst
-                'top_articles': top_articles  # Actual article content for Claude
+                'top_articles': top_articles,  # Actual article content for Claude
+                # PHASE 1.3-1.5: Magnitude data for better scoring
+                'contract_value': contract_value,  # Dollar amount for contracts
+                'guidance_magnitude': guidance_magnitude,  # % raise/cut for guidance
+                'ma_premium': ma_premium,  # % premium for M&A deals
+                'fda_approval_type': fda_approval_type  # FDA approval classification
             }
 
         except Exception:
@@ -941,10 +1113,12 @@ class MarketScreener:
             # Analyze for clustered buying (last 30 days)
             recent_buys = 0
             total_shares_bought = 0
+            total_dollar_value = 0  # PHASE 1.6: Track dollar amount
 
             for txn in transactions:
                 change = txn.get('change', 0)
                 filing_date = txn.get('filingDate', '')
+                share_price = txn.get('share', 0)  # Price per share at time of transaction
 
                 if not filing_date:
                     continue
@@ -959,17 +1133,35 @@ class MarketScreener:
                         if change > 0:
                             recent_buys += 1
                             total_shares_bought += change
+                            # PHASE 1.6: Calculate dollar value of purchase
+                            if share_price > 0:
+                                total_dollar_value += change * share_price
                 except:
                     continue
 
             # Clustered buying = 3+ insiders buying in last 30 days
             has_cluster = recent_buys >= 3
 
+            # PHASE 1.6: Weight score by dollar amount
+            # Base score: 25 points per buy (up to 100)
+            # Bonus: +25% if total value >$1M, +50% if >$5M, +75% if >$10M
+            base_score = min(recent_buys * 25, 100) if has_cluster else 0
+            dollar_multiplier = 1.0
+            if total_dollar_value > 10_000_000:
+                dollar_multiplier = 1.75
+            elif total_dollar_value > 5_000_000:
+                dollar_multiplier = 1.50
+            elif total_dollar_value > 1_000_000:
+                dollar_multiplier = 1.25
+
+            weighted_score = int(base_score * dollar_multiplier)
+
             result = {
                 'has_cluster': has_cluster,
                 'buy_count': recent_buys,
                 'total_shares': total_shares_bought,
-                'score': min(recent_buys * 25, 100) if has_cluster else 0,
+                'total_dollar_value': total_dollar_value,  # PHASE 1.6
+                'score': min(weighted_score, 100),  # PHASE 1.6: Cap at 100
                 'catalyst_type': 'insider_buying' if has_cluster else None
             }
 
