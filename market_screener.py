@@ -372,6 +372,20 @@ class MarketScreener:
                 'beat expectations': 4,
                 'raises guidance': 3,
                 'guidance raised': 3,
+                # Product launches (PHASE 1.1)
+                'launches': 4,
+                'product launch': 4,
+                'new product': 3,
+                'unveils': 3,
+                'introduces': 3,
+                # Partnerships (PHASE 1.2)
+                'partnership': 4,
+                'strategic partnership': 5,
+                'collaboration': 3,
+                'joint venture': 4,
+                'alliance': 3,
+                'partners with': 4,
+                # Original keywords
                 'analyst': 1,
                 'price target': 2,
                 'breakout': 1,
