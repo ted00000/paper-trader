@@ -668,13 +668,19 @@ Breakout: 3 pts (52-week high + volume)
 
 **Impact**: Coverage 60% → 75%
 
-### Phase 2: API Integrations (1 week, $15/mo)
-1. ⭐ Add Finnhub Analyst APIs (3-4 hrs)
-2. ⭐ Add Revenue Surprise Data (2-3 hrs, $15/mo)
-3. ⭐ Parse M&A deal premiums (2-3 hrs)
-4. ⭐ Implement magnitude-based scoring (8-10 hrs)
+### Phase 2: API Integrations (1 week, $0 - ALL FREE!)
+1. ⭐ Add Finnhub Analyst APIs (3-4 hrs, **FREE** - included in your current Finnhub free tier!)
+2. ⭐ Parse M&A deal premiums (2-3 hrs, **FREE**)
+3. ⭐ Implement magnitude-based scoring (8-10 hrs, **FREE**)
+4. ✅ Add Revenue Surprise Data via **FMP FREE TIER** (2-3 hrs, **$0** - 250 calls/day!)
 
-**Impact**: Coverage 75% → 92%
+**FMP Free Tier Details:**
+- 250 API calls/day (enough for 125 stocks @ 2 calls per stock)
+- Endpoints: `/analyst-estimates` (revenue estimates) + `/income-statement` (actual revenue)
+- Calculate revenue surprise % manually (actual - estimate) / estimate
+- **Alternative considered**: Polygon Benzinga Earnings add-on ($99/mo) - REJECTED as too expensive
+
+**Impact**: Coverage 75% → **92%** (all free!)
 
 ### Phase 3: Advanced (Optional, $$)
 1. 💰 Real-time news feed ($100-200/mo)
@@ -692,16 +698,21 @@ Breakout: 3 pts (52-week high + volume)
 | Contracts | 60% | 85% | Contract value | 🚨 HIGH | 2-3 hrs | $0 |
 | Analyst Upgrades | 50% | 70% | No API data | 🚨 HIGH | 3-4 hrs | $0 |
 | Insider Buying | 90% | 95% | Transaction size | ⭐ Medium | 1-2 hrs | $0 |
-| Earnings Beats | 70% | 95% | Revenue data | ⭐ Medium | 2-3 hrs | $15/mo |
+| Earnings Beats | 70% | 95% | Revenue data | ⭐ Medium | 2-3 hrs | $0 (FMP free) |
 | Guidance Raises | 60% | 80% | Magnitude | 🚨 HIGH | 2-3 hrs | $0 |
 | Product Launches | 20% | N/A | No keywords | 🚨 HIGH | 30 min | $0 |
 | Partnerships | 20% | N/A | No keywords | 🚨 HIGH | 30 min | $0 |
 
 **Overall Current Coverage**: ~60%
 **After Phase 1**: ~75% (+25% improvement, 1 day, $0)
-**After Phase 2**: ~92% (+53% improvement, 1 week, $15/mo)
+**After Phase 2**: ~92% (+53% improvement, 1 week, **$0 - ALL FREE!**)
 
 ---
 
 **Last Updated**: November 28, 2024
-**Status**: Initial Audit Complete - Awaiting Implementation Approval
+**Status**: ✅ **APPROVED - Ready for Implementation (Phase 1 + Phase 2, $0 total cost)**
+
+**Next Steps**:
+1. User to obtain FMP free tier API key from https://site.financialmodelingprep.com/register
+2. Begin Phase 1 implementation (keywords, parsing logic)
+3. Begin Phase 2 implementation (Finnhub analyst API, FMP revenue data, magnitude scoring)
