@@ -297,6 +297,7 @@ class TradingAgent:
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
                     'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
+                    'Keywords_Matched', 'News_Sources', 'News_Article_Count',  # Enhancement 2.5: Catalyst learning
                     'Sector', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -2879,6 +2880,106 @@ POSITION {i}: {ticker}
 
         analysis['enhancement_tracking'] = enhancement_tracking
 
+        # Enhancement 2.5: CATALYST & KEYWORD LEARNING
+        catalyst_learning = {}
+
+        # Catalyst Type Performance
+        if 'Catalyst_Type' in df_recent.columns:
+            catalyst_performance = {}
+            for catalyst_type in df_recent['Catalyst_Type'].unique():
+                if pd.isna(catalyst_type) or catalyst_type == '':
+                    continue
+                catalyst_trades = df_recent[df_recent['Catalyst_Type'] == catalyst_type]
+                catalyst_performance[catalyst_type] = {
+                    'count': len(catalyst_trades),
+                    'win_rate': (catalyst_trades['Return_Percent'] > 0).sum() / len(catalyst_trades) * 100 if len(catalyst_trades) > 0 else 0,
+                    'avg_return': catalyst_trades['Return_Percent'].mean() if len(catalyst_trades) > 0 else 0,
+                    'best_trade': catalyst_trades['Return_Percent'].max() if len(catalyst_trades) > 0 else 0,
+                    'worst_trade': catalyst_trades['Return_Percent'].min() if len(catalyst_trades) > 0 else 0
+                }
+            # Sort by win rate (descending)
+            catalyst_performance = dict(sorted(catalyst_performance.items(), key=lambda x: x[1]['win_rate'], reverse=True))
+            catalyst_learning['catalyst_type_performance'] = catalyst_performance
+
+        # Keyword Effectiveness
+        if 'Keywords_Matched' in df_recent.columns:
+            keyword_stats = {}
+            for _, row in df_recent.iterrows():
+                keywords_str = row.get('Keywords_Matched', '')
+                if pd.isna(keywords_str) or keywords_str == '':
+                    continue
+                keywords = keywords_str.split(',')
+                for keyword in keywords:
+                    keyword = keyword.strip()
+                    if keyword == '':
+                        continue
+                    if keyword not in keyword_stats:
+                        keyword_stats[keyword] = {'count': 0, 'wins': 0, 'total_return': 0}
+                    keyword_stats[keyword]['count'] += 1
+                    if row['Return_Percent'] > 0:
+                        keyword_stats[keyword]['wins'] += 1
+                    keyword_stats[keyword]['total_return'] += row['Return_Percent']
+
+            # Calculate win rates and avg returns
+            keyword_performance = {}
+            for keyword, stats in keyword_stats.items():
+                if stats['count'] >= 3:  # Only include keywords with 3+ trades
+                    keyword_performance[keyword] = {
+                        'count': stats['count'],
+                        'win_rate': (stats['wins'] / stats['count']) * 100,
+                        'avg_return': stats['total_return'] / stats['count']
+                    }
+            # Sort by win rate (descending)
+            keyword_performance = dict(sorted(keyword_performance.items(), key=lambda x: x[1]['win_rate'], reverse=True))
+            catalyst_learning['keyword_performance'] = keyword_performance
+
+        # News Source Effectiveness
+        if 'News_Sources' in df_recent.columns:
+            source_stats = {}
+            for _, row in df_recent.iterrows():
+                sources_str = row.get('News_Sources', '')
+                if pd.isna(sources_str) or sources_str == '':
+                    continue
+                sources = sources_str.split(',')
+                for source in sources:
+                    source = source.strip()
+                    if source == '' or source == 'Unknown':
+                        continue
+                    if source not in source_stats:
+                        source_stats[source] = {'count': 0, 'wins': 0, 'total_return': 0}
+                    source_stats[source]['count'] += 1
+                    if row['Return_Percent'] > 0:
+                        source_stats[source]['wins'] += 1
+                    source_stats[source]['total_return'] += row['Return_Percent']
+
+            # Calculate win rates and avg returns
+            source_performance = {}
+            for source, stats in source_stats.items():
+                if stats['count'] >= 3:  # Only include sources with 3+ trades
+                    source_performance[source] = {
+                        'count': stats['count'],
+                        'win_rate': (stats['wins'] / stats['count']) * 100,
+                        'avg_return': stats['total_return'] / stats['count']
+                    }
+            # Sort by win rate (descending)
+            source_performance = dict(sorted(source_performance.items(), key=lambda x: x[1]['win_rate'], reverse=True))
+            catalyst_learning['news_source_performance'] = source_performance
+
+        # Catalyst Tier Performance
+        if 'Catalyst_Tier' in df_recent.columns:
+            tier_performance = {}
+            for tier in ['Tier1', 'Tier 1', 'Tier2', 'Tier 2', 'Tier3', 'Tier 3']:
+                tier_trades = df_recent[df_recent['Catalyst_Tier'] == tier]
+                if len(tier_trades) > 0:
+                    tier_performance[tier] = {
+                        'count': len(tier_trades),
+                        'win_rate': (tier_trades['Return_Percent'] > 0).sum() / len(tier_trades) * 100,
+                        'avg_return': tier_trades['Return_Percent'].mean()
+                    }
+            catalyst_learning['tier_performance'] = tier_performance
+
+        analysis['catalyst_learning'] = catalyst_learning
+
         # RECOMMENDATIONS
         recommendations = []
 
@@ -2900,6 +3001,38 @@ POSITION {i}: {ticker}
         # News score validation
         if '0-5 (weak)' in news_buckets and news_buckets['0-5 (weak)']['count'] > 0:
             recommendations.append('⚠️ Trades with weak news scores detected - verify news filter')
+
+        # Enhancement 2.5: Catalyst learning recommendations
+        if 'catalyst_learning' in analysis and 'catalyst_type_performance' in analysis['catalyst_learning']:
+            catalyst_perf = analysis['catalyst_learning']['catalyst_type_performance']
+            # Flag underperforming catalyst types
+            for catalyst, stats in catalyst_perf.items():
+                if stats['count'] >= 5 and stats['win_rate'] < 40:
+                    recommendations.append(f"⚠️ Catalyst '{catalyst}' underperforming: {stats['win_rate']:.0f}% win rate over {stats['count']} trades - consider avoiding")
+                elif stats['count'] >= 5 and stats['win_rate'] >= 70:
+                    recommendations.append(f"✅ Catalyst '{catalyst}' high performance: {stats['win_rate']:.0f}% win rate - prioritize these")
+
+        if 'catalyst_learning' in analysis and 'keyword_performance' in analysis['catalyst_learning']:
+            keyword_perf = analysis['catalyst_learning']['keyword_performance']
+            # Flag best and worst performing keywords
+            if keyword_perf:
+                best_keywords = list(keyword_perf.items())[:3]  # Top 3
+                for keyword, stats in best_keywords:
+                    if stats['win_rate'] >= 70:
+                        recommendations.append(f"🎯 High-value keyword '{keyword}': {stats['win_rate']:.0f}% win rate ({stats['count']} trades)")
+                worst_keywords = list(keyword_perf.items())[-3:]  # Bottom 3
+                for keyword, stats in worst_keywords:
+                    if stats['win_rate'] < 40:
+                        recommendations.append(f"❌ Weak keyword '{keyword}': {stats['win_rate']:.0f}% win rate - investigate why")
+
+        if 'catalyst_learning' in analysis and 'news_source_performance' in analysis['catalyst_learning']:
+            source_perf = analysis['catalyst_learning']['news_source_performance']
+            # Flag best news sources
+            if source_perf:
+                best_sources = list(source_perf.items())[:3]
+                for source, stats in best_sources:
+                    if stats['win_rate'] >= 70:
+                        recommendations.append(f"📰 Reliable source '{source}': {stats['win_rate']:.0f}% win rate ({stats['count']} trades)")
 
         analysis['recommendations'] = recommendations
 
@@ -3834,6 +3967,7 @@ RECENT LESSONS LEARNED:
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
                     'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
+                    'Keywords_Matched', 'News_Sources', 'News_Article_Count',  # Enhancement 2.5: Catalyst learning
                     'Sector', 'Stop_Loss', 'Price_Target',
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -3891,6 +4025,9 @@ RECENT LESSONS LEARNED:
                 trade_data.get('technical_volume_ratio', 0.0),
                 trade_data.get('volume_quality', ''),  # Enhancement 2.2
                 trade_data.get('volume_trending_up', False),  # Enhancement 2.2
+                trade_data.get('keywords_matched', ''),  # Enhancement 2.5: Catalyst learning
+                trade_data.get('news_sources', ''),  # Enhancement 2.5
+                trade_data.get('news_article_count', 0),  # Enhancement 2.5
                 trade_data.get('sector', ''),
                 trade_data.get('stop_loss', 0),
                 trade_data.get('price_target', 0),
@@ -4704,6 +4841,16 @@ RECENT LESSONS LEARNED:
                         buy_pos['technical_volume_ratio'] = tech_result['details'].get('volume_ratio')
                         buy_pos['volume_quality'] = tech_result['details'].get('volume_quality')  # Enhancement 2.2
                         buy_pos['volume_trending_up'] = tech_result['details'].get('volume_trending_up')  # Enhancement 2.2
+
+                        # Enhancement 2.5: Extract keywords and news sources for learning
+                        catalyst_signals = catalyst_details.get('catalyst_signals', {})
+                        keywords_matched = catalyst_signals.get('keywords', [])
+                        top_articles = catalyst_signals.get('top_articles', [])
+                        news_sources = [article.get('url', '').split('/')[2] if '/' in article.get('url', '') else 'Unknown' for article in top_articles[:3]]
+
+                        buy_pos['keywords_matched'] = ','.join(keywords_matched) if keywords_matched else ''
+                        buy_pos['news_sources'] = ','.join(news_sources) if news_sources else ''
+                        buy_pos['news_article_count'] = len(top_articles)
 
                         validated_buys.append(buy_pos)
 
