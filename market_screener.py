@@ -28,6 +28,7 @@ import time
 PROJECT_DIR = Path(__file__).parent
 POLYGON_API_KEY = os.environ.get('POLYGON_API_KEY', '')
 FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', '')
+FMP_API_KEY = os.environ.get('FMP_API_KEY', '')  # PHASE 2.2: Financial Modeling Prep (free tier)
 
 # S&P 1500 Sector ETF Mapping (same as agent)
 SECTOR_ETF_MAP = {
@@ -200,6 +201,7 @@ class MarketScreener:
     def __init__(self):
         self.api_key = POLYGON_API_KEY
         self.finnhub_key = FINNHUB_API_KEY
+        self.fmp_key = FMP_API_KEY  # PHASE 2.2
         self.today = datetime.now().strftime('%Y-%m-%d')
         self.scan_results = []
 
@@ -208,6 +210,7 @@ class MarketScreener:
         self.analyst_ratings_cache = {}
         self.insider_transactions_cache = {}
         self.earnings_surprises_cache = {}
+        self.revenue_surprises_cache = {}  # PHASE 2.2: FMP revenue data
 
         if not self.api_key:
             raise ValueError("POLYGON_API_KEY not set in environment")
@@ -1071,6 +1074,106 @@ class MarketScreener:
             self.earnings_surprises_cache[ticker] = result
             return result
 
+    def get_revenue_surprise_fmp(self, ticker):
+        """
+        PHASE 2.2: Get revenue surprise using FMP free tier (250 calls/day)
+
+        Uses 2 API calls per stock:
+        1. /analyst-estimates - Get estimated revenue
+        2. /income-statement - Get actual revenue
+
+        Returns: Dict with revenue surprise data
+        """
+        if not self.fmp_key:
+            return {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
+
+        # Check cache first
+        if ticker in self.revenue_surprises_cache:
+            return self.revenue_surprises_cache[ticker]
+
+        try:
+            # Call 1: Get analyst revenue estimates (most recent quarter)
+            estimates_url = f"https://financialmodelingprep.com/api/v3/analyst-estimates/{ticker}"
+            estimates_params = {'apikey': self.fmp_key, 'limit': 1}
+            estimates_response = requests.get(estimates_url, params=estimates_params, timeout=30)
+            estimates_data = estimates_response.json()
+
+            if not isinstance(estimates_data, list) or not estimates_data:
+                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
+                self.revenue_surprises_cache[ticker] = result
+                return result
+
+            estimated_revenue = estimates_data[0].get('estimatedRevenueAvg', 0)
+            estimate_date = estimates_data[0].get('date', '')
+
+            if not estimated_revenue or estimated_revenue <= 0:
+                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
+                self.revenue_surprises_cache[ticker] = result
+                return result
+
+            # Call 2: Get actual revenue from income statement (most recent quarter)
+            actuals_url = f"https://financialmodelingprep.com/api/v3/income-statement/{ticker}"
+            actuals_params = {'apikey': self.fmp_key, 'period': 'quarter', 'limit': 1}
+            actuals_response = requests.get(actuals_url, params=actuals_params, timeout=30)
+            actuals_data = actuals_response.json()
+
+            if not isinstance(actuals_data, list) or not actuals_data:
+                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
+                self.revenue_surprises_cache[ticker] = result
+                return result
+
+            actual_revenue = actuals_data[0].get('revenue', 0)
+            actual_date = actuals_data[0].get('date', '')
+
+            if not actual_revenue or actual_revenue <= 0:
+                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
+                self.revenue_surprises_cache[ticker] = result
+                return result
+
+            # Calculate revenue surprise percentage
+            revenue_surprise_pct = ((actual_revenue - estimated_revenue) / estimated_revenue) * 100
+
+            # Check if beat is recent (last 30 days)
+            try:
+                actual_dt = datetime.strptime(actual_date, '%Y-%m-%d')
+                days_ago = (datetime.now() - actual_dt).days
+            except:
+                days_ago = 999  # Unknown date = too old
+
+            # Only count as catalyst if recent AND beat
+            has_revenue_beat = revenue_surprise_pct > 0 and days_ago <= 30
+
+            # Score: 0-50 points based on beat magnitude (scales with earnings beat)
+            if has_revenue_beat:
+                if revenue_surprise_pct >= 20:
+                    score = 50
+                elif revenue_surprise_pct >= 15:
+                    score = 40
+                elif revenue_surprise_pct >= 10:
+                    score = 30
+                else:
+                    score = 20
+            else:
+                score = 0
+
+            result = {
+                'has_revenue_beat': has_revenue_beat,
+                'revenue_surprise_pct': revenue_surprise_pct,
+                'actual_revenue': actual_revenue,
+                'estimated_revenue': estimated_revenue,
+                'days_ago': days_ago,
+                'score': score
+            }
+
+            self.revenue_surprises_cache[ticker] = result
+            time.sleep(0.15)  # Rate limit: 250 calls/day = ~17/min safe
+            return result
+
+        except Exception as e:
+            result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
+            self.revenue_surprises_cache[ticker] = result
+            return result
+
     def get_insider_transactions(self, ticker):
         """
         Check for clustered insider buying (Tier 1 catalyst)
@@ -1303,6 +1406,7 @@ class MarketScreener:
         analyst_result = self.get_analyst_ratings(ticker)
         insider_result = self.get_insider_transactions(ticker)
         earnings_surprise_result = self.get_earnings_surprises(ticker)
+        revenue_surprise_result = self.get_revenue_surprise_fmp(ticker)  # PHASE 2.2
 
         # NOTE: news_result and sec_8k_result already fetched in STEP 1.5 for fresh catalyst check
 
@@ -1431,6 +1535,17 @@ class MarketScreener:
                 catalyst_score += 17 * catalyst_weight_multiplier  # Recent beat (4-7 days)
             else:
                 catalyst_score += 15 * catalyst_weight_multiplier  # Older beat (8-30 days)
+
+        # PHASE 2.2: Revenue surprise bonus (enhances earnings beat)
+        if revenue_surprise_result.get('has_revenue_beat'):
+            # Revenue beat adds 5-10 points on top of earnings beat
+            rev_surprise_pct = revenue_surprise_result.get('revenue_surprise_pct', 0)
+            if rev_surprise_pct >= 20:
+                catalyst_score += 10 * catalyst_weight_multiplier  # Strong revenue beat
+            elif rev_surprise_pct >= 10:
+                catalyst_score += 7 * catalyst_weight_multiplier
+            else:
+                catalyst_score += 5 * catalyst_weight_multiplier
 
         # TIER 2 CATALYSTS
         # Analyst upgrade = 20 points
