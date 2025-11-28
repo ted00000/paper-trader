@@ -668,13 +668,14 @@ Breakout: 3 pts (52-week high + volume)
 
 **Impact**: Coverage 60% → 75%
 
-### Phase 2: API Integrations (1 week, $15/mo)
-1. ⭐ Add Finnhub Analyst APIs (3-4 hrs)
-2. ⭐ Add Revenue Surprise Data (2-3 hrs, $15/mo)
-3. ⭐ Parse M&A deal premiums (2-3 hrs)
-4. ⭐ Implement magnitude-based scoring (8-10 hrs)
+### Phase 2: API Integrations (1 week, $15/mo optional)
+1. ⭐ Add Finnhub Analyst APIs (3-4 hrs, **FREE** - included in your current Finnhub free tier!)
+2. ⭐ Parse M&A deal premiums (2-3 hrs, **FREE**)
+3. ⭐ Implement magnitude-based scoring (8-10 hrs, **FREE**)
+4. 💰 Add Revenue Surprise Data via Financial Modeling Prep (2-3 hrs, **$15/mo** - OPTIONAL)
 
-**Impact**: Coverage 75% → 92%
+**Impact WITHOUT Revenue Data**: Coverage 75% → 85% (all free!)
+**Impact WITH Revenue Data**: Coverage 75% → 92% ($15/mo for FMP)
 
 ### Phase 3: Advanced (Optional, $$)
 1. 💰 Real-time news feed ($100-200/mo)
@@ -699,7 +700,8 @@ Breakout: 3 pts (52-week high + volume)
 
 **Overall Current Coverage**: ~60%
 **After Phase 1**: ~75% (+25% improvement, 1 day, $0)
-**After Phase 2**: ~92% (+53% improvement, 1 week, $15/mo)
+**After Phase 2 (without FMP)**: ~85% (+42% improvement, 1 week, $0)
+**After Phase 2 (with FMP)**: ~92% (+53% improvement, 1 week, $15/mo)
 
 ---
 
