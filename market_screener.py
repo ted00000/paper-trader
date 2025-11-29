@@ -533,6 +533,56 @@ class MarketScreener:
         print(f"   RS 80-89 (top 20%): {percentile_80to89} stocks")
         print(f"   RS 70-79 (top 30%): {percentile_70to79} stocks")
 
+    def detect_sector_rotation(self):
+        """
+        PHASE 3.2: Detect sector rotation by analyzing sector ETF performance
+
+        Identifies:
+        - Leading sectors (outperforming SPY)
+        - Lagging sectors (underperforming SPY)
+        - Sector rotation trends (which sectors are rotating in/out)
+
+        Returns: Dict with sector rotation analysis
+        """
+        print(f"\n   Analyzing sector rotation...")
+
+        # Get SPY (market) performance as baseline
+        spy_return = self.get_3month_return('SPY')
+
+        # Calculate performance for each sector ETF
+        sector_performance = {}
+        for sector_name, etf in SECTOR_ETF_MAP.items():
+            etf_return = self.get_3month_return(etf)
+            relative_to_spy = etf_return - spy_return
+
+            sector_performance[sector_name] = {
+                'etf': etf,
+                '3m_return': round(etf_return, 2),
+                'vs_spy': round(relative_to_spy, 2),
+                'is_leading': relative_to_spy > 2.0,  # Leading if 2%+ above SPY
+                'is_lagging': relative_to_spy < -2.0  # Lagging if 2%+ below SPY
+            }
+
+        # Sort sectors by performance
+        sorted_sectors = sorted(sector_performance.items(), key=lambda x: x[1]['3m_return'], reverse=True)
+
+        # Identify leading and lagging sectors
+        leading_sectors = [name for name, data in sorted_sectors if data['is_leading']]
+        lagging_sectors = [name for name, data in sorted_sectors if data['is_lagging']]
+
+        print(f"   ✓ Sector rotation analyzed")
+        print(f"   SPY (market) 3-month return: {spy_return:+.1f}%")
+        print(f"   Leading sectors ({len(leading_sectors)}): {', '.join(leading_sectors) if leading_sectors else 'None'}")
+        print(f"   Lagging sectors ({len(lagging_sectors)}): {', '.join(lagging_sectors) if lagging_sectors else 'None'}")
+
+        return {
+            'spy_return': spy_return,
+            'sector_performance': sector_performance,
+            'leading_sectors': leading_sectors,
+            'lagging_sectors': lagging_sectors,
+            'sorted_sectors': sorted_sectors
+        }
+
     def get_news_score(self, ticker):
         """
         Fetch and score recent news (last 7 days)
@@ -1918,6 +1968,12 @@ class MarketScreener:
         print("=" * 60)
         self.calculate_rs_percentiles(candidates)
 
+        # PHASE 3.2: Detect sector rotation
+        print("\n" + "=" * 60)
+        print("SECTOR ROTATION ANALYSIS")
+        print("=" * 60)
+        sector_rotation = self.detect_sector_rotation()
+
         # Sort by composite score
         candidates.sort(key=lambda x: x['composite_score'], reverse=True)
 
@@ -1940,6 +1996,7 @@ class MarketScreener:
                 'min_price': MIN_PRICE,
                 'min_market_cap': MIN_MARKET_CAP
             },
+            'sector_rotation': sector_rotation,  # PHASE 3.2: Sector rotation analysis
             'candidates': top_candidates
         }
 
