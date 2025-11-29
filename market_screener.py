@@ -873,95 +873,19 @@ class MarketScreener:
 
     def get_analyst_ratings(self, ticker):
         """
-        Fetch recent analyst ratings/upgrades for a ticker
+        PHASE 2.1: Fetch analyst consensus trends using FREE tier recommendation endpoint
+
+        NOTE: Upgrade/downgrade endpoint is PAID ONLY (403 forbidden on free tier)
+        Instead, use /stock/recommendation which shows monthly consensus trends (FREE)
+
+        Strategy:
+        1. Use recommendation trends to detect improving analyst sentiment
+        2. Combine with news keyword detection ("upgrade") for best coverage
 
         Returns: Dict with catalyst data
         """
-        if not self.finnhub_key:
-            return {'has_upgrade': False, 'upgrade_count': 0, 'score': 0, 'catalyst_type': None}
-
-        # Check cache first
-        if ticker in self.analyst_ratings_cache:
-            return self.analyst_ratings_cache[ticker]
-
-        try:
-            # Get analyst ratings/upgrades from last 30 days
-            url = f'https://finnhub.io/api/v1/stock/upgrade-downgrade'
-            params = {
-                'symbol': ticker,
-                'from': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
-                'to': datetime.now().strftime('%Y-%m-%d'),
-                'token': self.finnhub_key
-            }
-
-            response = requests.get(url, params=params, timeout=30)
-            ratings = response.json()
-
-            if not isinstance(ratings, list):
-                ratings = []
-
-            # Analyze ratings for upgrades
-            upgrade_count = 0
-            downgrade_count = 0
-            recent_upgrades = []
-
-            for rating in ratings:
-                action = rating.get('action', '').lower()
-                from_grade = rating.get('fromGrade', '').lower()
-                to_grade = rating.get('toGrade', '').lower()
-                date_str = rating.get('time', '')
-
-                # Detect upgrades
-                if 'upgrade' in action or (from_grade and to_grade and
-                    ('buy' in to_grade or 'outperform' in to_grade or 'overweight' in to_grade)):
-                    upgrade_count += 1
-                    try:
-                        days_ago = (datetime.now() - datetime.fromisoformat(date_str.replace('Z', '+00:00'))).days
-                        recent_upgrades.append({
-                            'firm': rating.get('company', 'Unknown'),
-                            'action': action,
-                            'to_grade': to_grade,
-                            'days_ago': days_ago
-                        })
-                    except:
-                        pass
-
-                # Detect downgrades
-                elif 'downgrade' in action or (from_grade and to_grade and
-                    ('sell' in to_grade or 'underperform' in to_grade or 'underweight' in to_grade)):
-                    downgrade_count += 1
-
-            # Calculate score and determine catalyst type
-            has_upgrade = upgrade_count > 0
-            net_upgrades = upgrade_count - downgrade_count
-
-            # Tier 1 catalyst if upgraded in last 14 days (extended window)
-            catalyst_type = None
-            if recent_upgrades:
-                recent_count = sum(1 for u in recent_upgrades if u['days_ago'] <= 14)
-                if recent_count > 0:
-                    catalyst_type = 'analyst_upgrade'
-
-            result = {
-                'has_upgrade': has_upgrade,
-                'upgrade_count': upgrade_count,
-                'downgrade_count': downgrade_count,
-                'net_upgrades': net_upgrades,
-                'recent_upgrades': recent_upgrades[:3],  # Top 3 most recent
-                'score': min(net_upgrades * 50, 100) if net_upgrades > 0 else 0,
-                'catalyst_type': catalyst_type
-            }
-
-            # Cache result
-            self.analyst_ratings_cache[ticker] = result
-            time.sleep(0.1)  # Rate limit: 60 calls/minute = 1 per second safe
-
-            return result
-
-        except Exception as e:
-            result = {'has_upgrade': False, 'upgrade_count': 0, 'score': 0, 'catalyst_type': None}
-            self.analyst_ratings_cache[ticker] = result
-            return result
+        # Use the new free tier function
+        return self.get_analyst_recommendation_trends(ticker)
 
     def get_earnings_surprises(self, ticker):
         """
@@ -1277,6 +1201,108 @@ class MarketScreener:
             self.insider_transactions_cache[ticker] = result
             return result
 
+    def get_analyst_recommendation_trends(self, ticker):
+        """
+        PHASE 2.1: Check for improving analyst consensus using Finnhub FREE tier
+
+        Uses: /stock/recommendation endpoint (FREE)
+        Returns monthly aggregate: strongBuy, buy, hold, sell, strongSell counts
+
+        Detects upgrades by comparing current month vs 2-3 months ago:
+        - Increasing strongBuy count = bullish catalyst
+        - Decreasing sell/strongSell = improving sentiment
+
+        Returns: Dict with recommendation trend data
+        """
+        if not self.finnhub_key:
+            return {'has_improving_trend': False, 'score': 0, 'catalyst_type': None}
+
+        # Check cache first
+        if ticker in self.analyst_ratings_cache:
+            return self.analyst_ratings_cache[ticker]
+
+        try:
+            url = f'https://finnhub.io/api/v1/stock/recommendation'
+            params = {
+                'symbol': ticker,
+                'token': self.finnhub_key
+            }
+
+            response = requests.get(url, params=params, timeout=30)
+            data = response.json()
+
+            # API returns list of monthly snapshots, newest first
+            # Example: [{"period": "2025-11", "strongBuy": 15, "buy": 23, ...}, ...]
+            if not isinstance(data, list) or len(data) < 2:
+                result = {'has_improving_trend': False, 'score': 0, 'catalyst_type': None}
+                self.analyst_ratings_cache[ticker] = result
+                return result
+
+            # Compare current month (index 0) to 2-3 months ago (index 2)
+            current = data[0]
+            baseline = data[2] if len(data) > 2 else data[1]
+
+            # Extract counts
+            current_strong_buy = current.get('strongBuy', 0)
+            current_buy = current.get('buy', 0)
+            current_sell = current.get('sell', 0)
+            current_strong_sell = current.get('strongSell', 0)
+
+            baseline_strong_buy = baseline.get('strongBuy', 0)
+            baseline_buy = baseline.get('buy', 0)
+            baseline_sell = baseline.get('sell', 0)
+            baseline_strong_sell = baseline.get('strongSell', 0)
+
+            # Calculate bullish score (higher strongBuy/buy, lower sell/strongSell)
+            current_bullish = current_strong_buy * 2 + current_buy
+            current_bearish = current_sell + current_strong_sell * 2
+
+            baseline_bullish = baseline_strong_buy * 2 + baseline_buy
+            baseline_bearish = baseline_sell + baseline_strong_sell * 2
+
+            # Detect improving trend
+            bullish_improvement = current_bullish - baseline_bullish
+            bearish_reduction = baseline_bearish - current_bearish
+
+            # Significant upgrade = +3 or more strongBuy/buy OR -2 or more sell/strongSell
+            has_improving_trend = (bullish_improvement >= 3) or (bearish_reduction >= 2)
+
+            # Score based on magnitude of improvement
+            if has_improving_trend:
+                # 10 points per net strongBuy increase, 5 points per buy increase
+                # Cap at 50 points (Tier 2 catalyst level)
+                strong_buy_delta = current_strong_buy - baseline_strong_buy
+                buy_delta = current_buy - baseline_buy
+                sell_delta = baseline_sell - current_sell
+
+                score = min(
+                    strong_buy_delta * 10 + buy_delta * 5 + sell_delta * 5,
+                    50
+                )
+            else:
+                score = 0
+
+            result = {
+                'has_improving_trend': has_improving_trend,
+                'current_strong_buy': current_strong_buy,
+                'baseline_strong_buy': baseline_strong_buy,
+                'strong_buy_delta': current_strong_buy - baseline_strong_buy,
+                'bullish_improvement': bullish_improvement,
+                'bearish_reduction': bearish_reduction,
+                'score': score,
+                'catalyst_type': 'analyst_upgrade_trend' if has_improving_trend else None,
+                'period': current.get('period', 'Unknown')
+            }
+
+            self.analyst_ratings_cache[ticker] = result
+            time.sleep(0.1)  # Rate limit
+            return result
+
+        except Exception as e:
+            result = {'has_improving_trend': False, 'score': 0, 'catalyst_type': None}
+            self.analyst_ratings_cache[ticker] = result
+            return result
+
     def get_sec_8k_filings(self, ticker):
         """
         Check for recent SEC 8-K filings indicating M&A or major contracts
@@ -1458,7 +1484,7 @@ class MarketScreener:
             has_tier1_catalyst = True
 
         # Tier 2: Analyst Upgrades, Contracts
-        elif (analyst_result.get('catalyst_type') == 'analyst_upgrade' or
+        elif (analyst_result.get('catalyst_type') in ['analyst_upgrade', 'analyst_upgrade_trend'] or
               news_result.get('catalyst_type_news') == 'contract_news' or
               sec_8k_result.get('catalyst_type_8k') == 'contract_8k'):
             catalyst_tier = 'Tier 2'
@@ -1548,8 +1574,8 @@ class MarketScreener:
                 catalyst_score += 5 * catalyst_weight_multiplier
 
         # TIER 2 CATALYSTS
-        # Analyst upgrade = 20 points
-        if analyst_result.get('catalyst_type') == 'analyst_upgrade':
+        # Analyst upgrade trend = 20 points (PHASE 2.1: FREE tier recommendation trends)
+        if analyst_result.get('catalyst_type') in ['analyst_upgrade', 'analyst_upgrade_trend']:
             catalyst_score += 20 * catalyst_weight_multiplier
 
         # Major contract news = 20 points
@@ -1744,8 +1770,13 @@ class MarketScreener:
                 else:
                     catalyst_tier_display = 'Tier 1 - Earnings Beat (8-30d)'
         elif catalyst_tier == 'Tier 2':
-            if analyst_result.get('catalyst_type') == 'analyst_upgrade':
-                catalyst_tier_display = 'Tier 2 - Analyst Upgrade'
+            if analyst_result.get('catalyst_type') in ['analyst_upgrade', 'analyst_upgrade_trend']:
+                # PHASE 2.1: Show strongBuy delta if available
+                strong_buy_delta = analyst_result.get('strong_buy_delta', 0)
+                if strong_buy_delta > 0:
+                    catalyst_tier_display = f'Tier 2 - Analyst Upgrade Trend (+{strong_buy_delta} StrongBuy)'
+                else:
+                    catalyst_tier_display = 'Tier 2 - Analyst Upgrade Trend'
             elif catalyst_type_news == 'contract_news':
                 catalyst_tier_display = 'Tier 2 - Contract News'
             elif catalyst_type_8k == 'contract_8k':
