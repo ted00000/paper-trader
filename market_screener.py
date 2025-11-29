@@ -212,6 +212,10 @@ class MarketScreener:
         self.earnings_surprises_cache = {}
         self.revenue_surprises_cache = {}  # PHASE 2.2: FMP revenue data
 
+        # PHASE 3.1: IBD-style RS percentile ranking
+        # Store all stock returns during scan for percentile calculation
+        self.all_stock_returns = {}  # {ticker: 3month_return}
+
         if not self.api_key:
             raise ValueError("POLYGON_API_KEY not set in environment")
 
@@ -452,14 +456,19 @@ class MarketScreener:
 
     def calculate_relative_strength(self, ticker, sector):
         """
-        Calculate stock's RS vs sector ETF
+        PHASE 3.1: Calculate stock's RS vs sector ETF + IBD-style percentile rank
 
-        Returns: Dict with RS metrics
+        Returns: Dict with RS metrics including percentile rank (0-100)
+
+        Note: Percentile rank is calculated after full scan in calculate_rs_percentiles()
         """
         sector_etf = SECTOR_ETF_MAP.get(sector, 'SPY')
 
         stock_return = self.get_3month_return(ticker)
         sector_return = self.get_3month_return(sector_etf)
+
+        # Store stock return for later percentile calculation
+        self.all_stock_returns[ticker] = stock_return
 
         rs = stock_return - sector_return
 
@@ -469,8 +478,60 @@ class MarketScreener:
             'sector_return_3m': sector_return,
             'sector_etf': sector_etf,
             'passed_filter': rs >= MIN_RS_PCT,
-            'score': min(rs / 15 * 100, 100) if rs > 0 else 0  # 15%+ RS = perfect score
+            'score': min(rs / 15 * 100, 100) if rs > 0 else 0,  # 15%+ RS = perfect score
+            'rs_percentile': None  # Will be calculated after full scan
         }
+
+    def calculate_rs_percentiles(self, candidates):
+        """
+        PHASE 3.1: Calculate IBD-style RS percentile rank (0-100) for all candidates
+
+        IBD methodology:
+        - 99 = Top 1% of all stocks (market leaders)
+        - 90 = Top 10% (strong relative strength)
+        - 80 = Top 20% (above average)
+        - 50 = Average
+        - <50 = Below average (generally avoid)
+
+        Args:
+            candidates: List of candidate dicts with 'ticker' and 'relative_strength' keys
+
+        Returns: None (modifies candidates in-place)
+        """
+        if not self.all_stock_returns:
+            print("   ⚠️ No stock returns collected - skipping percentile calculation")
+            return
+
+        # Get all return values sorted ascending
+        all_returns = sorted(self.all_stock_returns.values())
+        total_stocks = len(all_returns)
+
+        print(f"\n   Calculating RS percentiles across {total_stocks} stocks...")
+
+        # Calculate percentile for each candidate
+        for candidate in candidates:
+            ticker = candidate['ticker']
+            stock_return = candidate['relative_strength']['stock_return_3m']
+
+            # Find how many stocks this stock beats
+            stocks_beaten = sum(1 for r in all_returns if r < stock_return)
+
+            # Calculate percentile (0-100)
+            percentile = int((stocks_beaten / total_stocks) * 100)
+
+            # Update candidate with percentile
+            candidate['relative_strength']['rs_percentile'] = percentile
+
+        print(f"   ✓ RS percentiles calculated")
+
+        # Print distribution summary
+        percentile_90plus = sum(1 for c in candidates if c['relative_strength']['rs_percentile'] >= 90)
+        percentile_80to89 = sum(1 for c in candidates if 80 <= c['relative_strength']['rs_percentile'] < 90)
+        percentile_70to79 = sum(1 for c in candidates if 70 <= c['relative_strength']['rs_percentile'] < 80)
+
+        print(f"   RS 90+ (top 10%): {percentile_90plus} stocks")
+        print(f"   RS 80-89 (top 20%): {percentile_80to89} stocks")
+        print(f"   RS 70-79 (top 30%): {percentile_70to79} stocks")
 
     def get_news_score(self, ticker):
         """
@@ -1851,6 +1912,12 @@ class MarketScreener:
 
         print(f"\n   Scan complete: {rs_pass_count}/{universe_size} passed RS filter\n")
 
+        # PHASE 3.1: Calculate IBD-style RS percentile rankings
+        print("=" * 60)
+        print("CALCULATING RS PERCENTILES")
+        print("=" * 60)
+        self.calculate_rs_percentiles(candidates)
+
         # Sort by composite score
         candidates.sort(key=lambda x: x['composite_score'], reverse=True)
 
@@ -1897,10 +1964,10 @@ class MarketScreener:
 
         # Print top 10 summary
         print("\n" + "=" * 80)
-        print("TOP 10 CANDIDATES")
+        print("TOP 10 CANDIDATES (PHASE 3.1: Now showing RS percentile rank)")
         print("=" * 80)
         print(f"Total candidates: {len(scan_output['candidates'])} | Tier 1 catalysts: {tier1_count}\n")
-        print(f"{'Rank':<5} {'Ticker':<7} {'Score':<7} {'Catalyst':<30} {'RS%':<7} Why")
+        print(f"{'Rank':<5} {'Ticker':<7} {'Score':<7} {'RS%':<7} {'RS-Pct':<7} {'Catalyst':<25} Why")
         print("-" * 80)
 
         for candidate in scan_output['candidates'][:10]:
@@ -1908,10 +1975,11 @@ class MarketScreener:
             ticker = candidate['ticker']
             score = candidate['composite_score']
             rs = candidate['relative_strength']['rs_pct']
-            catalyst = (candidate.get('catalyst_tier') or 'None')[:29]  # Truncate, handle None
-            why = candidate['why_selected'][:30]  # Truncate
+            rs_pct = candidate['relative_strength'].get('rs_percentile', 0)  # IBD-style percentile
+            catalyst = (candidate.get('catalyst_tier') or 'None')[:24]  # Truncate, handle None
+            why = candidate['why_selected'][:25]  # Truncate
 
-            print(f"{rank:<5} {ticker:<7} {score:<7.1f} {catalyst:<30} {rs:<7.1f} {why}")
+            print(f"{rank:<5} {ticker:<7} {score:<7.1f} {rs:>+6.1f} {rs_pct:>6} {catalyst:<25} {why}")
 
         print("=" * 80)
 
