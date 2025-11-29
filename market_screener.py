@@ -216,6 +216,9 @@ class MarketScreener:
         # Store all stock returns during scan for percentile calculation
         self.all_stock_returns = {}  # {ticker: 3month_return}
 
+        # PHASE 3.3: Real-time sector classification cache
+        self.sector_cache = {}  # {ticker: sector_name}
+
         if not self.api_key:
             raise ValueError("POLYGON_API_KEY not set in environment")
 
@@ -369,34 +372,127 @@ class MarketScreener:
 
     def get_stock_sector(self, ticker):
         """
-        Determine stock's sector
+        PHASE 3.3: Get stock sector from Polygon API (real-time classification)
 
-        In production, this would query Polygon's ticker details API.
-        For Phase 1, using simple sector mapping.
+        Uses Polygon's ticker details API to get accurate GICS sector classification.
+        Caches results to reduce API calls.
 
-        Returns: Sector name (defaults to 'Technology' if unknown)
+        Returns: Sector name (defaults to 'Technology' if API fails)
         """
-        # Simple sector mapping (expand in production)
-        tech_stocks = ['AAPL', 'MSFT', 'NVDA', 'AVGO', 'ORCL', 'CRM', 'CSCO', 'ADBE', 'ACN', 'AMD',
-                       'INTC', 'IBM', 'TXN', 'QCOM', 'AMAT', 'MU', 'LRCX', 'KLAC', 'SNPS', 'CDNS',
-                       'PLTR', 'NOW', 'PANW', 'FTNT', 'CRWD', 'WDAY', 'TEAM', 'DDOG', 'NET', 'ZS',
-                       'ANET', 'SMCI', 'MRVL', 'ARM', 'SNOW']
-        healthcare = ['LLY', 'UNH', 'JNJ', 'ABBV', 'MRK', 'TMO', 'ABT', 'DHR', 'PFE', 'BMY',
-                      'AMGN', 'GILD', 'CVS', 'CI', 'VRTX', 'REGN', 'HUM', 'ISRG', 'SYK', 'BSX']
-        financials = ['JPM', 'BAC', 'WFC', 'GS', 'MS', 'C', 'BLK', 'SPGI', 'AXP', 'USB',
-                      'PNC', 'TFC', 'SCHW', 'BK', 'COF', 'CME', 'ICE', 'AON', 'MMC', 'MCO', 'COIN', 'SOFI', 'HOOD']
-        consumer_disc = ['AMZN', 'TSLA', 'HD', 'MCD', 'NKE', 'LOW', 'SBUX', 'TJX', 'BKNG', 'ABNB',
-                         'CMG', 'ORLY', 'AZO', 'GM', 'F', 'MAR', 'HLT', 'YUM', 'DRI', 'ULTA',
-                         'SHOP', 'UBER', 'DASH', 'RIVN', 'LCID', 'NIO', 'XPEV', 'LI', 'RBLX']
-        comm_services = ['META', 'GOOGL', 'GOOG', 'NFLX', 'DIS', 'CMCSA', 'VZ', 'T', 'TMUS', 'CHTR']
-        industrials = ['CAT', 'BA', 'UNP', 'HON', 'UPS', 'RTX', 'LMT', 'DE', 'GE', 'MMM',
-                       'GD', 'NOC', 'ETN', 'EMR', 'ITW', 'PH', 'CSX', 'NSC', 'FDX', 'WM']
-        consumer_staples = ['WMT', 'PG', 'COST', 'KO', 'PEP', 'PM', 'MO', 'MDLZ', 'CL', 'KMB',
-                           'GIS', 'K', 'HSY', 'SYY', 'KHC', 'CAG', 'CPB', 'STZ', 'TAP', 'TSN']
-        energy = ['XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO', 'OXY', 'HES']
-        materials = ['LIN', 'APD', 'ECL', 'SHW', 'FCX', 'NEM', 'DD', 'DOW', 'PPG', 'VMC']
-        utilities = ['NEE', 'DUK', 'SO', 'D', 'AEP', 'EXC', 'SRE', 'XEL', 'ED', 'PEG']
-        real_estate = ['PLD', 'AMT', 'EQIX', 'PSA', 'WELL', 'DLR', 'O', 'CBRE', 'SPG', 'AVB']
+        # Check cache first
+        if ticker in self.sector_cache:
+            return self.sector_cache[ticker]
+
+        try:
+            # Query Polygon ticker details API
+            url = f'https://api.polygon.io/v3/reference/tickers/{ticker}'
+            params = {'apiKey': self.api_key}
+
+            response = requests.get(url, params=params, timeout=5)
+            data = response.json()
+
+            if response.status_code == 200 and 'results' in data:
+                # Polygon provides SIC sector description
+                sic_description = data['results'].get('sic_description', '')
+
+                # Map SIC description to our sector ETFs
+                sector = self._map_sic_to_sector(sic_description, ticker)
+
+                # Cache the result
+                self.sector_cache[ticker] = sector
+                return sector
+            else:
+                # API failed, use fallback
+                sector = self._fallback_sector_mapping(ticker)
+                self.sector_cache[ticker] = sector
+                return sector
+
+        except Exception:
+            # Network error or timeout, use fallback
+            sector = self._fallback_sector_mapping(ticker)
+            self.sector_cache[ticker] = sector
+            return sector
+
+    def _map_sic_to_sector(self, sic_description, ticker):
+        """
+        Map Polygon SIC description to our 11 sector categories
+
+        Args:
+            sic_description: SIC industry description from Polygon
+            ticker: Stock ticker (for fallback mapping)
+
+        Returns: Sector name matching SECTOR_ETF_MAP keys
+        """
+        if not sic_description:
+            return self._fallback_sector_mapping(ticker)
+
+        sic = sic_description.lower()
+
+        # Technology
+        if any(keyword in sic for keyword in ['software', 'computer', 'semiconductor', 'electronic', 'internet', 'technology', 'data processing']):
+            return 'Technology'
+
+        # Healthcare
+        if any(keyword in sic for keyword in ['pharma', 'drug', 'medical', 'healthcare', 'hospital', 'biotech', 'health services']):
+            return 'Healthcare'
+
+        # Financials
+        if any(keyword in sic for keyword in ['bank', 'financial', 'insurance', 'investment', 'securities', 'credit', 'mortgage']):
+            return 'Financials'
+
+        # Consumer Discretionary
+        if any(keyword in sic for keyword in ['retail', 'restaurant', 'hotel', 'auto', 'apparel', 'entertainment', 'leisure', 'home improvement']):
+            return 'Consumer Discretionary'
+
+        # Communication Services
+        if any(keyword in sic for keyword in ['telecom', 'communication', 'broadcasting', 'media', 'cable', 'wireless']):
+            return 'Communication Services'
+
+        # Industrials
+        if any(keyword in sic for keyword in ['industrial', 'aerospace', 'defense', 'machinery', 'transportation', 'construction', 'engineering']):
+            return 'Industrials'
+
+        # Consumer Staples
+        if any(keyword in sic for keyword in ['food', 'beverage', 'tobacco', 'household products', 'personal products']):
+            return 'Consumer Staples'
+
+        # Energy
+        if any(keyword in sic for keyword in ['oil', 'gas', 'energy', 'petroleum', 'coal']):
+            return 'Energy'
+
+        # Materials
+        if any(keyword in sic for keyword in ['chemicals', 'metals', 'mining', 'paper', 'packaging', 'materials']):
+            return 'Materials'
+
+        # Utilities
+        if any(keyword in sic for keyword in ['electric', 'utility', 'water', 'natural gas']):
+            return 'Utilities'
+
+        # Real Estate
+        if any(keyword in sic for keyword in ['real estate', 'reit', 'property']):
+            return 'Real Estate'
+
+        # Default fallback
+        return self._fallback_sector_mapping(ticker)
+
+    def _fallback_sector_mapping(self, ticker):
+        """
+        Fallback sector mapping for when Polygon API is unavailable
+
+        Returns: Sector name (defaults to 'Technology')
+        """
+        # Simple hardcoded mapping for common stocks (reduced from full list)
+        tech_stocks = {'AAPL', 'MSFT', 'NVDA', 'AVGO', 'ORCL', 'CRM', 'CSCO', 'ADBE', 'AMD', 'INTC'}
+        healthcare = {'LLY', 'UNH', 'JNJ', 'ABBV', 'MRK', 'TMO', 'ABT', 'DHR', 'PFE', 'BMY'}
+        financials = {'JPM', 'BAC', 'WFC', 'GS', 'MS', 'C', 'BLK', 'SPGI', 'AXP', 'USB'}
+        consumer_disc = {'AMZN', 'TSLA', 'HD', 'MCD', 'NKE', 'LOW', 'SBUX', 'TJX', 'BKNG'}
+        comm_services = {'META', 'GOOGL', 'GOOG', 'NFLX', 'DIS', 'CMCSA', 'VZ', 'T', 'TMUS'}
+        industrials = {'CAT', 'BA', 'UNP', 'HON', 'UPS', 'RTX', 'LMT', 'DE', 'GE', 'MMM'}
+        consumer_staples = {'WMT', 'PG', 'COST', 'KO', 'PEP', 'PM', 'MO', 'MDLZ', 'CL'}
+        energy = {'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO'}
+        materials = {'LIN', 'APD', 'ECL', 'SHW', 'FCX', 'NEM', 'DD', 'DOW'}
+        utilities = {'NEE', 'DUK', 'SO', 'D', 'AEP', 'EXC', 'SRE', 'XEL'}
+        real_estate = {'PLD', 'AMT', 'EQIX', 'PSA', 'WELL', 'DLR', 'O', 'CBRE'}
 
         if ticker in tech_stocks:
             return 'Technology'
