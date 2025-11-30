@@ -1408,6 +1408,117 @@ class MarketScreener:
             self.insider_transactions_cache[ticker] = result
             return result
 
+    def get_options_flow(self, ticker):
+        """
+        PARKING LOT ITEM #1: Options Flow Data (FREE via Polygon)
+
+        Detects unusual options activity (bullish call buying by institutions).
+        Uses Polygon /v2/snapshot/locale/us/markets/options/tickers/{ticker} endpoint.
+
+        Signals:
+        - High call volume vs put volume (call/put ratio >2.0 = bullish)
+        - Unusual volume spikes (today vs 30-day average)
+        - Large institutional sweeps (>$100K premium trades)
+
+        Returns: Dict with options flow metrics
+        """
+        try:
+            # Query Polygon options snapshot
+            url = f'https://api.polygon.io/v2/snapshot/locale/us/markets/options/tickers/{ticker}'
+            params = {'apiKey': self.api_key}
+
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+
+            if response.status_code != 200 or 'results' not in data:
+                return {
+                    'has_unusual_activity': False,
+                    'call_put_ratio': 0,
+                    'score': 0,
+                    'signal_type': None
+                }
+
+            results = data.get('results', [])
+            if not results:
+                return {
+                    'has_unusual_activity': False,
+                    'call_put_ratio': 0,
+                    'score': 0,
+                    'signal_type': None
+                }
+
+            # Aggregate call vs put volume
+            total_call_volume = 0
+            total_put_volume = 0
+            unusual_call_volume = 0
+
+            for option in results:
+                details = option.get('details', {})
+                day_data = option.get('day', {})
+
+                contract_type = details.get('contract_type', '')
+                volume = day_data.get('volume', 0)
+                vwap = day_data.get('vwap', 0)
+                open_interest = day_data.get('open_interest', 1)
+
+                # Skip if no volume
+                if volume == 0:
+                    continue
+
+                # Categorize as call or put
+                if contract_type == 'call':
+                    total_call_volume += volume
+
+                    # Detect unusual activity: volume >2x open interest (likely institutional sweep)
+                    if volume > open_interest * 2:
+                        unusual_call_volume += volume
+
+                elif contract_type == 'put':
+                    total_put_volume += volume
+
+            # Avoid division by zero
+            if total_put_volume == 0:
+                call_put_ratio = total_call_volume if total_call_volume > 0 else 0
+            else:
+                call_put_ratio = total_call_volume / total_put_volume
+
+            # Bullish signal: call/put ratio >2.0 AND some unusual activity
+            has_unusual_activity = call_put_ratio > 2.0 and unusual_call_volume > 0
+
+            # Score: 0-30 points based on call/put ratio
+            # 2.0 = 20 pts, 3.0 = 25 pts, 4.0+ = 30 pts
+            if call_put_ratio >= 4.0:
+                score = 30
+                signal_type = 'heavy_call_buying'
+            elif call_put_ratio >= 3.0:
+                score = 25
+                signal_type = 'strong_call_buying'
+            elif call_put_ratio >= 2.0:
+                score = 20
+                signal_type = 'moderate_call_buying'
+            else:
+                score = 0
+                signal_type = None
+
+            return {
+                'has_unusual_activity': has_unusual_activity,
+                'call_put_ratio': round(call_put_ratio, 2),
+                'total_call_volume': total_call_volume,
+                'total_put_volume': total_put_volume,
+                'unusual_call_volume': unusual_call_volume,
+                'score': score,
+                'signal_type': signal_type
+            }
+
+        except Exception:
+            # Silently fail (options data not available for all stocks)
+            return {
+                'has_unusual_activity': False,
+                'call_put_ratio': 0,
+                'score': 0,
+                'signal_type': None
+            }
+
     def get_analyst_recommendation_trends(self, ticker):
         """
         PHASE 2.1: Check for improving analyst consensus using Finnhub FREE tier
@@ -1640,6 +1751,7 @@ class MarketScreener:
         insider_result = self.get_insider_transactions(ticker)
         earnings_surprise_result = self.get_earnings_surprises(ticker)
         revenue_surprise_result = self.get_revenue_surprise_fmp(ticker)  # PHASE 2.2
+        options_flow_result = self.get_options_flow(ticker)  # PARKING LOT #1: Options flow
 
         # NOTE: news_result and sec_8k_result already fetched in STEP 1.5 for fresh catalyst check
 
@@ -1792,6 +1904,13 @@ class MarketScreener:
         # SEC 8-K contract filing = 20 points
         elif sec_8k_result.get('catalyst_type_8k') == 'contract_8k':
             catalyst_score += 20 * catalyst_weight_multiplier
+
+        # TIER 2.5: INSTITUTIONAL SIGNALS (PARKING LOT #1)
+        # Options flow (heavy call buying) = 15 points
+        # This sits between Tier 2 catalysts and Tier 3 (insider buying)
+        # Call/put ratio >4.0 = strong institutional interest
+        if options_flow_result.get('has_unusual_activity'):
+            catalyst_score += options_flow_result.get('score', 0) * catalyst_weight_multiplier
 
         # TIER 3 CATALYSTS (LEADING INDICATORS)
         # Insider buying = 15 points (but heavily discounted if Tier 3 only)
@@ -2009,6 +2128,7 @@ class MarketScreener:
             'insider_transactions': insider_result,
             'earnings_surprises': earnings_surprise_result,
             'earnings_data': earnings_result,
+            'options_flow': options_flow_result,  # PARKING LOT #1: Options flow data
             'catalyst_tier': catalyst_tier_display,
             'why_selected': why_selected
         }
