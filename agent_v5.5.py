@@ -2564,7 +2564,9 @@ POSITION {i}: {ticker}
                 'details': {}
             }
 
-    def calculate_conviction_level(self, catalyst_tier, news_score, vix, relative_strength, multi_catalyst=False):
+    def calculate_conviction_level(self, catalyst_tier, news_score, vix, relative_strength, multi_catalyst=False,
+                                   rs_percentile=None, sector_leading=False, sector_vs_spy=0,
+                                   options_flow=None, dark_pool=None, revenue_beat=False):
         """
         Determine conviction level based on multiple factors
 
@@ -2580,6 +2582,12 @@ POSITION {i}: {ticker}
             vix: VIX level
             relative_strength: Stock's 3M performance vs sector (%)
             multi_catalyst: Boolean, are there multiple catalysts?
+            rs_percentile: IBD-style RS percentile rank (0-100) [NEW]
+            sector_leading: Boolean, is stock's sector leading the market? [NEW]
+            sector_vs_spy: Sector performance vs SPY (%) [NEW]
+            options_flow: Dict with options flow data [NEW]
+            dark_pool: Dict with dark pool activity data [NEW]
+            revenue_beat: Boolean, did stock beat on revenue too? [NEW]
 
         Returns:
             {
@@ -2618,6 +2626,36 @@ POSITION {i}: {ticker}
         if multi_catalyst:
             supporting_factors += 1
             reasoning_parts.append('Multi-catalyst synergy')
+
+        # ENHANCEMENT 1: RS Percentile Boost (market-wide ranking)
+        if rs_percentile is not None:
+            if rs_percentile >= 90:  # Top 10% of ALL stocks
+                supporting_factors += 2  # DOUBLE WEIGHT for market leaders
+                reasoning_parts.append(f'Market leader (RS {rs_percentile}th percentile)')
+            elif rs_percentile >= 80:  # Top 20%
+                supporting_factors += 1
+                reasoning_parts.append(f'Strong RS ({rs_percentile}th percentile)')
+
+        # ENHANCEMENT 2: Leading Sector Preference
+        if sector_leading and sector_vs_spy > 2.0:
+            supporting_factors += 1
+            reasoning_parts.append(f'Leading sector ({sector_vs_spy:+.1f}% vs SPY)')
+
+        # ENHANCEMENT 3: Institutional Signals (options flow + dark pool)
+        if options_flow and options_flow.get('has_unusual_activity'):
+            supporting_factors += 1
+            signal = options_flow.get('signal_type', 'unusual_activity')
+            reasoning_parts.append(f'Options flow: {signal}')
+
+        if dark_pool and dark_pool.get('has_unusual_activity'):
+            supporting_factors += 1
+            signal = dark_pool.get('signal_type', 'accumulation')
+            reasoning_parts.append(f'Dark pool: {signal}')
+
+        # ENHANCEMENT 4: Revenue Beat Confirmation (stronger PED signal)
+        if revenue_beat:
+            supporting_factors += 1
+            reasoning_parts.append('EPS + Revenue beat (strong PED)')
 
         # REQUIRED FILTERS (auto-reject if failed)
         if relative_strength < 3.0:
@@ -4614,6 +4652,23 @@ RECENT LESSONS LEARNED:
         validated_buys = []
         all_picks = []  # Track all picks (accepted + rejected) for dashboard - ALWAYS initialize
 
+        # Load screener data for enhanced conviction factors
+        screener_data = self.load_screener_candidates()
+        screener_lookup = {}
+        sector_rotation = {}
+
+        if screener_data:
+            # Create ticker lookup for fast access to screener candidate data
+            for candidate in screener_data.get('candidates', []):
+                screener_lookup[candidate['ticker']] = candidate
+
+            # Extract sector rotation data
+            sector_rotation = screener_data.get('sector_rotation', {})
+            leading_sectors = sector_rotation.get('leading_sectors', [])
+            print(f"   ℹ️  Loaded screener data: {len(screener_lookup)} candidates, Leading sectors: {', '.join(leading_sectors) if leading_sectors else 'None'}")
+        else:
+            print(f"   ⚠️  No screener data available - conviction scoring will use limited factors")
+
         if original_buy_positions:
             print("5.5 Validating BUY recommendations (Phases 1-4: Full validation pipeline)...")
 
@@ -4800,12 +4855,31 @@ RECENT LESSONS LEARNED:
 
                     # Calculate conviction level (determines final position size)
                     multi_catalyst = catalyst_type == 'Multi_Catalyst' or catalyst_details.get('multi_catalyst', False)
+
+                    # Extract enhanced data from screener if available
+                    screener_candidate = screener_lookup.get(ticker, {})
+                    rs_percentile = screener_candidate.get('relative_strength', {}).get('rs_percentile')
+                    options_flow = screener_candidate.get('options_flow')
+                    dark_pool = screener_candidate.get('dark_pool')
+                    revenue_beat = screener_candidate.get('revenue_surprise', {}).get('has_beat', False)
+
+                    # Check if stock's sector is leading
+                    sector_perf = sector_rotation.get('sector_performance', {}).get(sector, {})
+                    sector_leading = sector_perf.get('is_leading', False)
+                    sector_vs_spy = sector_perf.get('vs_spy', 0)
+
                     conviction_result = self.calculate_conviction_level(
                         catalyst_tier=tier_result['tier'],
                         news_score=news_result['score'],
                         vix=vix_result['vix'],
                         relative_strength=rs_result['relative_strength'],
-                        multi_catalyst=multi_catalyst
+                        multi_catalyst=multi_catalyst,
+                        rs_percentile=rs_percentile,
+                        sector_leading=sector_leading,
+                        sector_vs_spy=sector_vs_spy,
+                        options_flow=options_flow,
+                        dark_pool=dark_pool,
+                        revenue_beat=revenue_beat
                     )
 
                     # Conviction may downgrade to SKIP based on factors
