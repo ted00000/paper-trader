@@ -1519,6 +1519,96 @@ class MarketScreener:
                 'signal_type': None
             }
 
+    def get_dark_pool_activity(self, ticker):
+        """
+        PARKING LOT ITEM #3: Dark Pool Activity Tracking (FREE via Polygon)
+
+        Detects institutional block trades by analyzing volume spikes.
+        Dark pools = private exchanges where institutions execute large orders
+        to avoid moving the market price.
+
+        Detection method:
+        - Compare recent volume to 30-day average volume
+        - Spike >1.5x average = moderate institutional activity
+        - Spike >2.0x average = heavy institutional accumulation
+
+        Returns: Dict with dark pool activity metrics
+        """
+        try:
+            # Get aggregated bars for last 30 days (daily bars)
+            url = f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{(datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")}/{datetime.now().strftime("%Y-%m-%d")}'
+            params = {'apiKey': self.api_key}
+
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+
+            if response.status_code != 200 or 'results' not in data:
+                return {
+                    'has_unusual_activity': False,
+                    'volume_spike_ratio': 0,
+                    'score': 0,
+                    'signal_type': None
+                }
+
+            results = data.get('results', [])
+            if len(results) < 5:
+                # Not enough data
+                return {
+                    'has_unusual_activity': False,
+                    'volume_spike_ratio': 0,
+                    'score': 0,
+                    'signal_type': None
+                }
+
+            # Calculate average volume (exclude most recent day)
+            volumes = [bar['v'] for bar in results[:-1]]
+            avg_volume = sum(volumes) / len(volumes)
+
+            # Get most recent day's volume
+            recent_volume = results[-1]['v']
+
+            # Calculate spike ratio
+            if avg_volume == 0:
+                volume_spike_ratio = 0
+            else:
+                volume_spike_ratio = recent_volume / avg_volume
+
+            # Detect unusual activity (volume spike >1.5x = institutional interest)
+            has_unusual_activity = volume_spike_ratio >= 1.5
+
+            # Score: 0-25 points based on volume spike
+            # 1.5x = 15 pts, 2.0x = 20 pts, 2.5x+ = 25 pts
+            if volume_spike_ratio >= 2.5:
+                score = 25
+                signal_type = 'heavy_accumulation'
+            elif volume_spike_ratio >= 2.0:
+                score = 20
+                signal_type = 'strong_accumulation'
+            elif volume_spike_ratio >= 1.5:
+                score = 15
+                signal_type = 'moderate_accumulation'
+            else:
+                score = 0
+                signal_type = None
+
+            return {
+                'has_unusual_activity': has_unusual_activity,
+                'volume_spike_ratio': round(volume_spike_ratio, 2),
+                'recent_volume': recent_volume,
+                'avg_volume': int(avg_volume),
+                'score': score,
+                'signal_type': signal_type
+            }
+
+        except Exception:
+            # Silently fail (volume data not available for all stocks)
+            return {
+                'has_unusual_activity': False,
+                'volume_spike_ratio': 0,
+                'score': 0,
+                'signal_type': None
+            }
+
     def get_analyst_recommendation_trends(self, ticker):
         """
         PHASE 2.1: Check for improving analyst consensus using Finnhub FREE tier
@@ -1752,6 +1842,7 @@ class MarketScreener:
         earnings_surprise_result = self.get_earnings_surprises(ticker)
         revenue_surprise_result = self.get_revenue_surprise_fmp(ticker)  # PHASE 2.2
         options_flow_result = self.get_options_flow(ticker)  # PARKING LOT #1: Options flow
+        dark_pool_result = self.get_dark_pool_activity(ticker)  # PARKING LOT #3: Dark pool activity
 
         # NOTE: news_result and sec_8k_result already fetched in STEP 1.5 for fresh catalyst check
 
@@ -1905,12 +1996,16 @@ class MarketScreener:
         elif sec_8k_result.get('catalyst_type_8k') == 'contract_8k':
             catalyst_score += 20 * catalyst_weight_multiplier
 
-        # TIER 2.5: INSTITUTIONAL SIGNALS (PARKING LOT #1)
-        # Options flow (heavy call buying) = 15 points
+        # TIER 2.5: INSTITUTIONAL SIGNALS (PARKING LOT #1 & #3)
+        # Options flow (heavy call buying) = 15-30 points
+        # Dark pool activity (volume spikes) = 15-25 points
         # This sits between Tier 2 catalysts and Tier 3 (insider buying)
         # Call/put ratio >4.0 = strong institutional interest
+        # Volume spike >2.0x = heavy accumulation
         if options_flow_result.get('has_unusual_activity'):
             catalyst_score += options_flow_result.get('score', 0) * catalyst_weight_multiplier
+        if dark_pool_result.get('has_unusual_activity'):
+            catalyst_score += dark_pool_result.get('score', 0) * catalyst_weight_multiplier
 
         # TIER 3 CATALYSTS (LEADING INDICATORS)
         # Insider buying = 15 points (but heavily discounted if Tier 3 only)
@@ -2129,6 +2224,7 @@ class MarketScreener:
             'earnings_surprises': earnings_surprise_result,
             'earnings_data': earnings_result,
             'options_flow': options_flow_result,  # PARKING LOT #1: Options flow data
+            'dark_pool': dark_pool_result,  # PARKING LOT #3: Dark pool activity
             'catalyst_tier': catalyst_tier_display,
             'why_selected': why_selected
         }
