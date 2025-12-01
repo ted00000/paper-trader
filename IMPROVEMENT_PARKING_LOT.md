@@ -2,7 +2,145 @@
 
 **Purpose**: Track deferred/skipped improvements for future consideration
 
-**Last Updated**: November 30, 2024
+**Last Updated**: December 1, 2024
+
+---
+
+## 🎯 Institutional-Grade Roadmap (From Third-Party Review - Dec 2024)
+
+**Context**: Third-party reviewer assessed Tedbot as "institutional-style" but not yet "institutional-grade" for serious capital deployment. Below are remaining gaps to cross that threshold.
+
+**Current Status**: Phase 4 completed - we've already addressed 75% of the reviewer's concerns!
+- ✅ Market breadth filter (4.2) - They wanted this, we built it
+- ✅ Liquidity constraints (4.4) - They wanted this, we built it
+- ✅ Cluster-based conviction (4.1) - They wanted this, we built it
+- ✅ Sector concentration reduction (4.3) - Exceeds their ask
+
+### Priority 1: AI Robustness & Failover (HIGH PRIORITY)
+**Status**: Not implemented
+**Reviewer concern**: "What happens when the LLM goes sideways one day?"
+**What it is**: Fallback logic when Claude API fails, times out, or returns unexpected output
+
+**Implementation**:
+1. **Degraded Mode Logic**:
+   - If Claude unavailable → Use purely rule-based filters
+   - Skip news-dependent setups (FDA, M&A need AI validation)
+   - Only execute high-confidence technical setups:
+     - Earnings beats (>20%) + RS ≥90 + Volume >2x + Stage 2 + Leading sector
+     - No news validation required for pure earnings plays
+2. **Health Checks**:
+   - Log every Claude API call with latency/success metrics
+   - Alert if >3 consecutive failures
+   - Alert if response time >30 seconds
+3. **Output Validation**:
+   - Verify Claude returns valid JSON structure
+   - Check conviction scores are in valid range (0-11)
+   - Flag if news scores are extreme (>20 or <0)
+
+**Effort**: 6-8 hours
+**Cost**: $0
+**Expected impact**: Institutional-grade robustness, no single point of failure
+**Risk mitigation**: Prevents catastrophic failure if Anthropic has outage
+
+**When to implement**: **NEXT** (before marketing to serious users)
+
+---
+
+### Priority 2: Operational Monitoring & Health Checks (MEDIUM-HIGH)
+**Status**: Partial (logs exist, no active monitoring)
+**Reviewer concern**: "Institutions care about monitoring, alerting, change management"
+
+**Implementation**:
+1. **Health Checks** (2-3 hours):
+   - Cron job monitoring (alerts if GO/EXECUTE/ANALYZE don't run)
+   - API connectivity checks (Polygon, FMP, Claude)
+   - Data freshness checks (screener data updated in last 24 hours?)
+2. **Alerting System** (2-3 hours):
+   - Discord webhook for critical errors (free)
+   - Daily summary: trades executed, positions held, P&L
+   - Error alerts: API failures, execution failures, data gaps
+3. **Version Control & Change Tracking** (1-2 hours):
+   - Add version tag to every trade in CSV (`system_version: v5.6`)
+   - Track code changes in CHANGELOG.md
+   - Link performance degradation to specific versions
+
+**Effort**: 5-8 hours total
+**Cost**: $0
+**Expected impact**: Professional-grade operations, catch issues early
+**When to implement**: Next 2-4 weeks (before live money)
+
+---
+
+### Priority 3: Track Record & Evidence Layer (CRITICAL FOR MARKETING)
+**Status**: Running in paper trading, no public portfolio
+**Reviewer concern**: "Without 6-12 months live results, can't claim 'best-in-class'"
+
+**Implementation**:
+1. **Public Model Portfolio** (4-6 hours):
+   - Dashboard card showing YTD/MTD performance
+   - Win rate, avg gain/loss, max drawdown, Sharpe
+   - Trade count, conviction distribution
+   - Updated daily at 5pm ET
+2. **Performance History** (2-3 hours):
+   - Monthly snapshots saved to JSON
+   - Performance across different regimes (VIX <20, 20-30, >30)
+   - Sector attribution (which sectors performed best)
+3. **Out-of-Sample Results** (ongoing):
+   - Run system for 6-12 months without tweaking
+   - Document all regime changes (bull, bear, chop)
+   - Prove consistency across market conditions
+
+**Effort**: 6-9 hours initial build, then ongoing data collection
+**Cost**: $0
+**Expected impact**: **REQUIRED** for subscription product credibility
+**Timeline**: Need 6-12 months of continuous results
+
+**When to implement**: Dashboard updates NOW, then let it run for 6+ months
+
+---
+
+### Priority 4: Retail Safety Wrapper (MEDIUM PRIORITY)
+**Status**: Not implemented
+**Reviewer concern**: "Average user could blow themselves up with wrong settings"
+
+**Implementation**:
+1. **Risk Modes** (3-4 hours):
+   - **Conservative**: 0.6x position sizing multiplier, VIX <25 only
+   - **Standard**: 1.0x (current behavior)
+   - **Aggressive**: 1.2x, allows VIX 25-30 trades
+2. **Portfolio-Level Stops** (2-3 hours):
+   - Max daily loss: -3% portfolio → stop trading for the day
+   - Max drawdown: -10% from peak → email alert, manual review required
+3. **Capital Allocation Limits** (1 hour):
+   - Default: System only trades 30% of account (protect capital)
+   - User can adjust 20-50% range
+   - Hard cap: Never exceed 50% account deployed
+
+**Effort**: 6-8 hours
+**Cost**: $0
+**Expected impact**: Prevent user misconfigurations, reduce support burden
+**When to implement**: Before public beta launch (3-6 months)
+
+---
+
+### Priority 5: Slippage Modeling & Cost Assumptions (LOW PRIORITY)
+**Status**: Not explicitly modeled
+**Reviewer concern**: "Model at least 0.2-0.5% slippage per trade in backtests"
+
+**Current reality**:
+- ✅ We filter for $20M+ daily volume (Phase 4.4)
+- ✅ Typical slippage on liquid names: 0.1-0.3%
+- ❌ Not explicitly modeled in P&L calculations
+
+**Implementation**:
+1. Add slippage assumption to trade logging (0.25% per trade)
+2. Adjust reported returns by -0.5% per round trip (in/out)
+3. Document assumptions in performance reports
+
+**Effort**: 1-2 hours
+**Cost**: $0
+**Expected impact**: More conservative/realistic performance reporting
+**When to implement**: Before publishing official track record (6+ months)
 
 ---
 
