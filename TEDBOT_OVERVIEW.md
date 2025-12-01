@@ -389,7 +389,7 @@ Day 6: $112.70 → TRAILING STOP HIT, EXIT at $112.70 (+12.7%)
 3. **Institutional Activity Signals** (Enhancement 3.3) - Options flow + dark pool tracking
 4. **GO Command Integration** (Enhancement 3.4) - Enhanced conviction scoring with Phase 3 data
 
-### Phase 4: Risk Optimization & Anti-Overlap (4 Enhancements) ✅ COMPLETED
+### Phase 4: Risk Optimization & Anti-Overlap (6 Enhancements) ✅ COMPLETED
 1. **Cluster-Based Conviction Scoring** (Enhancement 4.1) - Prevent double-counting correlated signals
    - Groups factors into 4 clusters: Momentum (cap +3), Institutional (cap +2), Catalyst (no cap), Market (cap +2)
    - Reduces max score from 14+ → 11 factors
@@ -403,6 +403,15 @@ Day 6: $112.70 → TRAILING STOP HIT, EXIT at $112.70 (+12.7%)
 4. **Liquidity Filter** (Enhancement 4.4) - Prevent execution slippage
    - Minimum $20M average daily dollar volume
    - Filters low-liquidity stocks at screener level
+5. **VIX Regime Logging** (Enhancement 4.5) - Track market conditions for learning & attribution
+   - Classifies VIX into 5 regimes: VERY_LOW (<15), LOW (15-20), ELEVATED (20-25), HIGH (25-30), EXTREME (≥30)
+   - Logs VIX_Regime and Market_Breadth_Regime to CSV for every trade
+   - Enables performance analysis across different market conditions
+6. **AI Robustness & Failover** (Enhancement 4.6) - Graceful degradation when Claude API fails
+   - GO command failure → HOLD existing positions, skip new entries
+   - ANALYZE command failure → Skip commentary, core operations completed
+   - Logs all failures to logs/claude_api_failures.json
+   - Automatic retry on next command execution
 
 ---
 
@@ -460,7 +469,7 @@ Analyzes past performance across multiple dimensions:
 - Risk: Stop Loss, Price Target, Max Drawdown
 - Technical: 50-day MA, 5/20 EMA, ADX, Volume Ratio, Volume Quality, RS Rating
 - Conviction: Level, Supporting Factors Count
-- Market: VIX at Entry, Market Regime, Macro Events
+- Market: VIX at Entry, Market Regime, Macro Events, VIX_Regime, Market_Breadth_Regime (Phase 4.5)
 - Exit: Reason, What Worked, What Failed
 - Rotation: Rotation Into Ticker, Rotation Reason (if applicable)
 
@@ -533,6 +542,7 @@ Analyzes past performance across multiple dimensions:
 11. **Quantitative + Qualitative**: Combines technical filters with AI reasoning
 12. **Full Transparency**: Every decision logged and traceable
 13. **Continuous Learning**: Performance attribution guides optimization
+14. **AI Failover Safety**: Graceful degradation when Claude API unavailable (no catastrophic trades)
 
 ---
 
@@ -624,14 +634,16 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 ---
 
 **Last Updated**: December 1, 2024
-**Version**: v5.6 (Phase 0-4 Complete: 22 Enhancements)
+**Version**: v5.6 (Phase 0-4 Complete: 24 Enhancements)
 **Status**: Live in production paper trading
 
-**Latest Updates (Phase 4 - Risk Optimization)**:
+**Latest Updates (Phase 4 - Risk Optimization & Institutional Enhancements)**:
 - ✅ Phase 4.1: Cluster-based conviction scoring (prevents double-counting correlated signals)
 - ✅ Phase 4.2: Market breadth & trend filter (regime-based position sizing)
 - ✅ Phase 4.3: Sector concentration reduction (max 2 per sector, 3 in leading sectors)
 - ✅ Phase 4.4: Liquidity filter (min $20M daily volume prevents slippage)
+- ✅ Phase 4.5: VIX regime logging (tracks market conditions for learning & attribution)
+- ✅ Phase 4.6: AI robustness & failover (graceful degradation when Claude API fails)
 
 **Previous Updates**:
 - ✅ Phase 3: IBD-style RS percentile ranking, sector rotation detection, institutional signals
