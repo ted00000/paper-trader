@@ -83,6 +83,12 @@ Tedbot is an AI-powered catalyst-driven swing trading system that uses Claude (A
    - **Dark Pool Activity**: Volume spikes >1.5x average (institutional accumulation)
    - Adds conviction when institutions are buying
 
+8. **Liquidity Filter** (Phase 4.4)
+   - **Minimum $20M average daily dollar volume**
+   - Prevents execution slippage on low-liquidity stocks
+   - Filters at screener level before GO command sees candidates
+   - Typical slippage on sub-$20M names: 1-3% per trade
+
 **Output**: List of catalyst-driven candidates saved to `screener_candidates.json` with enhanced metadata
 
 ---
@@ -111,30 +117,44 @@ Tedbot is an AI-powered catalyst-driven swing trading system that uses Claude (A
    - Scans for Fed meetings, CPI reports, FOMC within 48 hours
    - Adjusts position sizing or skips trades during high-impact events
 
-4. **Conviction Scoring** (Enhanced with Phase 3 Data)
-   - **Supporting Factors** (count determines conviction):
-     - Tier 1 catalyst: +1 factor
-     - RS >7% (sector outperformance): +1 factor
-     - **RS ≥90th percentile (market leader)**: +2 factors (DOUBLE WEIGHT)
-     - **RS 80-89th percentile**: +1 factor
-     - **Leading sector (+2% vs SPY)**: +1 factor
-     - Fresh news (<24hrs): +1 factor
-     - Volume >2x average: +1 factor
-     - News score >15/20: +1 factor
-     - ADX >25 (strong trend): +1 factor
-     - VIX <20 (normal conditions): +1 factor
-     - Multi-catalyst: +1 factor
-     - **Unusual options flow**: +1 factor (Phase 3.3)
-     - **Dark pool accumulation**: +1 factor (Phase 3.3)
-     - **Revenue beat (EPS + Revenue)**: +1 factor
+4. **Market Breadth & Trend Filter** (Phase 4.2)
+   - **SPY Trend Check**: Price above 50-day and 200-day MAs
+   - **Market Breadth**: % of stocks above 50-day MA (from screener data)
+   - **Three Regimes**:
+     - **HEALTHY** (SPY uptrend + breadth ≥50%): 100% position sizing
+     - **DEGRADED** (SPY above 50d + breadth ≥40%): 80% position sizing
+     - **UNHEALTHY** (otherwise): 60% position sizing
+   - Prevents trading during rotational/choppy markets
+   - Applied as multiplier to base conviction sizing
 
-   - **Conviction Levels**:
+5. **Conviction Scoring** (Phase 4.1 - Cluster-Based)
+   - **Prevents double-counting correlated signals via clustering**
+   - **Momentum Cluster** (cap +3):
+     - RS ≥90th percentile: +2 factors (DOUBLE WEIGHT)
+     - RS 80-89th percentile: +1 factor
+     - RS >7% sector outperformance: +1 factor
+     - Leading sector (+2% vs SPY): +1 factor
+   - **Institutional Cluster** (cap +2):
+     - Unusual options flow: +1 factor
+     - Dark pool accumulation: +1 factor
+   - **Catalyst Cluster** (no cap - independent signals):
+     - Tier 1 catalyst: +1 factor
+     - Multi-catalyst: +1 factor
+     - Revenue beat (EPS + Revenue): +1 factor
+     - News score >15/20: +1 factor
+   - **Market Conditions Cluster** (cap +2):
+     - VIX <20: +1 factor
+   - **Maximum possible score**: 11 factors (down from 14+ in Phase 3)
+
+   - **Conviction Levels** (base sizing, before market breadth adjustment):
      - **HIGH** (7+ factors): 13% position size
      - **MEDIUM-HIGH** (5-6 factors): 11% position size
      - **MEDIUM** (3-4 factors): 10% position size
      - **SKIP** (<3 factors): Pass on trade
+   - **Final Position Size** = Base Size × Market Breadth Adjustment
+   - **Example**: HIGH conviction (13%) in DEGRADED market = 13% × 0.8 = 10.4% actual position
 
-5. **Dynamic Profit Targets** (Enhancement 1.2)
+6. **Dynamic Profit Targets** (Enhancement 1.2)
    - **M&A targets**: +15% (stretch +20%)
    - **FDA approvals**: +15% (stretch +25%)
    - **Big earnings beats** (>20%): +12% (stretch +15%)
@@ -190,11 +210,18 @@ Tedbot is an AI-powered catalyst-driven swing trading system that uses Claude (A
    - **Gap 5-8%**: Wait for 1-day consolidation
    - **Gap >8%**: Skip (too extended, high reversal risk)
 
-4. **Position Sizing** (Enhanced Phase 3)
-   - HIGH conviction (7+ factors): 13% of account ($130)
-   - MEDIUM-HIGH (5-6 factors): 11% of account ($110)
-   - MEDIUM (3-4 factors): 10% of account ($100)
-   - SKIP (<3 factors): Pass on trade
+4. **Position Sizing** (Enhanced Phase 4)
+   - **Base Conviction Sizing**:
+     - HIGH (7+ factors): 13% base
+     - MEDIUM-HIGH (5-6 factors): 11% base
+     - MEDIUM (3-4 factors): 10% base
+   - **Market Breadth Adjustment** (Phase 4.2):
+     - HEALTHY market: 1.0x (no adjustment)
+     - DEGRADED market: 0.8x (reduce by 20%)
+     - UNHEALTHY market: 0.6x (reduce by 40%)
+   - **Final Position Size** = Base × Breadth Adjustment
+   - **Effective Range**: 6% (MEDIUM in UNHEALTHY) to 13% (HIGH in HEALTHY)
+   - **Example**: HIGH conviction (13%) + DEGRADED market → 13% × 0.8 = 10.4% actual
 
 5. **Stop Loss Calculation**
    - **Standard**: -7% from entry
@@ -356,11 +383,26 @@ Day 6: $112.70 → TRAILING STOP HIT, EXIT at $112.70 (+12.7%)
 3. **Portfolio Rebalancing** (Enhancement 2.3) - Quantitative rotation
 4. **Performance Attribution** (Enhancement 2.4) - Track what works
 
-### Phase 3: RS & Sector Intelligence (3 Enhancements) ✅ COMPLETED
+### Phase 3: RS & Sector Intelligence (4 Enhancements) ✅ COMPLETED
 1. **IBD-Style RS Percentile Ranking** (Enhancement 3.1) - Market-wide 0-100 ranking vs all stocks
 2. **Sector Rotation Detection** (Enhancement 3.2) - Track 11 sectors vs SPY, prioritize leading sectors
 3. **Institutional Activity Signals** (Enhancement 3.3) - Options flow + dark pool tracking
 4. **GO Command Integration** (Enhancement 3.4) - Enhanced conviction scoring with Phase 3 data
+
+### Phase 4: Risk Optimization & Anti-Overlap (4 Enhancements) ✅ COMPLETED
+1. **Cluster-Based Conviction Scoring** (Enhancement 4.1) - Prevent double-counting correlated signals
+   - Groups factors into 4 clusters: Momentum (cap +3), Institutional (cap +2), Catalyst (no cap), Market (cap +2)
+   - Reduces max score from 14+ → 11 factors
+2. **Market Breadth & Trend Filter** (Enhancement 4.2) - Regime-based position sizing
+   - SPY trend + market breadth analysis
+   - Three regimes: HEALTHY (1.0x), DEGRADED (0.8x), UNHEALTHY (0.6x)
+   - Prevents overtrading in rotational/choppy markets
+3. **Sector Concentration Reduction** (Enhancement 4.3) - Reduce correlated drawdown risk
+   - Max 2 positions per sector (down from 3)
+   - Exception: Allow 3 in top 2 leading sectors (+2% vs SPY)
+4. **Liquidity Filter** (Enhancement 4.4) - Prevent execution slippage
+   - Minimum $20M average daily dollar volume
+   - Filters low-liquidity stocks at screener level
 
 ---
 
@@ -438,14 +480,20 @@ Analyzes past performance across multiple dimensions:
 ## Risk Management Framework
 
 ### Position-Level Risk:
-- **Max position size**: 8% (HIGH conviction only)
+- **Position sizing** (Phase 4):
+  - Base: 10-13% (MEDIUM to HIGH conviction)
+  - Market breadth adjustment: 0.6x-1.0x multiplier
+  - **Effective range**: 6% (MEDIUM in UNHEALTHY) to 13% (HIGH in HEALTHY)
+  - **Typical max**: ~10-11% in normal/degraded markets
 - **Stop loss**: -7% standard, -5% for gap entries
 - **Max hold time**: 7 days standard, 60 days for PED
 
 ### Portfolio-Level Risk:
 - **Max positions**: 10 (diversification)
-- **Sector concentration**: Max 3 positions per sector
+- **Sector concentration** (Phase 4.3): Max 2 positions per sector (3 allowed in top 2 leading sectors)
 - **Sector rotation aware**: Prioritize leading sectors (+2% vs SPY)
+- **Market breadth filter** (Phase 4.2): Reduces exposure in rotational/choppy markets
+- **Liquidity floor** (Phase 4.4): Min $20M daily dollar volume (prevents slippage)
 - **Market regime**: SHUTDOWN at VIX >30
 - **Macro events**: Reduce sizing during Fed/CPI
 
@@ -477,11 +525,14 @@ Analyzes past performance across multiple dimensions:
 3. **Market-Wide RS Ranking**: IBD-style percentile scoring (only trades top 20% of stocks)
 4. **Sector Rotation Awareness**: Prioritizes stocks from leading sectors (+2% vs SPY)
 5. **Institutional Signal Detection**: Tracks options flow and dark pool activity (FREE via Polygon)
-6. **Adaptive Position Sizing**: 10-13% sizing based on conviction (up to 14 supporting factors)
-7. **Let Winners Run**: Trailing stops capture extended moves
-8. **Quantitative + Qualitative**: Combines technical filters with AI reasoning
-9. **Full Transparency**: Every decision logged and traceable
-10. **Continuous Learning**: Performance attribution guides optimization
+6. **Cluster-Based Conviction**: Prevents double-counting correlated signals (max 11 factors, down from 14+)
+7. **Market Breadth Filter**: Regime-based position sizing (HEALTHY/DEGRADED/UNHEALTHY)
+8. **Adaptive Position Sizing**: 6-13% sizing based on conviction + market conditions
+9. **Liquidity-Aware**: $20M minimum volume filter prevents execution slippage
+10. **Let Winners Run**: Trailing stops capture extended moves
+11. **Quantitative + Qualitative**: Combines technical filters with AI reasoning
+12. **Full Transparency**: Every decision logged and traceable
+13. **Continuous Learning**: Performance attribution guides optimization
 
 ---
 
@@ -559,7 +610,7 @@ A: Target +12-15% on winners (up from +8% baseline), -4% on losers.
 A: Average 3-7 days. Post-earnings drift positions: 30-60 days.
 
 **Q: What sectors does it trade?**
-A: Any sector, but limits to max 3 positions per sector to avoid concentration risk.
+A: Any sector, but limits to max 2 positions per sector to avoid concentration risk (3 allowed in top 2 leading sectors).
 
 **Q: Can it trade options?**
 A: No, stock-only for now. Options require different risk management.
@@ -572,12 +623,18 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: November 30, 2024
-**Version**: v5.5 (Phase 0-3 Complete: 18 Enhancements)
+**Last Updated**: December 1, 2024
+**Version**: v5.6 (Phase 0-4 Complete: 22 Enhancements)
 **Status**: Live in production paper trading
 
-**Latest Updates**:
-- ✅ Phase 3.1: IBD-style RS percentile ranking (market-wide 0-100 scale)
-- ✅ Phase 3.2: Sector rotation detection (11 sectors vs SPY)
-- ✅ Phase 3.3: Institutional signals (options flow + dark pool)
-- ✅ Phase 3.4: GO command integration (enhanced conviction with Phase 3 data)
+**Latest Updates (Phase 4 - Risk Optimization)**:
+- ✅ Phase 4.1: Cluster-based conviction scoring (prevents double-counting correlated signals)
+- ✅ Phase 4.2: Market breadth & trend filter (regime-based position sizing)
+- ✅ Phase 4.3: Sector concentration reduction (max 2 per sector, 3 in leading sectors)
+- ✅ Phase 4.4: Liquidity filter (min $20M daily volume prevents slippage)
+
+**Previous Updates**:
+- ✅ Phase 3: IBD-style RS percentile ranking, sector rotation detection, institutional signals
+- ✅ Phase 2: RS rank percentile, volume confirmation, portfolio rebalancing, performance attribution
+- ✅ Phase 1: Trailing stops, dynamic targets, conviction scoring, post-earnings drift, Stage 2 alignment
+- ✅ Phase 0: Gap-aware entry/exit, news validation, sector concentration, market regime filter
