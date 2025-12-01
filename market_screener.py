@@ -1879,6 +1879,20 @@ class MarketScreener:
         volume_result = self.get_volume_analysis(ticker)
         technical_result = self.get_technical_setup(ticker)
 
+        # PHASE 4.4: Liquidity filter - Reject stocks with insufficient dollar volume
+        # This prevents slippage issues on low-liquidity names (typically 1-3% slippage)
+        # Minimum: $20M average daily dollar volume
+        avg_volume = volume_result.get('avg_volume_20d', 0)
+        current_price = technical_result.get('current_price', 0)
+
+        if avg_volume > 0 and current_price > 0:
+            avg_dollar_volume = avg_volume * current_price
+            MIN_DOLLAR_VOLUME = 20_000_000  # $20M minimum
+
+            if avg_dollar_volume < MIN_DOLLAR_VOLUME:
+                # REJECT: Insufficient liquidity
+                return None  # Skip low-liquidity stocks to avoid slippage
+
         # Calculate composite score with TIER-AWARE WEIGHTING (Enhancement 0.2)
         # Determine catalyst tier for intelligent weighting
         catalyst_tier = 'None'
