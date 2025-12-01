@@ -4708,17 +4708,80 @@ RECENT LESSONS LEARNED:
         print("   ✓ Context loaded\n")
 
         print("4. Calling Claude for position review and decisions...")
-        response = self.call_claude_api('go', context, premarket_data)
-        response_text = response.get('content', [{}])[0].get('text', '')
-        print("   ✓ Response received\n")
 
-        # Step 4: Extract decisions from Claude's response
+        # AI FAILOVER: Graceful degradation if Claude API fails
+        try:
+            response = self.call_claude_api('go', context, premarket_data)
+            response_text = response.get('content', [{}])[0].get('text', '')
+            print("   ✓ Response received\n")
+        except Exception as e:
+            # CRITICAL: Claude API failure - enter degraded mode
+            error_type = type(e).__name__
+            error_msg = str(e)
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            print(f"\n{'='*70}")
+            print(f"🚨 CLAUDE API FAILURE - DEGRADED MODE ACTIVATED")
+            print(f"{'='*70}")
+            print(f"   Error Type: {error_type}")
+            print(f"   Error Message: {error_msg}")
+            print(f"   Timestamp: {timestamp}")
+            print(f"\n   DEGRADED MODE BEHAVIOR:")
+            print(f"   - Skipping all new entries (no BUY recommendations)")
+            print(f"   - Continuing to HOLD existing positions")
+            print(f"   - Rule-based EXIT monitoring active (stops, time limits)")
+            print(f"   - System will retry Claude API on next GO command")
+            print(f"{'='*70}\n")
+
+            # Log the failure for monitoring
+            log_entry = {
+                'timestamp': timestamp,
+                'command': 'go',
+                'error_type': error_type,
+                'error_message': error_msg,
+                'degraded_mode': True,
+                'action_taken': 'Skipped new entries, held existing positions'
+            }
+
+            # Save failure log
+            log_file = self.project_dir / 'logs' / 'claude_api_failures.json'
+            log_file.parent.mkdir(exist_ok=True)
+
+            existing_logs = []
+            if log_file.exists():
+                try:
+                    existing_logs = json.loads(log_file.read_text())
+                except:
+                    pass
+
+            existing_logs.append(log_entry)
+            log_file.write_text(json.dumps(existing_logs, indent=2))
+
+            # Return degraded mode decisions: HOLD all existing, no new entries
+            decisions = {
+                'hold': [pos['ticker'] for pos in existing_positions] if existing_positions else [],
+                'exit': [],
+                'buy': []
+            }
+
+            # Create a minimal response for logging
+            response_text = f"DEGRADED MODE: Claude API unavailable. Holding {len(decisions['hold'])} positions, no new entries."
+
+            print("   ✓ Degraded mode decisions generated\n")
+
+        # Step 4: Extract decisions from Claude's response (or degraded mode)
         print("5. Extracting decisions from response...")
-        decisions = self.extract_json_from_response(response_text)
 
-        if not decisions:
-            print("   ✗ No valid JSON found in response\n")
-            return False
+        if not response_text or response_text.startswith('DEGRADED MODE:'):
+            # Degraded mode: use the pre-generated decisions
+            print("   ℹ️ Using degraded mode decisions (AI failover active)")
+        else:
+            # Normal mode: extract from Claude response
+            decisions = self.extract_json_from_response(response_text)
+
+            if not decisions:
+                print("   ✗ No valid JSON found in response\n")
+                return False
 
         # Step 5: Process decisions and create pending file
         hold_positions = decisions.get('hold', [])
@@ -5772,12 +5835,58 @@ RECENT LESSONS LEARNED:
         print("   ✓ Context loaded\n")
 
         print("2. Calling Claude API for performance analysis...")
-        response = self.call_claude_api('analyze', context)
-        print("   ✓ Response received\n")
 
-        print("3. Saving response...")
-        self.save_response('analyze', response)
-        print("   ✓ Complete\n")
+        # AI FAILOVER: Graceful degradation if Claude API fails
+        try:
+            response = self.call_claude_api('analyze', context)
+            print("   ✓ Response received\n")
+
+            print("3. Saving response...")
+            self.save_response('analyze', response)
+            print("   ✓ Complete\n")
+
+        except Exception as e:
+            # ANALYZE command failure - log but continue (not critical)
+            error_type = type(e).__name__
+            error_msg = str(e)
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            print(f"\n{'='*70}")
+            print(f"⚠️ CLAUDE API FAILURE - ANALYZE COMMAND")
+            print(f"{'='*70}")
+            print(f"   Error Type: {error_type}")
+            print(f"   Error Message: {error_msg}")
+            print(f"   Timestamp: {timestamp}")
+            print(f"\n   IMPACT: Daily analysis not generated")
+            print(f"   - All position exits/holds already processed")
+            print(f"   - Trade logging completed successfully")
+            print(f"   - Only missing: Claude's commentary on performance")
+            print(f"{'='*70}\n")
+
+            # Log the failure
+            log_entry = {
+                'timestamp': timestamp,
+                'command': 'analyze',
+                'error_type': error_type,
+                'error_message': error_msg,
+                'degraded_mode': True,
+                'action_taken': 'Skipped Claude analysis, core operations completed'
+            }
+
+            log_file = self.project_dir / 'logs' / 'claude_api_failures.json'
+            log_file.parent.mkdir(exist_ok=True)
+
+            existing_logs = []
+            if log_file.exists():
+                try:
+                    existing_logs = json.loads(log_file.read_text())
+                except:
+                    pass
+
+            existing_logs.append(log_entry)
+            log_file.write_text(json.dumps(existing_logs, indent=2))
+
+            print("   ℹ️ ANALYZE gracefully skipped - all critical operations complete\n")
 
         print("="*60)
         print("ANALYZE COMMAND COMPLETE")
