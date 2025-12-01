@@ -2,7 +2,70 @@
 
 **Purpose**: Track deferred/skipped improvements for future consideration
 
-**Last Updated**: November 29, 2024
+**Last Updated**: November 30, 2024
+
+---
+
+## Phase 4 Deferred Items (From Third-Party Review)
+
+### 1. Forward Guidance Delta Tracking
+**Status**: Deferred (requires paid API tier or manual parsing)
+**What it solves**: AI can misinterpret guidance nuance (e.g., "guidance raised" vs "guidance maintained")
+**Current solution**: We check "revenue beat" confirmation, but don't track guidance delta
+**Full implementation**:
+- Track guidance changes (raised/maintained/lowered)
+- Add +1 conviction factor for "guidance raised"
+- Requires either:
+  - FMP Pro tier ($29/month) for detailed transcripts
+  - Manual parsing of earnings transcripts (high maintenance)
+
+**Partial implementation (DONE)**: We already check EPS surprise + revenue surprise, which catches most strong earnings
+**Effort**: 2 hours (if using FMP Pro), 8+ hours (if manual parsing)
+**Cost**: $29/month (FMP Pro) or $0 (manual)
+**Expected impact**: +2-3% better earnings trade quality
+
+**When to revisit**: If we see pattern of earnings beat trades failing due to guidance misses
+
+---
+
+### 2. Advanced Fundamental Filters
+**Status**: Deferred (requires paid tier)
+**What it would add**:
+- Gross margin stability check
+- EPS acceleration (YoY growth rate)
+- Free cash flow trends
+
+**Current reality**:
+- ✅ We already check EPS surprise & revenue surprise (FMP free)
+- ❌ Don't have margin, cash flow, or acceleration data
+
+**Why deferred**:
+- FMP free tier only provides surprise data
+- Full fundamentals require Pro tier ($29/month)
+- Our catalyst-driven strategy cares more about events than financials
+
+**Effort**: 4 hours
+**Cost**: $29/month (FMP Pro)
+**Expected impact**: +3-5% trade quality (avoid value traps)
+
+**When to revisit**: If we see pattern of trades failing on weak fundamentals despite catalyst
+
+---
+
+### 3. Position Sizing Aggressiveness Review
+**Status**: MONITORING (no immediate action)
+**Concern**: 13% position size = 0.91% portfolio loss per stop
+**Current risk**: 3-5 correlated stops = -2.7% to -4.5% daily drawdown
+**Mitigation already in place**:
+- ✅ Sector concentration limited to 2 positions (Phase 4.3)
+- ✅ Leading sector exception allows 3 only in top 2 sectors
+- ✅ Market breadth filter reduces sizing in DEGRADED/UNHEALTHY markets
+- ✅ Liquidity filter prevents slippage on low-volume names
+
+**Action**: Monitor correlation of stops over next 30 days
+**Trigger**: If >2 stops hit same day more than 2x per month, reduce HIGH conviction from 13% → 12%
+
+**When to revisit**: After 30 days of Phase 4 data
 
 ---
 

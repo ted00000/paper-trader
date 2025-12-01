@@ -641,24 +641,39 @@ POSITION {i}: {ticker}
         except Exception as e:
             return {'stage2': False, 'error': str(e), 'ticker': ticker}
 
-    def enforce_sector_concentration(self, new_positions, current_portfolio):
+    def enforce_sector_concentration(self, new_positions, current_portfolio, leading_sectors=None):
         """
-        Enhancement 1.3: Enforce sector concentration limits to reduce correlation risk
+        Enhancement 1.3 + 4.3: Enforce sector concentration limits to reduce correlation risk
 
         Prevents scenarios like 3 tech stocks (NVDA, AMD, AVGO) crashing together
         causing 20%+ portfolio loss.
 
-        Rules:
-        - Maximum 3 positions per sector (30% of portfolio)
+        Rules (Phase 4 Enhanced):
+        - Maximum 2 positions per sector (20% of portfolio) - REDUCED from 3
+        - EXCEPTION: Allow 3 positions if sector is in top 2 leading sectors (+3% vs SPY)
         - Maximum 2 positions per industry (20% of portfolio)
         - Alert if 2+ positions in same sub-sector (high correlation warning)
+
+        Args:
+            new_positions: List of positions to validate
+            current_portfolio: Current portfolio positions
+            leading_sectors: List of top 2 leading sectors (from screener data)
 
         Returns:
         - accepted_positions: List of positions that passed validation
         - rejected_positions: List of positions with rejection reasons
         """
-        MAX_PER_SECTOR = 3  # 30% max per sector (e.g., Technology, Healthcare)
+        MAX_PER_SECTOR = 2  # PHASE 4.3: Reduced from 3 → 2 (20% max per sector)
+        MAX_PER_SECTOR_LEADING = 3  # Exception for top 2 leading sectors
         MAX_PER_INDUSTRY = 2  # 20% max per industry (e.g., Semiconductors, Biotech)
+
+        # Default to empty list if no leading sectors provided
+        if leading_sectors is None:
+            leading_sectors = []
+
+        # Log leading sectors for visibility
+        if leading_sectors:
+            print(f"\n   Top 2 Leading Sectors (allowed 3 positions): {', '.join(leading_sectors[:2])}")
 
         # Count current holdings by sector and industry
         sector_counts = {}
@@ -684,15 +699,20 @@ POSITION {i}: {ticker}
             sector = new_pos.get('sector', 'Unknown')
             industry = new_pos.get('industry', 'Unknown')
 
-            # Check sector limit
-            if sector_counts.get(sector, 0) >= MAX_PER_SECTOR:
+            # Check sector limit (with exception for top 2 leading sectors)
+            # PHASE 4.3: Allow 3 positions in top 2 leading sectors, otherwise max 2
+            sector_is_leading = sector in leading_sectors[:2] if leading_sectors else False
+            max_allowed = MAX_PER_SECTOR_LEADING if sector_is_leading else MAX_PER_SECTOR
+
+            if sector_counts.get(sector, 0) >= max_allowed:
                 rejected_positions.append({
                     'ticker': ticker,
-                    'reason': f'Sector concentration: Already have {sector_counts[sector]} {sector} positions (max {MAX_PER_SECTOR})',
+                    'reason': f'Sector concentration: Already have {sector_counts[sector]} {sector} positions (max {max_allowed})',
                     'sector': sector,
                     'industry': industry
                 })
-                print(f"   ⚠️ REJECTED {ticker}: Sector limit reached ({sector}: {sector_counts[sector]}/{MAX_PER_SECTOR})")
+                leading_note = " (leading sector)" if sector_is_leading else ""
+                print(f"   ⚠️ REJECTED {ticker}: Sector limit reached ({sector}: {sector_counts[sector]}/{max_allowed}{leading_note})")
                 continue
 
             # Check industry limit
@@ -2051,6 +2071,108 @@ POSITION {i}: {ticker}
                 'source': 'assumption'
             }
 
+    def check_market_breadth(self):
+        """
+        PHASE 4.2: Market Breadth & Trend Filter
+
+        Checks market health to avoid trading during rotational/choppy conditions.
+        Catalyst-driven swing strategies perform poorly when:
+        - Market is in downtrend (SPY below key MAs)
+        - Breadth is poor (< 40% of stocks above 50-day MA)
+        - Rotational environment (sectors whipsawing)
+
+        Returns:
+            {
+                'spy_above_50d': bool,
+                'spy_above_200d': bool,
+                'breadth_pct': float (% of screener stocks above 50-day MA),
+                'market_healthy': bool,
+                'regime': str ('HEALTHY' | 'DEGRADED' | 'UNHEALTHY'),
+                'position_size_adjustment': float (1.0 = normal, 0.8 = reduce 20%),
+                'message': str
+            }
+        """
+        try:
+            # Fetch SPY data for trend check (200 days needed for 200-day MA)
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=250)  # ~1 year
+
+            start_str = start_date.strftime('%Y-%m-%d')
+            end_str = end_date.strftime('%Y-%m-%d')
+
+            url = f'https://api.polygon.io/v2/aggs/ticker/SPY/range/1/day/{start_str}/{end_str}?apiKey={POLYGON_API_KEY}'
+            response = requests.get(url, timeout=10)
+            data = response.json()
+
+            spy_above_50d = False
+            spy_above_200d = False
+
+            if data.get('status') in ['OK', 'DELAYED'] and 'results' in data:
+                results = data['results']
+
+                if len(results) >= 200:
+                    current_price = results[-1]['c']
+
+                    # Calculate 50-day and 200-day MAs
+                    ma_50 = sum([r['c'] for r in results[-50:]]) / 50
+                    ma_200 = sum([r['c'] for r in results[-200:]]) / 200
+
+                    spy_above_50d = current_price > ma_50
+                    spy_above_200d = current_price > ma_200
+
+            # Calculate breadth from screener data (% of stocks above 50-day MA)
+            screener_data = self.load_screener_candidates()
+            breadth_pct = 0
+
+            if screener_data and screener_data.get('candidates'):
+                candidates = screener_data['candidates']
+                total = len(candidates)
+
+                # Count how many are above 50-day MA (we have this data in screener)
+                above_50d = sum(1 for c in candidates if c.get('technical_filters', {}).get('above_50d_sma', False))
+                breadth_pct = (above_50d / total * 100) if total > 0 else 0
+
+            # Determine market regime
+            # HEALTHY: SPY above both MAs AND breadth >50%
+            # DEGRADED: SPY above 50d MA OR breadth 40-50%
+            # UNHEALTHY: SPY below both MAs AND breadth <40%
+
+            if spy_above_50d and spy_above_200d and breadth_pct >= 50:
+                regime = 'HEALTHY'
+                adjustment = 1.0
+                message = f'✓ Market HEALTHY: SPY above 50d/200d, breadth {breadth_pct:.0f}%'
+            elif spy_above_50d and breadth_pct >= 40:
+                regime = 'DEGRADED'
+                adjustment = 0.8  # Reduce position sizes by 20%
+                message = f'⚠️ Market DEGRADED: SPY above 50d, breadth {breadth_pct:.0f}% - reducing size 20%'
+            else:
+                regime = 'UNHEALTHY'
+                adjustment = 0.6  # Reduce position sizes by 40%
+                message = f'⚠️ Market UNHEALTHY: Low breadth ({breadth_pct:.0f}%), SPY trend weak - reducing size 40%'
+
+            return {
+                'spy_above_50d': spy_above_50d,
+                'spy_above_200d': spy_above_200d,
+                'breadth_pct': round(breadth_pct, 1),
+                'market_healthy': regime == 'HEALTHY',
+                'regime': regime,
+                'position_size_adjustment': adjustment,
+                'message': message
+            }
+
+        except Exception as e:
+            # On error, assume healthy (don't block trading on API failures)
+            print(f"   ⚠️ Market breadth check failed: {e}")
+            return {
+                'spy_above_50d': True,
+                'spy_above_200d': True,
+                'breadth_pct': 50.0,
+                'market_healthy': True,
+                'regime': 'HEALTHY',
+                'position_size_adjustment': 1.0,
+                'message': 'Market breadth check failed - assuming healthy'
+            }
+
     def check_macro_calendar(self, check_date=None):
         """
         Check if a date falls within blackout windows for major macro events
@@ -2601,61 +2723,119 @@ POSITION {i}: {ticker}
         supporting_factors = 0
         reasoning_parts = []
 
-        # Count supporting factors
-        if catalyst_tier == 'Tier1':
-            supporting_factors += 1
-            reasoning_parts.append('Tier 1 catalyst')
+        # PHASE 4.1: CLUSTER-BASED SCORING
+        # Prevents double-counting correlated signals by grouping into clusters with caps
+        #
+        # OLD PROBLEM:
+        # - RS percentile + RS vs sector + sector leading + ADX all measure momentum
+        # - Could get +2 (RS 90th) + +1 (RS >7%) + +1 (leading sector) = +4 for same thing
+        #
+        # NEW SOLUTION:
+        # - Cluster 1 (Momentum): Cap at +3 total
+        # - Cluster 2 (Institutional): Cap at +2 total
+        # - Cluster 3 (Catalyst): No cap (these are independent)
+        # - Cluster 4 (Market Conditions): Cap at +2 total
 
-        if news_score >= 15:
-            supporting_factors += 1
-            reasoning_parts.append(f'Strong news ({news_score}/20)')
-        elif news_score >= 10:
-            supporting_factors += 1
-            reasoning_parts.append(f'Good news ({news_score}/20)')
+        # === CLUSTER 1: MOMENTUM (cap +3) ===
+        momentum_factors = 0
+        momentum_parts = []
 
-        if vix < 25:
-            supporting_factors += 1
-            reasoning_parts.append(f'Low VIX ({vix})')
-        elif vix < 30:
-            reasoning_parts.append(f'Moderate VIX ({vix})')
-
-        if relative_strength >= 3.0:
-            supporting_factors += 1
-            reasoning_parts.append(f'Sector leader (RS +{relative_strength:.1f}%)')
-
-        if multi_catalyst:
-            supporting_factors += 1
-            reasoning_parts.append('Multi-catalyst synergy')
-
-        # ENHANCEMENT 1: RS Percentile Boost (market-wide ranking)
+        # RS Percentile (strongest signal, gets priority)
         if rs_percentile is not None:
-            if rs_percentile >= 90:  # Top 10% of ALL stocks
-                supporting_factors += 2  # DOUBLE WEIGHT for market leaders
-                reasoning_parts.append(f'Market leader (RS {rs_percentile}th percentile)')
+            if rs_percentile >= 90:  # Top 10%
+                momentum_factors += 2  # DOUBLE WEIGHT
+                momentum_parts.append(f'RS {rs_percentile}th percentile')
             elif rs_percentile >= 80:  # Top 20%
-                supporting_factors += 1
-                reasoning_parts.append(f'Strong RS ({rs_percentile}th percentile)')
+                momentum_factors += 1
+                momentum_parts.append(f'RS {rs_percentile}th percentile')
 
-        # ENHANCEMENT 2: Leading Sector Preference
-        if sector_leading and sector_vs_spy > 2.0:
-            supporting_factors += 1
-            reasoning_parts.append(f'Leading sector ({sector_vs_spy:+.1f}% vs SPY)')
+        # RS vs Sector (only count if RS percentile didn't max out contribution)
+        if momentum_factors < 3 and relative_strength >= 7.0:
+            momentum_factors += 1
+            momentum_parts.append(f'Strong sector RS (+{relative_strength:.1f}%)')
+        elif momentum_factors < 3 and relative_strength >= 3.0:
+            # Lower threshold gets partial credit only if room
+            if momentum_factors < 2:  # Don't add if already have 2+ points
+                momentum_parts.append(f'RS +{relative_strength:.1f}%')
 
-        # ENHANCEMENT 3: Institutional Signals (options flow + dark pool)
+        # Leading Sector (only if room in momentum cluster)
+        if momentum_factors < 3 and sector_leading and sector_vs_spy > 2.0:
+            momentum_factors += 1
+            momentum_parts.append(f'Leading sector ({sector_vs_spy:+.1f}% vs SPY)')
+
+        # Cap at +3
+        momentum_factors = min(momentum_factors, 3)
+        supporting_factors += momentum_factors
+
+        if momentum_parts:
+            reasoning_parts.append(f"Momentum: {', '.join(momentum_parts)}")
+
+        # === CLUSTER 2: INSTITUTIONAL SIGNALS (cap +2) ===
+        institutional_factors = 0
+        institutional_parts = []
+
         if options_flow and options_flow.get('has_unusual_activity'):
-            supporting_factors += 1
+            institutional_factors += 1
             signal = options_flow.get('signal_type', 'unusual_activity')
-            reasoning_parts.append(f'Options flow: {signal}')
+            institutional_parts.append(f'Options: {signal}')
 
         if dark_pool and dark_pool.get('has_unusual_activity'):
-            supporting_factors += 1
+            institutional_factors += 1
             signal = dark_pool.get('signal_type', 'accumulation')
-            reasoning_parts.append(f'Dark pool: {signal}')
+            institutional_parts.append(f'Dark pool: {signal}')
 
-        # ENHANCEMENT 4: Revenue Beat Confirmation (stronger PED signal)
+        # Cap at +2
+        institutional_factors = min(institutional_factors, 2)
+        supporting_factors += institutional_factors
+
+        if institutional_parts:
+            reasoning_parts.append(f"Institutional: {', '.join(institutional_parts)}")
+
+        # === CLUSTER 3: CATALYST QUALITY (no cap - independent signals) ===
+        catalyst_factors = 0
+        catalyst_parts = []
+
+        if catalyst_tier == 'Tier1':
+            catalyst_factors += 1
+            catalyst_parts.append('Tier 1')
+
+        if multi_catalyst:
+            catalyst_factors += 1
+            catalyst_parts.append('Multi-catalyst')
+
         if revenue_beat:
-            supporting_factors += 1
-            reasoning_parts.append('EPS + Revenue beat (strong PED)')
+            catalyst_factors += 1
+            catalyst_parts.append('Revenue beat')
+
+        if news_score >= 15:
+            catalyst_factors += 1
+            catalyst_parts.append(f'Strong news ({news_score}/20)')
+        elif news_score >= 10:
+            catalyst_factors += 1
+            catalyst_parts.append(f'Good news ({news_score}/20)')
+
+        supporting_factors += catalyst_factors
+
+        if catalyst_parts:
+            reasoning_parts.append(f"Catalyst: {', '.join(catalyst_parts)}")
+
+        # === CLUSTER 4: MARKET CONDITIONS (cap +2) ===
+        market_factors = 0
+        market_parts = []
+
+        if vix < 20:
+            market_factors += 1
+            market_parts.append(f'Low VIX ({vix})')
+        elif vix < 25:
+            market_factors += 1
+            market_parts.append(f'Normal VIX ({vix})')
+
+        # Cap at +2 (room for future market condition factors)
+        market_factors = min(market_factors, 2)
+        supporting_factors += market_factors
+
+        if market_parts:
+            reasoning_parts.append(f"Market: {', '.join(market_parts)}")
 
         # REQUIRED FILTERS (auto-reject if failed)
         if relative_strength < 3.0:
@@ -2674,11 +2854,19 @@ POSITION {i}: {ticker}
                 'supporting_factors': supporting_factors
             }
 
-        # CONVICTION DETERMINATION (based on supporting factors)
-        if supporting_factors >= 5 and news_score >= 15 and vix < 25:
+        # CONVICTION DETERMINATION (based on cluster-adjusted supporting factors)
+        # PHASE 4.1: New thresholds based on cluster caps
+        # Max possible: Momentum +3, Institutional +2, Catalyst +4, Market +2 = 11 total
+        #
+        # HIGH (7+ factors): Need strong signals across multiple clusters
+        # MEDIUM-HIGH (5-6 factors): Good signals in 2-3 clusters
+        # MEDIUM (3-4 factors): Minimal acceptable (catalyst + one other cluster)
+        # SKIP (<3 factors): Insufficient conviction
+
+        if supporting_factors >= 7 and news_score >= 15 and vix < 25:
             conviction = 'HIGH'
             position_size = 13.0
-        elif supporting_factors >= 4 and news_score >= 10 and vix < 30:
+        elif supporting_factors >= 5 and news_score >= 10 and vix < 30:
             conviction = 'MEDIUM-HIGH'
             position_size = 11.0
         elif supporting_factors >= 3 and news_score >= 5 and vix < 30:
@@ -2688,12 +2876,13 @@ POSITION {i}: {ticker}
             conviction = 'SKIP'
             position_size = 0.0
 
-        reasoning = ', '.join(reasoning_parts) if reasoning_parts else 'Insufficient factors'
+        # Build final reasoning with cluster breakdown
+        cluster_summary = f"{supporting_factors} factors: " + ' | '.join(reasoning_parts) if reasoning_parts else 'Insufficient factors'
 
         return {
             'conviction': conviction,
             'position_size_pct': position_size,
-            'reasoning': reasoning,
+            'reasoning': cluster_summary,
             'supporting_factors': supporting_factors
         }
 
@@ -4608,8 +4797,8 @@ RECENT LESSONS LEARNED:
             else:
                 print()
 
-        # Step 5.4: PHASE 3 - Check VIX and Macro Calendar
-        print("5.4 Checking market regime (Phase 3: VIX + Macro Calendar)...")
+        # Step 5.4: PHASE 3-4 - Check VIX, Macro Calendar, and Market Breadth
+        print("5.4 Checking market regime (Phase 3-4: VIX + Macro + Breadth)...")
 
         # Fetch VIX level
         vix_result = self.fetch_vix_level()
@@ -4618,6 +4807,10 @@ RECENT LESSONS LEARNED:
         # Check macro calendar
         macro_result = self.check_macro_calendar()
         print(f"   {macro_result['message']}")
+
+        # PHASE 4.2: Check market breadth & trend
+        breadth_result = self.check_market_breadth()
+        print(f"   {breadth_result['message']}")
 
         # Determine if we should proceed with BUY recommendations
         can_enter_positions = True
@@ -4902,7 +5095,17 @@ RECENT LESSONS LEARNED:
                         buy_pos['stock_return_3m'] = rs_result['stock_return_3m']
                         buy_pos['sector_etf'] = rs_result['sector_etf']
                         buy_pos['conviction_level'] = conviction_result['conviction']
-                        buy_pos['position_size_pct'] = conviction_result['position_size_pct']  # Phase 4 overrides Phase 2
+
+                        # PHASE 4.2: Apply market breadth adjustment to position size
+                        base_position_size = conviction_result['position_size_pct']
+                        breadth_adjustment = breadth_result['position_size_adjustment']
+                        adjusted_position_size = base_position_size * breadth_adjustment
+
+                        buy_pos['position_size_pct'] = adjusted_position_size  # Phase 4 overrides Phase 2
+                        buy_pos['position_size_base'] = base_position_size  # Store original for reference
+                        buy_pos['market_breadth_adjustment'] = breadth_adjustment  # Store adjustment factor
+                        buy_pos['market_breadth_regime'] = breadth_result['regime']  # Store regime
+
                         buy_pos['target_pct'] = tier_result['target_pct']
                         buy_pos['supporting_factors'] = conviction_result['supporting_factors']
 
@@ -4983,14 +5186,18 @@ RECENT LESSONS LEARNED:
             buy_positions = validated_buys
             print(f"   ✓ Validated: {len(validated_buys)} BUY positions passed checks\n")
 
-        # Step 5.6: Enhancement 1.3 - Enforce Sector Concentration Limits
+        # Step 5.6: Enhancement 1.3 + 4.3 - Enforce Sector Concentration Limits
         if buy_positions:
-            print("5.6 Enforcing sector concentration limits (Enhancement 1.3)...")
+            print("5.6 Enforcing sector concentration limits (Enhancement 1.3 + 4.3)...")
+
+            # Get top 2 leading sectors from screener data (for Phase 4.3 exception)
+            leading_sectors_list = sector_rotation.get('leading_sectors', []) if sector_rotation else []
 
             # Get current portfolio for sector analysis
             accepted_buys, rejected_buys = self.enforce_sector_concentration(
                 new_positions=buy_positions,
-                current_portfolio=existing_positions + hold_positions  # Include HOLD positions
+                current_portfolio=existing_positions + hold_positions,  # Include HOLD positions
+                leading_sectors=leading_sectors_list  # PHASE 4.3: Pass leading sectors for exception
             )
 
             # Log rejections
