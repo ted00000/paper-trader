@@ -293,6 +293,7 @@ class TradingAgent:
                     'Exit_Reason', 'Exit_Type', 'Catalyst_Type', 'Catalyst_Tier', 'Catalyst_Age_Days',
                     'News_Validation_Score', 'News_Exit_Triggered',
                     'VIX_At_Entry', 'Market_Regime', 'Macro_Event_Near',
+                    'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
@@ -983,6 +984,8 @@ POSITION {i}: {ticker}
             'vix_at_entry': position.get('vix_at_entry', 0.0),
             'market_regime': position.get('market_regime', 'Unknown'),
             'macro_event_near': position.get('macro_event_near', 'None'),
+            'vix_regime': position.get('vix_regime', 'UNKNOWN'),
+            'market_breadth_regime': position.get('market_breadth_regime', 'UNKNOWN'),
             'relative_strength': position.get('relative_strength', 0.0),
             'stock_return_3m': position.get('stock_return_3m', 0.0),
             'sector_etf': position.get('sector_etf', 'Unknown'),
@@ -1041,6 +1044,8 @@ POSITION {i}: {ticker}
             'vix_at_entry': trade.get('vix_at_entry', 0.0),
             'market_regime': trade.get('market_regime', 'Unknown'),
             'macro_event_near': trade.get('macro_event_near', 'None'),
+            'vix_regime': trade.get('vix_regime', 'UNKNOWN'),
+            'market_breadth_regime': trade.get('market_breadth_regime', 'UNKNOWN'),
             'relative_strength': trade.get('relative_strength', 0.0),
             'stock_return_3m': trade.get('stock_return_3m', 0.0),
             'sector_etf': trade.get('sector_etf', 'Unknown'),
@@ -4190,6 +4195,7 @@ RECENT LESSONS LEARNED:
                     'Exit_Reason', 'Exit_Type', 'Catalyst_Type', 'Catalyst_Tier', 'Catalyst_Age_Days',
                     'News_Validation_Score', 'News_Exit_Triggered',
                     'VIX_At_Entry', 'Market_Regime', 'Macro_Event_Near',
+                    'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
@@ -4239,6 +4245,8 @@ RECENT LESSONS LEARNED:
                 trade_data.get('vix_at_entry', 0.0),
                 trade_data.get('market_regime', 'Unknown'),
                 trade_data.get('macro_event_near', 'None'),
+                trade_data.get('vix_regime', 'UNKNOWN'),  # Phase 4 VIX regime
+                trade_data.get('market_breadth_regime', 'UNKNOWN'),  # Phase 4 market breadth
                 trade_data.get('relative_strength', 0.0),
                 trade_data.get('stock_return_3m', 0.0),
                 trade_data.get('sector_etf', 'Unknown'),
@@ -5089,6 +5097,21 @@ RECENT LESSONS LEARNED:
                         buy_pos['news_score'] = news_result['score']
                         buy_pos['vix_at_entry'] = vix_result['vix']
                         buy_pos['market_regime'] = vix_result['regime']
+
+                        # VIX Regime Classification (for learning & attribution)
+                        vix = vix_result['vix']
+                        if vix < 15:
+                            vix_regime = 'VERY_LOW'  # Complacency risk
+                        elif vix < 20:
+                            vix_regime = 'LOW'  # Ideal for swing trading
+                        elif vix < 25:
+                            vix_regime = 'ELEVATED'  # Caution
+                        elif vix < 30:
+                            vix_regime = 'HIGH'  # High risk
+                        else:
+                            vix_regime = 'EXTREME'  # Shutdown mode
+                        buy_pos['vix_regime'] = vix_regime
+
                         buy_pos['macro_event_near'] = macro_result['event_type'] or 'None'
                         buy_pos['relative_strength'] = rs_result['relative_strength']
                         buy_pos['rs_rating'] = rs_result['rs_rating']  # Enhancement 2.1
