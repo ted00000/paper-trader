@@ -50,9 +50,15 @@ Tedbot is an AI-powered catalyst-driven swing trading system that uses Claude (A
    - **GOOD** (1.5x+ average): Acceptable minimum
    - **Volume trending up**: Recent 5-day avg > prior 20-day by 20%+
 
-4. **Relative Strength Check**
-   - Stock must outperform its sector ETF by 3%+ over 3 months
-   - **RS Rating** (0-100 scale):
+4. **Relative Strength Analysis** (Phase 3.1 - IBD-Style)
+   - **3-Month Performance**: Stock vs sector ETF
+   - **RS Percentile Rank** (0-100, market-wide comparison):
+     - 95+: Elite (top 5% of all stocks)
+     - 90-94: Excellent (top 10%)
+     - 80-89: Strong (top 20%)
+     - 70-79: Above Average
+     - <70: Filter out (only trade market leaders)
+   - **Traditional RS %**: Stock outperformance vs sector
      - 95: Elite (RS ≥15%)
      - 85: Strong (RS 10-15%)
      - 75: Very Good (RS 7-10%)
@@ -66,7 +72,18 @@ Tedbot is an AI-powered catalyst-driven swing trading system that uses Claude (A
    - Stock within 25% of 52-week high
    - 50-day MA > 150-day and 200-day MAs
 
-**Output**: List of catalyst-driven candidates saved to `screener_candidates.json`
+6. **Sector Rotation Detection** (Phase 3.2)
+   - Tracks 11 sector ETFs vs SPY benchmark
+   - **Leading Sectors**: >2% outperformance vs SPY (3-month)
+   - **Lagging Sectors**: <-2% underperformance vs SPY
+   - Prioritizes stocks from leading sectors in GO command
+
+7. **Institutional Activity Signals** (Phase 3.3)
+   - **Options Flow**: Unusual call buying (call/put ratio >2.0)
+   - **Dark Pool Activity**: Volume spikes >1.5x average (institutional accumulation)
+   - Adds conviction when institutions are buying
+
+**Output**: List of catalyst-driven candidates saved to `screener_candidates.json` with enhanced metadata
 
 ---
 
@@ -94,16 +111,28 @@ Tedbot is an AI-powered catalyst-driven swing trading system that uses Claude (A
    - Scans for Fed meetings, CPI reports, FOMC within 48 hours
    - Adjusts position sizing or skips trades during high-impact events
 
-4. **Conviction Scoring** (Based on Supporting Factors)
-   - **HIGH Conviction** (5+ factors):
-     - 8% position size
-     - Factors: Tier 1 catalyst, RS >7%, Fresh news (<24hrs), Volume >2x, News score >15/20, ADX >25, VIX <20
+4. **Conviction Scoring** (Enhanced with Phase 3 Data)
+   - **Supporting Factors** (count determines conviction):
+     - Tier 1 catalyst: +1 factor
+     - RS >7% (sector outperformance): +1 factor
+     - **RS ≥90th percentile (market leader)**: +2 factors (DOUBLE WEIGHT)
+     - **RS 80-89th percentile**: +1 factor
+     - **Leading sector (+2% vs SPY)**: +1 factor
+     - Fresh news (<24hrs): +1 factor
+     - Volume >2x average: +1 factor
+     - News score >15/20: +1 factor
+     - ADX >25 (strong trend): +1 factor
+     - VIX <20 (normal conditions): +1 factor
+     - Multi-catalyst: +1 factor
+     - **Unusual options flow**: +1 factor (Phase 3.3)
+     - **Dark pool accumulation**: +1 factor (Phase 3.3)
+     - **Revenue beat (EPS + Revenue)**: +1 factor
 
-   - **MEDIUM-HIGH Conviction** (3-4 factors):
-     - 6% position size
-
-   - **MEDIUM Conviction** (2 factors):
-     - 4% position size
+   - **Conviction Levels**:
+     - **HIGH** (7+ factors): 13% position size
+     - **MEDIUM-HIGH** (5-6 factors): 11% position size
+     - **MEDIUM** (3-4 factors): 10% position size
+     - **SKIP** (<3 factors): Pass on trade
 
 5. **Dynamic Profit Targets** (Enhancement 1.2)
    - **M&A targets**: +15% (stretch +20%)
@@ -161,10 +190,11 @@ Tedbot is an AI-powered catalyst-driven swing trading system that uses Claude (A
    - **Gap 5-8%**: Wait for 1-day consolidation
    - **Gap >8%**: Skip (too extended, high reversal risk)
 
-4. **Position Sizing**
-   - HIGH conviction: 8% of account ($80)
-   - MEDIUM-HIGH: 6% of account ($60)
-   - MEDIUM: 4% of account ($40)
+4. **Position Sizing** (Enhanced Phase 3)
+   - HIGH conviction (7+ factors): 13% of account ($130)
+   - MEDIUM-HIGH (5-6 factors): 11% of account ($110)
+   - MEDIUM (3-4 factors): 10% of account ($100)
+   - SKIP (<3 factors): Pass on trade
 
 5. **Stop Loss Calculation**
    - **Standard**: -7% from entry
@@ -312,7 +342,7 @@ Day 6: $112.70 → TRAILING STOP HIT, EXIT at $112.70 (+12.7%)
 3. **Sector Concentration Limits** (Enhancement 0.3)
 4. **Market Regime Filter** (Enhancement 0.4)
 
-### Phase 1: Core Trading Logic (4 Enhancements)
+### Phase 1: Core Trading Logic (6 Enhancements)
 1. **Trailing Stops** (Enhancement 1.1) - Let winners run
 2. **Dynamic Profit Targets** (Enhancement 1.2) - Catalyst-specific targets
 3. **Conviction Scoring** (Enhancement 1.3) - Position sizing by strength
@@ -325,6 +355,12 @@ Day 6: $112.70 → TRAILING STOP HIT, EXIT at $112.70 (+12.7%)
 2. **Volume Confirmation** (Enhancement 2.2) - Quality + trend scoring
 3. **Portfolio Rebalancing** (Enhancement 2.3) - Quantitative rotation
 4. **Performance Attribution** (Enhancement 2.4) - Track what works
+
+### Phase 3: RS & Sector Intelligence (3 Enhancements) ✅ COMPLETED
+1. **IBD-Style RS Percentile Ranking** (Enhancement 3.1) - Market-wide 0-100 ranking vs all stocks
+2. **Sector Rotation Detection** (Enhancement 3.2) - Track 11 sectors vs SPY, prioritize leading sectors
+3. **Institutional Activity Signals** (Enhancement 3.3) - Options flow + dark pool tracking
+4. **GO Command Integration** (Enhancement 3.4) - Enhanced conviction scoring with Phase 3 data
 
 ---
 
@@ -409,6 +445,7 @@ Analyzes past performance across multiple dimensions:
 ### Portfolio-Level Risk:
 - **Max positions**: 10 (diversification)
 - **Sector concentration**: Max 3 positions per sector
+- **Sector rotation aware**: Prioritize leading sectors (+2% vs SPY)
 - **Market regime**: SHUTDOWN at VIX >30
 - **Macro events**: Reduce sizing during Fed/CPI
 
@@ -437,11 +474,14 @@ Analyzes past performance across multiple dimensions:
 
 1. **AI-Powered Analysis**: Claude reads and understands news like a human analyst
 2. **Catalyst-Driven**: Trades on events, not just technicals
-3. **Adaptive Position Sizing**: Bigger bets on higher conviction
-4. **Let Winners Run**: Trailing stops capture extended moves
-5. **Quantitative + Qualitative**: Combines technical filters with AI reasoning
-6. **Full Transparency**: Every decision logged and traceable
-7. **Continuous Learning**: Performance attribution guides optimization
+3. **Market-Wide RS Ranking**: IBD-style percentile scoring (only trades top 20% of stocks)
+4. **Sector Rotation Awareness**: Prioritizes stocks from leading sectors (+2% vs SPY)
+5. **Institutional Signal Detection**: Tracks options flow and dark pool activity (FREE via Polygon)
+6. **Adaptive Position Sizing**: 10-13% sizing based on conviction (up to 14 supporting factors)
+7. **Let Winners Run**: Trailing stops capture extended moves
+8. **Quantitative + Qualitative**: Combines technical filters with AI reasoning
+9. **Full Transparency**: Every decision logged and traceable
+10. **Continuous Learning**: Performance attribution guides optimization
 
 ---
 
@@ -458,21 +498,28 @@ Analyzes past performance across multiple dimensions:
 **2. Analysis (GO - 9:00 AM):**
 - News Score: 18/20 (5 articles, all positive, fresh <12hrs)
 - VIX: 18 (GREEN - normal trading)
-- Conviction: HIGH (6 supporting factors)
+- Sector: Technology (Leading sector, +3.4% vs SPY)
+- RS Percentile: 92 (top 8% of all stocks)
+- Institutional Signals: Dark pool accumulation detected (2.1x volume)
+- Conviction: HIGH (9 supporting factors)
   - Tier 1 catalyst ✓
   - RS >7% ✓
-  - Fresh news ✓
+  - **RS 92nd percentile (top 10%)** ✓✓ (double weight)
+  - **Leading sector (+3.4% vs SPY)** ✓
+  - Fresh news (<12hrs) ✓
   - Volume >2x ✓
   - News >15/20 ✓
   - ADX >25 ✓
-- Position Size: 8% ($80)
+  - **Dark pool accumulation** ✓
+  - **Revenue beat (EPS + Revenue)** ✓
+- Position Size: 13% ($130)
 - Target: +12% (Strong PED detected)
 - Hold: 30-60 days (earnings drift)
 
 **3. Execution (EXECUTE - 9:45 AM):**
 - Entry Price: $140.00
 - Gap: +2.5% (normal entry)
-- Shares: 0.57 shares ($80 position)
+- Shares: 0.93 shares ($130 position - HIGH conviction 13%)
 - Stop Loss: $130.20 (-7%)
 - Price Target: $156.80 (+12%)
 
@@ -491,9 +538,9 @@ Analyzes past performance across multiple dimensions:
 - Exit: $161.70
 - Return: **+15.5%**
 - Hold: 23 days
-- Profit: $12.37
+- Profit: $20.16 (from $130 position vs $12.37 from old $80 position)
 - Exit Reason: "Trailing stop hit (peak was +17.9%)"
-- What Worked: "Strong earnings catalyst, post-earnings drift as expected, excellent volume confirmation"
+- What Worked: "Strong earnings catalyst, post-earnings drift as expected, excellent volume confirmation, market-leading RS percentile (92), leading sector (Technology), institutional accumulation"
 
 ---
 
@@ -525,6 +572,12 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: November 26, 2024
-**Version**: v5.5 (Phase 0-2 Complete: 12 Enhancements)
+**Last Updated**: November 30, 2024
+**Version**: v5.5 (Phase 0-3 Complete: 18 Enhancements)
 **Status**: Live in production paper trading
+
+**Latest Updates**:
+- ✅ Phase 3.1: IBD-style RS percentile ranking (market-wide 0-100 scale)
+- ✅ Phase 3.2: Sector rotation detection (11 sectors vs SPY)
+- ✅ Phase 3.3: Institutional signals (options flow + dark pool)
+- ✅ Phase 3.4: GO command integration (enhanced conviction with Phase 3 data)
