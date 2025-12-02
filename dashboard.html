@@ -681,8 +681,9 @@
                     </div>
                 </div>
             </div>
-            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); font-size: 0.875rem; color: var(--text-secondary); text-align: center;">
-                System Version: 6.0
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); font-size: 0.875rem; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--neon-green);">System Version: 6.0</span>
+                <span style="color: var(--neon-green);">Last Updated: <span id="headerUpdateTime">--</span></span>
             </div>
         </header>
 
@@ -1387,13 +1388,16 @@
             });
 
             document.getElementById('updateTime').textContent = timeStr + ' ET';
+            document.getElementById('headerUpdateTime').textContent = timeStr + ' ET';
         } else {
             // Invalid date format
             document.getElementById('updateTime').textContent = 'Awaiting first update';
+            document.getElementById('headerUpdateTime').textContent = 'Awaiting first update';
         }
     } else {
         // No timestamp or not initialized
         document.getElementById('updateTime').textContent = 'Awaiting first update';
+        document.getElementById('headerUpdateTime').textContent = 'Awaiting first update';
     }
 }
 
