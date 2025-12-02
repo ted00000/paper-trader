@@ -859,6 +859,77 @@
             </div>
         </div>
 
+        <!-- Public Model Portfolio -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">📈 Model Portfolio Performance</h2>
+                <span class="badge" id="portfolio-last-updated">Loading...</span>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="health-summary">
+                <div class="health-stat">
+                    <div class="stat-value" id="ytd-return">-</div>
+                    <div class="stat-label">YTD Return %</div>
+                </div>
+                <div class="health-stat">
+                    <div class="stat-value" id="mtd-return">-</div>
+                    <div class="stat-label">MTD Return %</div>
+                </div>
+                <div class="health-stat">
+                    <div class="stat-value" id="total-trades">-</div>
+                    <div class="stat-label">Total Trades</div>
+                </div>
+                <div class="health-stat">
+                    <div class="stat-value" id="win-rate">-</div>
+                    <div class="stat-label">Win Rate</div>
+                </div>
+                <div class="health-stat">
+                    <div class="stat-value" id="avg-gain">-</div>
+                    <div class="stat-label">Avg Gain %</div>
+                </div>
+                <div class="health-stat">
+                    <div class="stat-value" id="avg-loss">-</div>
+                    <div class="stat-label">Avg Loss %</div>
+                </div>
+                <div class="health-stat">
+                    <div class="stat-value" id="max-drawdown">-</div>
+                    <div class="stat-label">Max Drawdown %</div>
+                </div>
+                <div class="health-stat">
+                    <div class="stat-value" id="sharpe-ratio">-</div>
+                    <div class="stat-label">Sharpe Ratio</div>
+                </div>
+            </div>
+
+            <!-- Conviction Distribution -->
+            <div class="health-issues" style="background: #111; border: 1px solid #222; padding: 20px;">
+                <h3 style="color: #00ff41; margin-top: 0;">Conviction Distribution</h3>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 15px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: #ff4444;" id="conviction-high">-</div>
+                        <div style="color: #888; margin-top: 5px;">HIGH Conviction</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: #ffa500;" id="conviction-medium">-</div>
+                        <div style="color: #888; margin-top: 5px;">MEDIUM Conviction</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: #888;" id="conviction-low">-</div>
+                        <div style="color: #888; margin-top: 5px;">LOW Conviction</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance by Regime -->
+            <div class="health-issues" style="background: #111; border: 1px solid #222; padding: 20px; margin-top: 20px;">
+                <h3 style="color: #00ff41; margin-top: 0;">Performance by Market Regime</h3>
+                <div id="regime-performance-container">
+                    <p class="loading">Loading regime analysis...</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Daily Picks Section -->
         <div class="section">
             <h2 class="section-title">📊 Today's Picks Analysis</h2>
@@ -1226,6 +1297,135 @@
         }
     }
 
+    // Fetch and display portfolio performance
+    async function loadPortfolioPerformance() {
+        try {
+            const response = await fetch('/api/portfolio/performance');
+            const perf = await response.json();
+
+            // Update main metrics
+            document.getElementById('ytd-return').textContent =
+                (perf.ytd_return > 0 ? '+' : '') + perf.ytd_return + '%';
+            document.getElementById('ytd-return').style.color =
+                perf.ytd_return > 0 ? '#00ff41' : (perf.ytd_return < 0 ? '#ff4444' : '#888');
+
+            document.getElementById('mtd-return').textContent =
+                (perf.mtd_return > 0 ? '+' : '') + perf.mtd_return + '%';
+            document.getElementById('mtd-return').style.color =
+                perf.mtd_return > 0 ? '#00ff41' : (perf.mtd_return < 0 ? '#ff4444' : '#888');
+
+            document.getElementById('total-trades').textContent = perf.total_trades;
+            document.getElementById('win-rate').textContent = perf.win_rate + '%';
+            document.getElementById('avg-gain').textContent = '+' + perf.avg_gain + '%';
+            document.getElementById('avg-loss').textContent = perf.avg_loss + '%';
+            document.getElementById('max-drawdown').textContent = perf.max_drawdown + '%';
+            document.getElementById('sharpe-ratio').textContent = perf.sharpe_ratio;
+
+            // Update conviction distribution
+            document.getElementById('conviction-high').textContent = perf.total_conviction.HIGH;
+            document.getElementById('conviction-medium').textContent = perf.total_conviction.MEDIUM;
+            document.getElementById('conviction-low').textContent = perf.total_conviction.LOW;
+
+            // Update last updated badge
+            const badge = document.getElementById('portfolio-last-updated');
+            if (perf.last_updated) {
+                badge.textContent = 'Updated: ' + perf.last_updated;
+                badge.className = 'badge success';
+            } else {
+                badge.textContent = 'No trades yet';
+                badge.className = 'badge';
+            }
+
+        } catch (error) {
+            console.error('Error loading portfolio performance:', error);
+            document.getElementById('ytd-return').textContent = 'Error';
+        }
+    }
+
+    // Fetch and display regime performance
+    async function loadRegimePerformance() {
+        try {
+            const response = await fetch('/api/portfolio/regime-performance');
+            const data = await response.json();
+
+            const container = document.getElementById('regime-performance-container');
+            let html = '';
+
+            // VIX Regimes
+            if (Object.keys(data.vix_regimes).length > 0) {
+                html += '<h4 style="color: #fff; margin-top: 0;">VIX Regime Performance</h4>';
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+
+                for (const [regime, stats] of Object.entries(data.vix_regimes)) {
+                    const avgColor = stats.avg_return > 0 ? '#00ff41' : (stats.avg_return < 0 ? '#ff4444' : '#888');
+                    html += `
+                        <div style="background: #0a0a0a; padding: 15px; border-radius: 8px; border: 1px solid #333;">
+                            <div style="font-weight: bold; color: #ffa500; margin-bottom: 10px;">${regime}</div>
+                            <div style="color: #888; font-size: 0.9em; margin: 5px 0;">Trades: ${stats.trades}</div>
+                            <div style="color: ${avgColor}; font-size: 1.3em; font-weight: bold;">${stats.avg_return > 0 ? '+' : ''}${stats.avg_return}%</div>
+                            <div style="color: #888; font-size: 0.9em; margin-top: 5px;">Win Rate: ${stats.win_rate}%</div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            // Market Breadth Regimes
+            if (Object.keys(data.market_breadth_regimes).length > 0) {
+                html += '<h4 style="color: #fff; margin-top: 15px;">Market Breadth Regime Performance</h4>';
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+
+                for (const [regime, stats] of Object.entries(data.market_breadth_regimes)) {
+                    const avgColor = stats.avg_return > 0 ? '#00ff41' : (stats.avg_return < 0 ? '#ff4444' : '#888');
+                    html += `
+                        <div style="background: #0a0a0a; padding: 15px; border-radius: 8px; border: 1px solid #333;">
+                            <div style="font-weight: bold; color: #00ff41; margin-bottom: 10px;">${regime}</div>
+                            <div style="color: #888; font-size: 0.9em; margin: 5px 0;">Trades: ${stats.trades}</div>
+                            <div style="color: ${avgColor}; font-size: 1.3em; font-weight: bold;">${stats.avg_return > 0 ? '+' : ''}${stats.avg_return}%</div>
+                            <div style="color: #888; font-size: 0.9em; margin-top: 5px;">Win Rate: ${stats.win_rate}%</div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            // Sector Performance (top 5)
+            if (Object.keys(data.sector_performance).length > 0) {
+                html += '<h4 style="color: #fff; margin-top: 15px;">Top Sector Performance</h4>';
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">';
+
+                // Sort sectors by avg return and take top 5
+                const sortedSectors = Object.entries(data.sector_performance)
+                    .sort((a, b) => b[1].avg_return - a[1].avg_return)
+                    .slice(0, 5);
+
+                for (const [sector, stats] of sortedSectors) {
+                    const avgColor = stats.avg_return > 0 ? '#00ff41' : (stats.avg_return < 0 ? '#ff4444' : '#888');
+                    html += `
+                        <div style="background: #0a0a0a; padding: 15px; border-radius: 8px; border: 1px solid #333;">
+                            <div style="font-weight: bold; color: #fff; margin-bottom: 10px;">${sector}</div>
+                            <div style="color: #888; font-size: 0.9em; margin: 5px 0;">Trades: ${stats.trades}</div>
+                            <div style="color: ${avgColor}; font-size: 1.3em; font-weight: bold;">${stats.avg_return > 0 ? '+' : ''}${stats.avg_return}%</div>
+                            <div style="color: #888; font-size: 0.9em; margin-top: 5px;">Win Rate: ${stats.win_rate}%</div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            if (html === '') {
+                html = '<p style="color: #888;">No regime data available yet. Trade data will populate as trades are completed.</p>';
+            }
+
+            container.innerHTML = html;
+
+        } catch (error) {
+            console.error('Error loading regime performance:', error);
+            document.getElementById('regime-performance-container').innerHTML =
+                '<p class="error-message">Error loading regime analysis</p>';
+        }
+    }
+
     // Fetch and display daily picks
     async function loadDailyPicks() {
         try {
@@ -1296,10 +1496,14 @@
 
     // Call on page load
     loadSystemHealth();
+    loadPortfolioPerformance();
+    loadRegimePerformance();
     loadDailyPicks();
 
     // Refresh every 5 minutes
     setInterval(loadSystemHealth, 5 * 60 * 1000);
+    setInterval(loadPortfolioPerformance, 5 * 60 * 1000);
+    setInterval(loadRegimePerformance, 5 * 60 * 1000);
     setInterval(loadDailyPicks, 5 * 60 * 1000);
     </script>
 
