@@ -649,9 +649,9 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: December 1, 2024
-**Version**: v5.6 (Phase 0-4 Complete: 26 Enhancements)
-**Status**: Live in production paper trading
+**Last Updated**: December 2, 2024
+**Version**: v6.0 (Phase 0-4 Complete: 26 Enhancements - CODE FROZEN)
+**Status**: Live in production paper trading - 6-12 month results collection period
 
 **Latest Updates (Phase 4 - Risk Optimization & Institutional Enhancements)**:
 - ✅ Phase 4.1: Cluster-based conviction scoring (prevents double-counting correlated signals)

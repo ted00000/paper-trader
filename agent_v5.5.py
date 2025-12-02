@@ -262,7 +262,7 @@ CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
 PROJECT_DIR = Path(__file__).parent
 
 # System version tracking (Enhancement 4.7)
-SYSTEM_VERSION = 'v5.6'  # Phase 0-4 Complete: 24 Enhancements
+SYSTEM_VERSION = 'v6.0'  # Phase 0-4 Complete: 24 Enhancements
 
 class TradingAgent:
     """Production-ready trading agent v4.3 - Complete implementation"""
@@ -1056,6 +1056,18 @@ POSITION {i}: {ticker}
             'sector_etf': trade.get('sector_etf', 'Unknown'),
             'conviction_level': trade.get('conviction_level', 'MEDIUM'),
             'supporting_factors': trade.get('supporting_factors', 0),
+            'rs_rating': trade.get('rs_rating', 0),  # Enhancement 2.1
+            'technical_score': trade.get('technical_score', 0),  # Phase 5.6
+            'technical_sma50': trade.get('technical_sma50', 0.0),
+            'technical_ema5': trade.get('technical_ema5', 0.0),
+            'technical_ema20': trade.get('technical_ema20', 0.0),
+            'technical_adx': trade.get('technical_adx', 0.0),
+            'technical_volume_ratio': trade.get('technical_volume_ratio', 0.0),
+            'volume_quality': trade.get('volume_quality', ''),  # Enhancement 2.2
+            'volume_trending_up': trade.get('volume_trending_up', False),  # Enhancement 2.2
+            'keywords_matched': trade.get('keywords_matched', ''),  # Enhancement 2.5
+            'news_sources': trade.get('news_sources', ''),  # Enhancement 2.5
+            'news_article_count': trade.get('news_article_count', 0),  # Enhancement 2.5
             'sector': trade.get('sector', ''),
             'stop_loss': trade.get('stop_loss', 0),
             'price_target': trade.get('price_target', 0),
