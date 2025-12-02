@@ -681,8 +681,29 @@
                     </div>
                 </div>
             </div>
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); font-size: 0.875rem; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--neon-green);">System Version: 6.0</span>
+                <span style="color: var(--neon-green);">Last Updated: <span id="headerUpdateTime">--</span></span>
+            </div>
         </header>
-        
+
+        <!-- System Status Bar -->
+        <div style="background: var(--bg-dark-gray); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="color: var(--text-secondary); font-weight: 500;">System:</span>
+                <span id="systemHealthStatus" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--neon-green);"></span>
+                    <span style="color: var(--neon-green);">Healthy</span>
+                </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                <span style="color: var(--text-secondary);">Screener: <span id="screenerStatus" style="color: var(--text-primary);">--</span></span>
+                <span style="color: var(--text-secondary);">GO: <span id="goStatus" style="color: var(--text-primary);">--</span></span>
+                <span style="color: var(--text-secondary);">EXECUTE: <span id="executeStatus" style="color: var(--text-primary);">--</span></span>
+                <span style="color: var(--text-secondary);">ANALYZE: <span id="analyzeStatus" style="color: var(--text-primary);">--</span></span>
+            </div>
+        </div>
+
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-header">
@@ -719,152 +740,134 @@
             </div>
         </div>
 
-        <!-- System Status Bar (NEW) -->
-        <div class="section system-status-bar" style="padding: 20px 32px; margin-bottom: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                <div class="system-badges" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <span style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;">System:</span>
-                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">v5.6 COMPOUND GROWTH</span>
-                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">NEWS</span>
-                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">TIERS</span>
-                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">VIX/MACRO</span>
-                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(0,255,65,0.1); color: var(--neon-green); border: 1px solid var(--neon-green);">CONVICTION</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 0.875rem; color: var(--text-secondary);">Next:</span>
-                    <span id="nextScheduled" style="font-size: 0.875rem; color: var(--neon-green); font-weight: 600;">ANALYZE 4:30 PM ET</span>
-                </div>
-            </div>
-        </div>
-        
+        <!-- Row 1: Performance Chart (left) + Catalyst Breakdown (right) -->
         <div class="content-grid">
             <div class="section">
                 <div class="section-header">
-                    <h2 class="section-title">Active Portfolio</h2>
-                    <span class="section-badge" id="positionCount">10 Positions</span>
+                    <h2 class="section-title">Performance</h2>
                 </div>
-                <div id="portfolioContent" class="loading">Loading portfolio data</div>
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
+                </div>
             </div>
 
-            <div>
-                <div class="section">
-                    <div class="section-header">
-                        <h2 class="section-title">Performance</h2>
+            <div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">Catalyst Breakdown</h2>
+                </div>
+                <div id="catalystBreakdown">
+                    <div class="performance-item">
+                        <div class="performance-label">Earnings Beats</div>
+                        <div class="performance-bar">
+                            <div class="performance-bar-fill" id="earningsBar" style="width: 0%"></div>
+                        </div>
+                        <div class="performance-value" id="earningsCount">0</div>
                     </div>
-                    <div class="chart-container">
-                        <canvas id="performanceChart"></canvas>
+                    <div class="performance-item">
+                        <div class="performance-label">Sector Momentum</div>
+                        <div class="performance-bar">
+                            <div class="performance-bar-fill" id="sectorBar" style="width: 0%"></div>
+                        </div>
+                        <div class="performance-value" id="sectorCount">0</div>
+                    </div>
+                    <div class="performance-item">
+                        <div class="performance-label">Technical Breakouts</div>
+                        <div class="performance-bar">
+                            <div class="performance-bar-fill" id="technicalBar" style="width: 0%"></div>
+                        </div>
+                        <div class="performance-value" id="technicalCount">0</div>
+                    </div>
+                    <div class="performance-item">
+                        <div class="performance-label">Analyst Upgrades</div>
+                        <div class="performance-bar">
+                            <div class="performance-bar-fill" id="analystBar" style="width: 0%"></div>
+                        </div>
+                        <div class="performance-value" id="analystCount">0</div>
+                    </div>
+                    <div class="performance-item">
+                        <div class="performance-label">Binary Events</div>
+                        <div class="performance-bar">
+                            <div class="performance-bar-fill" id="binaryBar" style="width: 0%"></div>
+                        </div>
+                        <div class="performance-value" id="binaryCount">0</div>
                     </div>
                 </div>
-                
-                <div class="section" style="margin-top: 24px;">
-                    <div class="section-header">
-                        <h2 class="section-title">Catalyst Breakdown</h2>
+            </div>
+        </div>
+
+        <!-- Row 2: Active Portfolio - Full Width -->
+        <div class="section" style="margin-bottom: 24px;">
+            <div class="section-header">
+                <h2 class="section-title">Active Portfolio</h2>
+                <span class="section-badge" id="positionCount">10 Positions</span>
+            </div>
+            <div id="portfolioContent" class="loading">Loading portfolio data</div>
+        </div>
+
+        <!-- Row 3: Model Portfolio Track Record - Full Width -->
+        <div class="section" style="margin-bottom: 24px;">
+            <div class="section-header">
+                <h2 class="section-title">📈 Model Portfolio Track Record</h2>
+                <span class="section-badge" id="portfolioLastUpdated">Loading...</span>
+            </div>
+
+            <div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                <div class="stat-card">
+                    <div class="stat-label">YTD Return</div>
+                    <div class="stat-value" id="ytd-return" style="color: var(--neon-green);">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">MTD Return</div>
+                    <div class="stat-value" id="mtd-return">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Trades</div>
+                    <div class="stat-value" id="total-trades">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Win Rate</div>
+                    <div class="stat-value" id="win-rate">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Gain</div>
+                    <div class="stat-value" id="avg-gain" style="color: var(--neon-green);">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Loss</div>
+                    <div class="stat-value" id="avg-loss" style="color: var(--red);">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Max Drawdown</div>
+                    <div class="stat-value" id="max-drawdown">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Sharpe Ratio</div>
+                    <div class="stat-value" id="sharpe-ratio">-</div>
+                </div>
+            </div>
+
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px; margin-bottom: 16px;">
+                <h3 style="color: var(--neon-green); margin: 0 0 16px 0;">Conviction Distribution</h3>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: #ff4444;" id="conviction-high">-</div>
+                        <div style="color: var(--text-secondary); margin-top: 8px;">HIGH Conviction</div>
                     </div>
-                    <div id="catalystBreakdown">
-                        <div class="performance-item">
-                            <div class="performance-label">Earnings Beats</div>
-                            <div class="performance-bar">
-                                <div class="performance-bar-fill" id="earningsBar" style="width: 0%"></div>
-                            </div>
-                            <div class="performance-value" id="earningsCount">0</div>
-                        </div>
-                        <div class="performance-item">
-                            <div class="performance-label">Sector Momentum</div>
-                            <div class="performance-bar">
-                                <div class="performance-bar-fill" id="sectorBar" style="width: 0%"></div>
-                            </div>
-                            <div class="performance-value" id="sectorCount">0</div>
-                        </div>
-                        <div class="performance-item">
-                            <div class="performance-label">Technical Breakouts</div>
-                            <div class="performance-bar">
-                                <div class="performance-bar-fill" id="technicalBar" style="width: 0%"></div>
-                            </div>
-                            <div class="performance-value" id="technicalCount">0</div>
-                        </div>
-                        <div class="performance-item">
-                            <div class="performance-label">Analyst Upgrades</div>
-                            <div class="performance-bar">
-                                <div class="performance-bar-fill" id="analystBar" style="width: 0%"></div>
-                            </div>
-                            <div class="performance-value" id="analystCount">0</div>
-                        </div>
-                        <div class="performance-item">
-                            <div class="performance-label">Binary Events</div>
-                            <div class="performance-bar">
-                                <div class="performance-bar-fill" id="binaryBar" style="width: 0%"></div>
-                            </div>
-                            <div class="performance-value" id="binaryCount">0</div>
-                        </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: #ffa500;" id="conviction-medium">-</div>
+                        <div style="color: var(--text-secondary); margin-top: 8px;">MEDIUM Conviction</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: var(--text-secondary);" id="conviction-low">-</div>
+                        <div style="color: var(--text-secondary); margin-top: 8px;">LOW Conviction</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Model Portfolio Performance -->
-                <div class="section" style="margin-top: 24px;">
-                    <div class="section-header">
-                        <h2 class="section-title">📈 Model Portfolio Track Record</h2>
-                        <span class="section-badge" id="portfolioLastUpdated">Loading...</span>
-                    </div>
-
-                    <div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-                        <div class="stat-card">
-                            <div class="stat-label">YTD Return</div>
-                            <div class="stat-value" id="ytd-return" style="color: var(--neon-green);">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">MTD Return</div>
-                            <div class="stat-value" id="mtd-return">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Total Trades</div>
-                            <div class="stat-value" id="total-trades">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Win Rate</div>
-                            <div class="stat-value" id="win-rate">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Avg Gain</div>
-                            <div class="stat-value" id="avg-gain" style="color: var(--neon-green);">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Avg Loss</div>
-                            <div class="stat-value" id="avg-loss" style="color: var(--red);">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Max Drawdown</div>
-                            <div class="stat-value" id="max-drawdown">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Sharpe Ratio</div>
-                            <div class="stat-value" id="sharpe-ratio">-</div>
-                        </div>
-                    </div>
-
-                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px; margin-bottom: 16px;">
-                        <h3 style="color: var(--neon-green); margin: 0 0 16px 0;">Conviction Distribution</h3>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-                            <div style="text-align: center;">
-                                <div style="font-size: 2em; font-weight: bold; color: #ff4444;" id="conviction-high">-</div>
-                                <div style="color: var(--text-secondary); margin-top: 8px;">HIGH Conviction</div>
-                            </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 2em; font-weight: bold; color: #ffa500;" id="conviction-medium">-</div>
-                                <div style="color: var(--text-secondary); margin-top: 8px;">MEDIUM Conviction</div>
-                            </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 2em; font-weight: bold; color: var(--text-secondary);" id="conviction-low">-</div>
-                                <div style="color: var(--text-secondary); margin-top: 8px;">LOW Conviction</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px;">
-                        <h3 style="color: var(--neon-green); margin: 0 0 16px 0;">Performance by Market Regime</h3>
-                        <div id="regime-performance-container">
-                            <p style="color: var(--text-secondary);">Loading regime analysis...</p>
-                        </div>
-                    </div>
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px;">
+                <h3 style="color: var(--neon-green); margin: 0 0 16px 0;">Performance by Market Regime</h3>
+                <div id="regime-performance-container">
+                    <p style="color: var(--text-secondary);">Loading regime analysis...</p>
                 </div>
             </div>
         </div>
@@ -1384,13 +1387,16 @@
             });
 
             document.getElementById('updateTime').textContent = timeStr + ' ET';
+            document.getElementById('headerUpdateTime').textContent = timeStr + ' ET';
         } else {
             // Invalid date format
             document.getElementById('updateTime').textContent = 'Awaiting first update';
+            document.getElementById('headerUpdateTime').textContent = 'Awaiting first update';
         }
     } else {
         // No timestamp or not initialized
         document.getElementById('updateTime').textContent = 'Awaiting first update';
+        document.getElementById('headerUpdateTime').textContent = 'Awaiting first update';
     }
 }
 
@@ -1542,17 +1548,51 @@
             }
         }
 
+        // Load system status
+        async function loadSystemStatus() {
+            try {
+                const response = await fetch('/api/system/status');
+                const status = await response.json();
+
+                // Update health indicator
+                const healthStatus = document.getElementById('systemHealthStatus');
+                const colorMap = {
+                    'green': 'var(--neon-green)',
+                    'orange': '#ffa500',
+                    'red': 'var(--red)',
+                    'gray': '#808080'
+                };
+                const color = colorMap[status.status_color] || 'gray';
+
+                healthStatus.innerHTML = `
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: ${color};"></span>
+                    <span style="color: ${color};">${status.status_text}</span>
+                `;
+
+                // Update process statuses
+                document.getElementById('screenerStatus').textContent = status.processes.screener;
+                document.getElementById('goStatus').textContent = status.processes.go;
+                document.getElementById('executeStatus').textContent = status.processes.execute;
+                document.getElementById('analyzeStatus').textContent = status.processes.analyze;
+
+            } catch (error) {
+                console.error('Error loading system status:', error);
+            }
+        }
+
         // Initialize
         updateMarketStatus();
         loadData();
         loadPortfolioPerformance();
         loadRegimePerformance();
+        loadSystemStatus();
 
         // Update market status every minute
         setInterval(updateMarketStatus, REFRESH_INTERVAL);
         setInterval(loadData, REFRESH_INTERVAL);
         setInterval(loadPortfolioPerformance, 5 * 60 * 1000); // Every 5 minutes
         setInterval(loadRegimePerformance, 5 * 60 * 1000); // Every 5 minutes
+        setInterval(loadSystemStatus, 2 * 60 * 1000); // Every 2 minutes
     </script>
 </body>
 </html>
