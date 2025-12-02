@@ -58,14 +58,15 @@ class HealthChecker:
 
         apis = {
             'Polygon': 'https://api.polygon.io/v2/aggs/ticker/SPY/prev?apiKey=' + os.getenv('POLYGON_API_KEY', ''),
-            'Anthropic': 'https://api.anthropic.com/v1/messages',  # Will fail without auth, but tests connectivity
+            'Anthropic': 'https://api.anthropic.com/v1/messages',  # Will return 400/405 without proper POST, but tests connectivity
         }
 
         for api_name, url in apis.items():
             try:
                 response = requests.get(url, timeout=10)
-                # Polygon should return 200, Anthropic will return 401 (auth required) but connection works
-                if response.status_code in [200, 401]:
+                # Polygon should return 200
+                # Anthropic returns 400 (bad request) or 405 (method not allowed) - both mean API is reachable
+                if response.status_code in [200, 400, 401, 405]:
                     print(f"   ✓ {api_name} API reachable")
                 else:
                     self.warnings.append(f"⚠️ {api_name} API returned status {response.status_code}")
