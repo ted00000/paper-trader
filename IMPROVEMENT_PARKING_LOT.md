@@ -18,6 +18,7 @@
 - ✅ VIX regime logging (Enhancement 4.5) - Tracks VIX regimes for learning & attribution
 - ✅ AI robustness & failover (Enhancement 4.6) - Graceful degradation when Claude API fails
 - ✅ Operational monitoring (Enhancement 4.7) - Health checks, alerting, version tracking
+- ✅ Public model portfolio display (Enhancement 4.8) - Dashboard performance metrics & regime analysis
 
 ### ✅ COMPLETED: AI Robustness & Failover (Enhancement 4.6)
 **Status**: ✅ IMPLEMENTED (Dec 1, 2024)
@@ -83,12 +84,13 @@
 
 ---
 
-### Priority 1: Dashboard Health Monitoring & Performance Display (CRITICAL FOR MARKETING)
-**Status**: Health checks running, need dashboard integration
+### ✅ COMPLETED: Public Model Portfolio Display (Enhancement 4.8)
+**Status**: ✅ IMPLEMENTED (Dec 1, 2024)
 **Reviewer concern**: "Without 6-12 months live results, can't claim 'best-in-class'" + operational transparency
+**What it is**: Public-facing portfolio performance metrics on admin dashboard
 
 **Implementation**:
-1. **Admin Dashboard - System Health Tab** (3-4 hours):
+1. **Admin Dashboard - System Health Integration** (completed):
    - Real-time health status display (pulls from health_check.py)
    - Last command execution times (GO/EXECUTE/ANALYZE)
    - API status indicators (Polygon, Anthropic)
@@ -96,30 +98,59 @@
    - Active positions count + P&L
    - Disk space usage
    - Recent Claude API failures (if any)
-   - Replace Discord webhook with dashboard alerts
+   - Dashboard alerts replace Discord webhook approach
 
-2. **Public Model Portfolio Tab** (4-6 hours):
-   - Dashboard card showing YTD/MTD performance
-   - Win rate, avg gain/loss, max drawdown, Sharpe
-   - Trade count, conviction distribution
-   - Updated daily at 5pm ET
+2. **Public Model Portfolio Tab** (completed):
+   - YTD/MTD returns with color-coded display (green=profit, red=loss)
+   - Total trades, win rate percentage
+   - Average gain/loss per trade
+   - Max drawdown calculation
+   - Sharpe ratio (annualized, assuming ~50 trades/year)
+   - Conviction distribution (HIGH/MEDIUM/LOW trade counts)
+   - Auto-refresh every 5 minutes
 
-3. **Performance History** (2-3 hours):
-   - Monthly snapshots saved to JSON
-   - Performance across different regimes (VIX <20, 20-30, >30)
-   - Sector attribution (which sectors performed best)
+3. **Performance by Market Regime** (completed):
+   - VIX regime performance (5 levels: VERY_LOW, LOW, ELEVATED, HIGH, EXTREME)
+   - Market breadth regime analysis (HEALTHY/DEGRADED/UNHEALTHY)
+   - Top 5 sector performance attribution
+   - Trade count, avg return %, win rate per regime
+   - Color-coded cards for visual clarity
 
-4. **Out-of-Sample Results** (ongoing):
-   - Run system for 6-12 months without tweaking
-   - Document all regime changes (bull, bear, chop)
-   - Prove consistency across market conditions
+4. **Backend API Endpoints** (completed):
+   - `/api/portfolio/performance` - Main performance metrics
+   - `/api/portfolio/regime-performance` - Regime & sector analysis
+   - Uses numpy for statistical calculations
+   - Real-time CSV parsing from completed_trades.csv
 
-**Effort**: 9-13 hours initial build, then ongoing data collection
+**Effort**: 5 hours (actual)
 **Cost**: $0
-**Expected impact**: **REQUIRED** for subscription product credibility + operational transparency
-**Timeline**: Dashboard updates NOW, then let it run for 6+ months
+**Impact**: Complete transparency, enables 6-12 month track record building
+**Result**: Dashboard now shows comprehensive performance metrics, ready for public demonstration
 
-**When to implement**: Dashboard updates THIS WEEK, then let system build track record
+**Next Step**: Out-of-Sample Results Collection (ongoing - 6-12 months)
+- Run system without code tweaking
+- Document regime changes (bull, bear, chop)
+- Prove consistency across market conditions
+- Build credible track record for subscription product
+
+---
+
+### Priority 1: Out-of-Sample Results Collection (CRITICAL FOR MARKETING)
+**Status**: In progress - system operational, building track record
+**Reviewer concern**: "Without 6-12 months live results, can't claim 'best-in-class'"
+
+**Requirements**:
+- Run system for 6-12 months without tweaking code
+- Document all market regime changes encountered
+- Prove consistency across different market conditions
+- Maintain detailed trade logs with regime data
+
+**Timeline**: Dec 2024 - Jun 2025 (minimum)
+**Effort**: Ongoing monitoring, no code changes
+**Cost**: $0
+**Expected impact**: **REQUIRED** for subscription product credibility
+
+**Current approach**: ✅ All infrastructure complete, system running in production
 
 ---
 

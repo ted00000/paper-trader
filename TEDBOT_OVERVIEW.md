@@ -389,7 +389,7 @@ Day 6: $112.70 → TRAILING STOP HIT, EXIT at $112.70 (+12.7%)
 3. **Institutional Activity Signals** (Enhancement 3.3) - Options flow + dark pool tracking
 4. **GO Command Integration** (Enhancement 3.4) - Enhanced conviction scoring with Phase 3 data
 
-### Phase 4: Risk Optimization & Anti-Overlap (7 Enhancements) ✅ COMPLETED
+### Phase 4: Risk Optimization & Anti-Overlap (8 Enhancements) ✅ COMPLETED
 1. **Cluster-Based Conviction Scoring** (Enhancement 4.1) - Prevent double-counting correlated signals
    - Groups factors into 4 clusters: Momentum (cap +3), Institutional (cap +2), Catalyst (no cap), Market (cap +2)
    - Reduces max score from 14+ → 11 factors
@@ -414,9 +414,17 @@ Day 6: $112.70 → TRAILING STOP HIT, EXIT at $112.70 (+12.7%)
    - Automatic retry on next command execution
 7. **Operational Monitoring** (Enhancement 4.7) - Health checks, alerting, version tracking
    - health_check.py: Automated health monitoring (command execution, API connectivity, data freshness)
-   - Discord webhook integration for alerts (critical/warnings/healthy status)
+   - Dashboard integration for real-time health display
    - System version tracking (System_Version column in CSV)
    - Daily health checks at 5pm ET via cron
+8. **Public Model Portfolio Display** (Enhancement 4.8) - Performance transparency & regime analysis
+   - YTD/MTD returns with color-coded display
+   - Win rate, avg gain/loss, max drawdown, Sharpe ratio
+   - Conviction distribution tracking (HIGH/MEDIUM/LOW)
+   - Performance by VIX regime (5 levels)
+   - Performance by market breadth regime
+   - Top sector performance attribution
+   - Auto-refresh every 5 minutes on dashboard
 
 ---
 
@@ -549,7 +557,8 @@ Analyzes past performance across multiple dimensions:
 12. **Full Transparency**: Every decision logged and traceable
 13. **Continuous Learning**: Performance attribution guides optimization
 14. **AI Failover Safety**: Graceful degradation when Claude API unavailable (no catastrophic trades)
-15. **Operational Monitoring**: Automated health checks, Discord alerts, version tracking per trade
+15. **Operational Monitoring**: Automated health checks, dashboard alerts, version tracking per trade
+16. **Public Performance Display**: Real-time YTD/MTD metrics, regime analysis, complete transparency
 
 ---
 
@@ -641,7 +650,7 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 ---
 
 **Last Updated**: December 1, 2024
-**Version**: v5.6 (Phase 0-4 Complete: 25 Enhancements)
+**Version**: v5.6 (Phase 0-4 Complete: 26 Enhancements)
 **Status**: Live in production paper trading
 
 **Latest Updates (Phase 4 - Risk Optimization & Institutional Enhancements)**:
@@ -651,7 +660,8 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 - ✅ Phase 4.4: Liquidity filter (min $20M daily volume prevents slippage)
 - ✅ Phase 4.5: VIX regime logging (tracks market conditions for learning & attribution)
 - ✅ Phase 4.6: AI robustness & failover (graceful degradation when Claude API fails)
-- ✅ Phase 4.7: Operational monitoring (health checks, Discord alerts, version tracking)
+- ✅ Phase 4.7: Operational monitoring (health checks, dashboard alerts, version tracking)
+- ✅ Phase 4.8: Public model portfolio display (YTD/MTD metrics, regime analysis, transparency)
 
 **Previous Updates**:
 - ✅ Phase 3: IBD-style RS percentile ranking, sector rotation detection, institutional signals
