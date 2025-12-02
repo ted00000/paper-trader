@@ -1144,57 +1144,59 @@
     // Fetch and display system health
     async function loadSystemHealth() {
         try {
-            const response = await fetch('/api/system-health');
+            const response = await fetch('/api/system/health');
             const health = await response.json();
 
             const container = document.getElementById('system-health-container');
             const badge = document.getElementById('health-status-badge');
 
-            // Update badge
+            // Update badge based on status_color from health_check.py
             if (health.status === 'healthy') {
                 badge.textContent = '✅ Healthy';
                 badge.className = 'badge success';
-            } else if (health.status === 'warning') {
-                badge.textContent = '⚠️ Warnings';
+            } else if (health.status === 'degraded') {
+                badge.textContent = '⚠️ Degraded';
                 badge.className = 'badge warning';
             } else {
-                badge.textContent = '❌ Errors';
+                badge.textContent = '❌ Unhealthy';
                 badge.className = 'badge error';
             }
 
-            // Build health display
-            let html = '<div class="health-summary">' +
-                '<div class="health-stat">' +
-                '<div class="stat-value">' + health.checks_passed + '/' + health.checks_total + '</div>' +
-                '<div class="stat-label">Checks Passed</div>' +
-                '</div>' +
-                '<div class="health-stat">' +
-                '<div class="stat-value">' + health.errors.length + '</div>' +
-                '<div class="stat-label">Errors</div>' +
-                '</div>' +
-                '<div class="health-stat">' +
-                '<div class="stat-value">' + health.warnings.length + '</div>' +
-                '<div class="stat-label">Warnings</div>' +
-                '</div>' +
-                '<div class="health-stat">' +
+            // Build health display with system stats
+            let html = '<div class="health-summary">';
+
+            // System stats from health_check.py
+            if (health.stats) {
+                for (const [key, value] of Object.entries(health.stats)) {
+                    const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    html += '<div class="health-stat">' +
+                        '<div class="stat-value">' + value + '</div>' +
+                        '<div class="stat-label">' + displayKey + '</div>' +
+                        '</div>';
+                }
+            }
+
+            // Add last check time
+            html += '<div class="health-stat">' +
                 '<div class="stat-value">' + health.timestamp.split(' ')[1] + '</div>' +
                 '<div class="stat-label">Last Check</div>' +
-                '</div>' +
                 '</div>';
 
-            // Show errors if any
-            if (health.errors.length > 0) {
+            html += '</div>';
+
+            // Show critical issues if any
+            if (health.issues && health.issues.length > 0) {
                 html += '<div class="health-issues">' +
-                    '<h3 style="color: #dc3545; margin-top: 20px;">❌ Errors:</h3>' +
+                    '<h3 style="color: #dc3545; margin-top: 20px;">❌ Critical Issues:</h3>' +
                     '<ul style="color: #dc3545;">';
-                health.errors.forEach(err => {
-                    html += '<li>' + err + '</li>';
+                health.issues.forEach(issue => {
+                    html += '<li>' + issue + '</li>';
                 });
                 html += '</ul></div>';
             }
 
             // Show warnings if any
-            if (health.warnings.length > 0) {
+            if (health.warnings && health.warnings.length > 0) {
                 html += '<div class="health-issues">' +
                     '<h3 style="color: #f39c12; margin-top: 20px;">⚠️ Warnings:</h3>' +
                     '<ul style="color: #f39c12;">';
@@ -1205,9 +1207,11 @@
             }
 
             // All clear message
-            if (health.errors.length === 0 && health.warnings.length === 0) {
+            if ((!health.issues || health.issues.length === 0) &&
+                (!health.warnings || health.warnings.length === 0)) {
                 html += '<div style="text-align: center; padding: 20px; color: #28a745;">' +
-                    '<strong>✅ All systems operational</strong>' +
+                    '<strong>✅ All systems operational</strong><br>' +
+                    '<span style="font-size: 0.9em; color: #888;">Commands running, APIs connected, data fresh</span>' +
                     '</div>';
             }
 

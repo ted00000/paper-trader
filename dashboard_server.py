@@ -599,20 +599,28 @@ def view_log(operation):
 @app.route('/api/system/health')
 @require_auth
 def system_health():
-    """Get comprehensive system health check"""
+    """Get comprehensive system health check - runs health_check.py"""
     try:
-        health_file = PROJECT_DIR / 'dashboard_data' / 'system_health.json'
+        # Import and run health checker
+        import sys
+        sys.path.insert(0, str(PROJECT_DIR))
+        from health_check import HealthChecker
 
-        if health_file.exists():
-            with open(health_file) as f:
-                health_data = json.load(f)
-        else:
-            health_data = {'status': 'unknown', 'message': 'Health check not run yet'}
+        checker = HealthChecker()
+        health_data = checker.run_silent()
 
         return jsonify(health_data)
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'status': 'error',
+            'status_color': 'red',
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'stats': {},
+            'issues': [f'Health check failed: {str(e)}'],
+            'warnings': [],
+            'healthy': False
+        }), 500
 
 if __name__ == '__main__':
     print("\n" + "="*60)
