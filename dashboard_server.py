@@ -624,9 +624,8 @@ def system_health():
         }), 500
 
 @app.route('/api/portfolio/performance')
-@require_auth
 def portfolio_performance():
-    """Get public portfolio performance metrics"""
+    """Get public portfolio performance metrics (no auth required for transparency)"""
     try:
         trades_file = PROJECT_DIR / 'trade_history' / 'completed_trades.csv'
 
@@ -737,9 +736,8 @@ def portfolio_performance():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/portfolio/regime-performance')
-@require_auth
 def regime_performance():
-    """Get performance across different market regimes"""
+    """Get performance across different market regimes (no auth required for transparency)"""
     try:
         trades_file = PROJECT_DIR / 'trade_history' / 'completed_trades.csv'
 
