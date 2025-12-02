@@ -2,11 +2,146 @@
 
 ## What is Tedbot?
 
-Tedbot is an AI-powered catalyst-driven swing trading system that uses Claude (Anthropic's AI) to identify, analyze, and trade stocks experiencing significant catalysts. The system operates autonomously with a $1,000 paper trading account, making data-driven decisions based on news events, technical analysis, and market conditions.
+Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that uses Claude (Anthropic's AI) to identify, analyze, and trade stocks experiencing significant catalysts. The system operates fully autonomously with a $1,000 paper trading account, making data-driven decisions based on news events, technical analysis, market conditions, and continuous learning from past performance.
 
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
+**Current Version**: v6.0 (26 enhancements across 5 phases) - CODE FROZEN for 6-12 month results collection
+
+---
+
+## 🔄 Complete System Architecture: Screener → Decision → Execution → Learning
+
+Tedbot implements a **closed-loop autonomous trading system** with four interconnected stages:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    STAGE 1: IDENTIFICATION                       │
+│                      (Market Screener)                           │
+│  • Scans 3000+ stocks continuously                              │
+│  • Detects Tier 1/2/3 catalysts (M&A, FDA, earnings beats)     │
+│  • Applies technical filters (price > 50 MA, ADX >20)          │
+│  • Calculates RS percentile rank (0-100, IBD-style)            │
+│  • Tracks sector rotation (11 sectors vs SPY)                  │
+│  • Detects institutional activity (options flow + dark pool)   │
+│  • Filters for liquidity (min $20M daily volume)               │
+│  OUTPUT: 50-100 candidates → screener_candidates.json          │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│              STAGE 2: DECISION-MAKING (GO Command)              │
+│                     (Claude AI Analysis)                         │
+│                                                                  │
+│  CONTEXT LOADED (load_optimized_context):                       │
+│  • Strategy rules (8000 chars, auto-updated by learning)       │
+│  • Catalyst exclusions (<40% win rate triggers warnings)       │
+│  • Recent lessons learned (2000 chars from past trades)        │
+│  • Current portfolio positions                                  │
+│  • Account status                                               │
+│                                                                  │
+│  CLAUDE ANALYZES:                                               │
+│  • VIX regime (5 levels: VERY_LOW → EXTREME)                   │
+│  • Market breadth (HEALTHY/DEGRADED/UNHEALTHY)                 │
+│  • Cluster-based conviction scoring (max 11 factors)           │
+│    - Momentum cluster (cap +3): RS, sector strength            │
+│    - Institutional cluster (cap +2): options, dark pool        │
+│    - Catalyst cluster (no cap): tier, multi-catalyst, news     │
+│    - Market cluster (cap +2): VIX conditions                   │
+│  • Dynamic position sizing (6-13% based on conviction + regime)│
+│  • Historical performance accountability                        │
+│                                                                  │
+│  DECISIONS:                                                      │
+│  • BUY: 0-10 positions (skips trades if market UNHEALTHY)      │
+│  • HOLD: Continue existing positions                            │
+│  • EXIT: Flag positions for rotation if better opportunities   │
+│  OUTPUT: pending_positions.json → EXECUTE command              │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│           STAGE 3: EXECUTION (EXECUTE + ANALYZE Commands)       │
+│                                                                  │
+│  EXECUTE (9:45 AM - after market open):                         │
+│  • Validates gap-aware entry (<3%: enter, 3-8%: caution, >8%: skip) │
+│  • Calculates position size (conviction × market breadth adj)  │
+│  • Sets stop loss (-7% standard, -5% for gaps)                 │
+│  • Sets price target (dynamic based on catalyst type)          │
+│  • Enters positions at market open prices                      │
+│                                                                  │
+│  ANALYZE (4:30 PM - after market close):                        │
+│  • Checks stop losses (-7% hard stop)                          │
+│  • Checks price targets (activates trailing stops)             │
+│  • Monitors time limits (3 weeks max hold)                     │
+│  • Checks news sentiment deterioration                         │
+│  • Trailing stops: 50% profit (trail -5%), 100% (trail -3%)   │
+│  • Exits positions meeting criteria                             │
+│  OUTPUT: Updates current_portfolio.json, logs to CSV           │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│              STAGE 4: LEARNING (Continuous Improvement)         │
+│                                                                  │
+│  TRADE COMPLETION (when position exits):                        │
+│  • Logs 52-column CSV with complete trade attribution:         │
+│    - Technical: SMA50, EMA5, EMA20, ADX, Volume Ratio, Score   │
+│    - Volume: Quality (EXCELLENT/STRONG/GOOD), Trending (T/F)   │
+│    - Keywords: Matched keywords from news                       │
+│    - News: Sources, article count                              │
+│    - RS Rating: 0-100 percentile rank                          │
+│    - Supporting Factors: Cluster-based conviction count        │
+│    - VIX Regime: 5 levels (VERY_LOW → EXTREME)                 │
+│    - Market Breadth Regime: 3 levels (HEALTHY/DEGRADED/UNHEALTHY) │
+│    - System Version: v6.0+ (tracks code version per trade)     │
+│                                                                  │
+│  SCHEDULED LEARNING ANALYSIS:                                   │
+│  • DAILY (5:00 PM): 7-day tactical analysis (quick losers)     │
+│  • WEEKLY (Fridays 5:30 PM): 30-day pattern detection          │
+│  • MONTHLY (Last Sunday 6:00 PM): 90-day strategic review      │
+│                                                                  │
+│  LEARNING OUTPUTS:                                              │
+│  • catalyst_exclusions.json: <40% win rate → exclusion list    │
+│  • lessons_learned.md: Proven patterns (70%+) vs failures (<40%)│
+│  • strategy_rules.md: Auto-updated position sizing rules       │
+│  • catalyst_performance.csv: Win rates by catalyst type        │
+│  SAVED TO: strategy_evolution/ directory                        │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+                    ┌──────────────────┐
+                    │   FEEDBACK LOOP   │
+                    │    CLOSES HERE    │
+                    └──────────────────┘
+                              ↓
+              Learning insights loaded into STAGE 2
+              (Claude sees historical performance in next GO command)
+```
+
+### Key System Properties
+
+**Autonomy**: Runs 24/7 without human intervention
+- Automated scheduling via cron (screener, GO, EXECUTE, ANALYZE, learning)
+- Self-healing: AI failover if Claude API fails (holds positions, skips entries, logs failure)
+- Self-improving: Learning system automatically excludes underperforming catalysts
+- Health monitoring: Daily 5pm ET health checks with dashboard alerts
+
+**Risk Management**: Institutional-grade safety mechanisms
+- VIX shutdown: Stops trading at VIX >30, exits all at stops
+- Market breadth filter: Reduces sizing by 40% in UNHEALTHY markets
+- Cluster-based conviction: Prevents double-counting correlated signals (max 11 factors)
+- Sector concentration: Max 2 per sector (3 in leading sectors)
+- Liquidity filter: Min $20M daily volume prevents slippage
+
+**Transparency**: Complete performance visibility
+- Public dashboard: YTD/MTD returns, win rate, Sharpe ratio, max drawdown
+- Regime analysis: Performance by VIX regime (5 levels) and market breadth (3 levels)
+- Conviction tracking: HIGH/MEDIUM/LOW distribution and accuracy
+- Sector attribution: Top performing sectors
+- Version tracking: System_Version column tracks which code generated each trade
+
+**Learning**: Closed-loop continuous improvement
+- Trade → CSV (52 columns) → Learning (daily/weekly/monthly) → Insights (exclusions, lessons, rules) → Claude Context → Decision → Trade
+- Historical performance directly informs future decisions
+- Catalyst exclusions presented as warnings with accountability tracking
+- Deviations from learning recommendations require explanation and are logged
 
 ---
 
