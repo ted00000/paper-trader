@@ -798,6 +798,74 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Model Portfolio Performance -->
+                <div class="section" style="margin-top: 24px;">
+                    <div class="section-header">
+                        <h2 class="section-title">📈 Model Portfolio Track Record</h2>
+                        <span class="section-badge" id="portfolioLastUpdated">Loading...</span>
+                    </div>
+
+                    <div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                        <div class="stat-card">
+                            <div class="stat-label">YTD Return</div>
+                            <div class="stat-value" id="ytd-return" style="color: var(--neon-green);">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">MTD Return</div>
+                            <div class="stat-value" id="mtd-return">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Total Trades</div>
+                            <div class="stat-value" id="total-trades">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Win Rate</div>
+                            <div class="stat-value" id="win-rate">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Avg Gain</div>
+                            <div class="stat-value" id="avg-gain" style="color: var(--neon-green);">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Avg Loss</div>
+                            <div class="stat-value" id="avg-loss" style="color: var(--red);">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Max Drawdown</div>
+                            <div class="stat-value" id="max-drawdown">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Sharpe Ratio</div>
+                            <div class="stat-value" id="sharpe-ratio">-</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px; margin-bottom: 16px;">
+                        <h3 style="color: var(--neon-green); margin: 0 0 16px 0;">Conviction Distribution</h3>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 2em; font-weight: bold; color: #ff4444;" id="conviction-high">-</div>
+                                <div style="color: var(--text-secondary); margin-top: 8px;">HIGH Conviction</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 2em; font-weight: bold; color: #ffa500;" id="conviction-medium">-</div>
+                                <div style="color: var(--text-secondary); margin-top: 8px;">MEDIUM Conviction</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 2em; font-weight: bold; color: var(--text-secondary);" id="conviction-low">-</div>
+                                <div style="color: var(--text-secondary); margin-top: 8px;">LOW Conviction</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px;">
+                        <h3 style="color: var(--neon-green); margin: 0 0 16px 0;">Performance by Market Regime</h3>
+                        <div id="regime-performance-container">
+                            <p style="color: var(--text-secondary);">Loading regime analysis...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1354,14 +1422,137 @@
             // Initial check
             setTimeout(updateScrollIndicator, 100); // Delay to ensure content is rendered
         }
-        
+
+        // Load portfolio performance from API
+        async function loadPortfolioPerformance() {
+            try {
+                const response = await fetch('/api/portfolio/performance');
+                const perf = await response.json();
+
+                // Update main metrics
+                document.getElementById('ytd-return').textContent = (perf.ytd_return > 0 ? '+' : '') + perf.ytd_return + '%';
+                document.getElementById('ytd-return').style.color = perf.ytd_return > 0 ? 'var(--neon-green)' : (perf.ytd_return < 0 ? 'var(--red)' : 'var(--text-secondary)');
+
+                document.getElementById('mtd-return').textContent = (perf.mtd_return > 0 ? '+' : '') + perf.mtd_return + '%';
+                document.getElementById('mtd-return').style.color = perf.mtd_return > 0 ? 'var(--neon-green)' : (perf.mtd_return < 0 ? 'var(--red)' : 'var(--text-secondary)');
+
+                document.getElementById('total-trades').textContent = perf.total_trades;
+                document.getElementById('win-rate').textContent = perf.win_rate + '%';
+                document.getElementById('avg-gain').textContent = '+' + perf.avg_gain + '%';
+                document.getElementById('avg-loss').textContent = perf.avg_loss + '%';
+                document.getElementById('max-drawdown').textContent = perf.max_drawdown + '%';
+                document.getElementById('sharpe-ratio').textContent = perf.sharpe_ratio;
+
+                // Update conviction distribution
+                document.getElementById('conviction-high').textContent = perf.total_conviction.HIGH;
+                document.getElementById('conviction-medium').textContent = perf.total_conviction.MEDIUM;
+                document.getElementById('conviction-low').textContent = perf.total_conviction.LOW;
+
+                // Update last updated badge
+                const badge = document.getElementById('portfolioLastUpdated');
+                if (perf.last_updated) {
+                    badge.textContent = 'Updated: ' + perf.last_updated;
+                } else {
+                    badge.textContent = 'No trades yet';
+                }
+            } catch (error) {
+                console.error('Error loading portfolio performance:', error);
+            }
+        }
+
+        // Load regime performance from API
+        async function loadRegimePerformance() {
+            try {
+                const response = await fetch('/api/portfolio/regime-performance');
+                const data = await response.json();
+
+                const container = document.getElementById('regime-performance-container');
+                let html = '';
+
+                // VIX Regimes
+                if (Object.keys(data.vix_regimes).length > 0) {
+                    html += '<h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 16px;">VIX Regime Performance</h4>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">';
+
+                    for (const [regime, stats] of Object.entries(data.vix_regimes)) {
+                        const avgColor = stats.avg_return > 0 ? 'var(--neon-green)' : (stats.avg_return < 0 ? 'var(--red)' : 'var(--text-secondary)');
+                        html += `
+                            <div style="background: #1a1a1a; padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div style="font-weight: bold; color: #ffa500; margin-bottom: 10px; font-size: 0.9em;">${regime}</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85em; margin: 5px 0;">Trades: ${stats.trades}</div>
+                                <div style="color: ${avgColor}; font-size: 1.4em; font-weight: bold;">${stats.avg_return > 0 ? '+' : ''}${stats.avg_return}%</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85em; margin-top: 5px;">Win Rate: ${stats.win_rate}%</div>
+                            </div>
+                        `;
+                    }
+                    html += '</div>';
+                }
+
+                // Market Breadth Regimes
+                if (Object.keys(data.market_breadth_regimes).length > 0) {
+                    html += '<h4 style="color: var(--text-primary); margin-top: 16px; margin-bottom: 16px;">Market Breadth Regime Performance</h4>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">';
+
+                    for (const [regime, stats] of Object.entries(data.market_breadth_regimes)) {
+                        const avgColor = stats.avg_return > 0 ? 'var(--neon-green)' : (stats.avg_return < 0 ? 'var(--red)' : 'var(--text-secondary)');
+                        html += `
+                            <div style="background: #1a1a1a; padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div style="font-weight: bold; color: var(--neon-green); margin-bottom: 10px; font-size: 0.9em;">${regime}</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85em; margin: 5px 0;">Trades: ${stats.trades}</div>
+                                <div style="color: ${avgColor}; font-size: 1.4em; font-weight: bold;">${stats.avg_return > 0 ? '+' : ''}${stats.avg_return}%</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85em; margin-top: 5px;">Win Rate: ${stats.win_rate}%</div>
+                            </div>
+                        `;
+                    }
+                    html += '</div>';
+                }
+
+                // Top Sectors
+                if (Object.keys(data.sector_performance).length > 0) {
+                    html += '<h4 style="color: var(--text-primary); margin-top: 16px; margin-bottom: 16px;">Top Sector Performance</h4>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">';
+
+                    const sortedSectors = Object.entries(data.sector_performance)
+                        .sort((a, b) => b[1].avg_return - a[1].avg_return)
+                        .slice(0, 5);
+
+                    for (const [sector, stats] of sortedSectors) {
+                        const avgColor = stats.avg_return > 0 ? 'var(--neon-green)' : (stats.avg_return < 0 ? 'var(--red)' : 'var(--text-secondary)');
+                        html += `
+                            <div style="background: #1a1a1a; padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div style="font-weight: bold; color: var(--text-primary); margin-bottom: 10px; font-size: 0.9em;">${sector}</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85em; margin: 5px 0;">Trades: ${stats.trades}</div>
+                                <div style="color: ${avgColor}; font-size: 1.4em; font-weight: bold;">${stats.avg_return > 0 ? '+' : ''}${stats.avg_return}%</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85em; margin-top: 5px;">Win Rate: ${stats.win_rate}%</div>
+                            </div>
+                        `;
+                    }
+                    html += '</div>';
+                }
+
+                if (html === '') {
+                    html = '<p style="color: var(--text-secondary);">No regime data available yet. Trade data will populate as trades are completed.</p>';
+                }
+
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading regime performance:', error);
+                document.getElementById('regime-performance-container').innerHTML =
+                    '<p style="color: var(--red);">Error loading regime analysis</p>';
+            }
+        }
+
         // Initialize
         updateMarketStatus();
         loadData();
+        loadPortfolioPerformance();
+        loadRegimePerformance();
 
         // Update market status every minute
         setInterval(updateMarketStatus, REFRESH_INTERVAL);
         setInterval(loadData, REFRESH_INTERVAL);
+        setInterval(loadPortfolioPerformance, 5 * 60 * 1000); // Every 5 minutes
+        setInterval(loadRegimePerformance, 5 * 60 * 1000); // Every 5 minutes
     </script>
 </body>
 </html>
