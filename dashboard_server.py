@@ -827,6 +827,99 @@ def regime_performance():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/system/status')
+def system_status():
+    """Get public system status - minimal health info for public dashboard (no auth required)"""
+    try:
+        logs_dir = PROJECT_DIR / 'logs'
+
+        def get_last_run_info(command):
+            """Get last run timestamp for a command"""
+            log_file = logs_dir / f'{command}.log'
+            if not log_file.exists():
+                return None
+
+            mod_time = datetime.fromtimestamp(log_file.stat().st_mtime)
+            hours_ago = (datetime.now() - mod_time).total_seconds() / 3600
+
+            # Convert to relative time string
+            if hours_ago < 1:
+                minutes_ago = int(hours_ago * 60)
+                return f"{minutes_ago}m ago"
+            elif hours_ago < 24:
+                return f"{int(hours_ago)}h ago"
+            else:
+                days_ago = int(hours_ago / 24)
+                return f"{days_ago}d ago"
+
+        # Check screener data freshness
+        screener_file = PROJECT_DIR / 'screener_candidates.json'
+        screener_status = None
+        if screener_file.exists():
+            mod_time = datetime.fromtimestamp(screener_file.stat().st_mtime)
+            hours_ago = (datetime.now() - mod_time).total_seconds() / 3600
+            if hours_ago < 1:
+                screener_status = f"{int(hours_ago * 60)}m ago"
+            elif hours_ago < 24:
+                screener_status = f"{int(hours_ago)}h ago"
+            else:
+                screener_status = f"{int(hours_ago / 24)}d ago"
+
+        # Determine overall health
+        go_info = get_last_run_info('go')
+        execute_info = get_last_run_info('execute')
+        analyze_info = get_last_run_info('analyze')
+
+        # Simple health logic: if any command hasn't run in 48 hours, degraded
+        all_times = []
+        for cmd in ['go', 'execute', 'analyze']:
+            log_file = logs_dir / f'{cmd}.log'
+            if log_file.exists():
+                mod_time = datetime.fromtimestamp(log_file.stat().st_mtime)
+                hours_ago = (datetime.now() - mod_time).total_seconds() / 3600
+                all_times.append(hours_ago)
+
+        if not all_times:
+            health_status = 'unknown'
+            health_color = 'gray'
+            health_text = 'Unknown'
+        elif max(all_times) > 48:
+            health_status = 'degraded'
+            health_color = 'orange'
+            health_text = 'Degraded'
+        else:
+            health_status = 'healthy'
+            health_color = 'green'
+            health_text = 'Healthy'
+
+        return jsonify({
+            'status': health_status,
+            'status_color': health_color,
+            'status_text': health_text,
+            'processes': {
+                'screener': screener_status or 'N/A',
+                'go': go_info or 'N/A',
+                'execute': execute_info or 'N/A',
+                'analyze': analyze_info or 'N/A'
+            },
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'status_color': 'red',
+            'status_text': 'Error',
+            'processes': {
+                'screener': 'N/A',
+                'go': 'N/A',
+                'execute': 'N/A',
+                'analyze': 'N/A'
+            },
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("ADMIN DASHBOARD SERVER")
