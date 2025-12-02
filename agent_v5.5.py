@@ -261,6 +261,9 @@ CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages'
 CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
 PROJECT_DIR = Path(__file__).parent
 
+# System version tracking (Enhancement 4.7)
+SYSTEM_VERSION = 'v5.6'  # Phase 0-4 Complete: 24 Enhancements
+
 class TradingAgent:
     """Production-ready trading agent v4.3 - Complete implementation"""
 
@@ -294,6 +297,7 @@ class TradingAgent:
                     'News_Validation_Score', 'News_Exit_Triggered',
                     'VIX_At_Entry', 'Market_Regime', 'Macro_Event_Near',
                     'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
+                    'System_Version',  # Enhancement 4.7 - Track code version per trade
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
@@ -1046,6 +1050,7 @@ POSITION {i}: {ticker}
             'macro_event_near': trade.get('macro_event_near', 'None'),
             'vix_regime': trade.get('vix_regime', 'UNKNOWN'),
             'market_breadth_regime': trade.get('market_breadth_regime', 'UNKNOWN'),
+            'system_version': SYSTEM_VERSION,
             'relative_strength': trade.get('relative_strength', 0.0),
             'stock_return_3m': trade.get('stock_return_3m', 0.0),
             'sector_etf': trade.get('sector_etf', 'Unknown'),
@@ -4196,6 +4201,7 @@ RECENT LESSONS LEARNED:
                     'News_Validation_Score', 'News_Exit_Triggered',
                     'VIX_At_Entry', 'Market_Regime', 'Macro_Event_Near',
                     'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
+                    'System_Version',  # Enhancement 4.7 - Track code version per trade
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
