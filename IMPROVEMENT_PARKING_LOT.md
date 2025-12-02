@@ -17,6 +17,7 @@
 - ✅ Sector concentration reduction (4.3) - Exceeds their ask
 - ✅ VIX regime logging (Enhancement 4.5) - Tracks VIX regimes for learning & attribution
 - ✅ AI robustness & failover (Enhancement 4.6) - Graceful degradation when Claude API fails
+- ✅ Operational monitoring (Enhancement 4.7) - Health checks, alerting, version tracking
 
 ### ✅ COMPLETED: AI Robustness & Failover (Enhancement 4.6)
 **Status**: ✅ IMPLEMENTED (Dec 1, 2024)
@@ -47,32 +48,42 @@
 
 ---
 
-### Priority 1: Operational Monitoring & Health Checks (MEDIUM-HIGH)
-**Status**: Partial (logs exist, no active monitoring)
+### ✅ COMPLETED: Operational Monitoring & Health Checks (Enhancement 4.7)
+**Status**: ✅ IMPLEMENTED (Dec 1, 2024)
 **Reviewer concern**: "Institutions care about monitoring, alerting, change management"
+**What it is**: Automated system monitoring with health checks, alerting, and version tracking
 
 **Implementation**:
-1. **Health Checks** (2-3 hours):
-   - Cron job monitoring (alerts if GO/EXECUTE/ANALYZE don't run)
-   - API connectivity checks (Polygon, FMP, Claude)
-   - Data freshness checks (screener data updated in last 24 hours?)
-2. **Alerting System** (2-3 hours):
-   - Discord webhook for critical errors (free)
-   - Daily summary: trades executed, positions held, P&L
-   - Error alerts: API failures, execution failures, data gaps
-3. **Version Control & Change Tracking** (1-2 hours):
-   - Add version tag to every trade in CSV (`system_version: v5.6`)
-   - Track code changes in CHANGELOG.md
-   - Link performance degradation to specific versions
+1. **Health Checks** (`health_check.py`):
+   - Command execution monitoring (GO/EXECUTE/ANALYZE ran today?)
+   - API connectivity tests (Polygon, Anthropic reachable?)
+   - Data freshness validation (screener updated in 24 hours?)
+   - Active positions monitoring (count, average P&L)
+   - Claude API failure detection (from logs/claude_api_failures.json)
+   - Disk space monitoring (alerts when low)
+2. **Alerting System**:
+   - Discord webhook integration (optional, configured via .env)
+   - Color-coded alerts: Red (critical), Orange (warnings), Green (healthy)
+   - Daily health report with system stats
+   - Exit codes: 0 (healthy), 1 (issues detected)
+3. **Version Tracking**:
+   - Added SYSTEM_VERSION constant to agent_v5.5.py (v5.6)
+   - System_Version column added to CSV exports
+   - Every trade tagged with code version that generated it
+   - Enables correlation of performance changes with code updates
+4. **Deployment Tools**:
+   - setup_monitoring.sh: Automated setup script
+   - Configures cron jobs for daily 5pm ET health checks
+   - Logs saved to logs/health_check.log
 
-**Effort**: 5-8 hours total
+**Effort**: 4 hours (actual)
 **Cost**: $0
-**Expected impact**: Professional-grade operations, catch issues early
-**When to implement**: Next 2-4 weeks (before live money)
+**Impact**: Professional-grade operations, catch issues early
+**Result**: Complete institutional-grade monitoring system with automated daily health checks
 
 ---
 
-### Priority 2: Track Record & Evidence Layer (CRITICAL FOR MARKETING)
+### Priority 1: Track Record & Evidence Layer (CRITICAL FOR MARKETING)
 **Status**: Running in paper trading, no public portfolio
 **Reviewer concern**: "Without 6-12 months live results, can't claim 'best-in-class'"
 
@@ -100,7 +111,7 @@
 
 ---
 
-### Priority 3: Retail Safety Wrapper (MEDIUM PRIORITY)
+### Priority 2: Retail Safety Wrapper (MEDIUM PRIORITY)
 **Status**: Not implemented
 **Reviewer concern**: "Average user could blow themselves up with wrong settings"
 
@@ -124,7 +135,7 @@
 
 ---
 
-### Priority 4: Slippage Modeling & Cost Assumptions (LOW PRIORITY)
+### Priority 3: Slippage Modeling & Cost Assumptions (LOW PRIORITY)
 **Status**: Not explicitly modeled
 **Reviewer concern**: "Model at least 0.2-0.5% slippage per trade in backtests"
 
