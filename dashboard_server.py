@@ -14,6 +14,7 @@ import json
 import os
 import csv
 from time import time
+import numpy as np
 
 # Project setup
 PROJECT_DIR = Path(__file__).parent
@@ -621,6 +622,212 @@ def system_health():
             'warnings': [],
             'healthy': False
         }), 500
+
+@app.route('/api/portfolio/performance')
+@require_auth
+def portfolio_performance():
+    """Get public portfolio performance metrics"""
+    try:
+        trades_file = PROJECT_DIR / 'trade_history' / 'completed_trades.csv'
+
+        if not trades_file.exists():
+            return jsonify({
+                'ytd_return': 0,
+                'mtd_return': 0,
+                'total_trades': 0,
+                'win_rate': 0,
+                'avg_gain': 0,
+                'avg_loss': 0,
+                'max_drawdown': 0,
+                'sharpe_ratio': 0,
+                'total_conviction': {'HIGH': 0, 'MEDIUM': 0, 'LOW': 0},
+                'last_updated': None
+            })
+
+        trades = []
+        with open(trades_file) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('Trade_ID') and row.get('Exit_Date'):
+                    trades.append(row)
+
+        if not trades:
+            return jsonify({
+                'ytd_return': 0,
+                'mtd_return': 0,
+                'total_trades': 0,
+                'win_rate': 0,
+                'avg_gain': 0,
+                'avg_loss': 0,
+                'max_drawdown': 0,
+                'sharpe_ratio': 0,
+                'total_conviction': {'HIGH': 0, 'MEDIUM': 0, 'LOW': 0},
+                'last_updated': None
+            })
+
+        # Calculate metrics
+        now = datetime.now()
+        ytd_start = datetime(now.year, 1, 1)
+        mtd_start = datetime(now.year, now.month, 1)
+
+        ytd_trades = []
+        mtd_trades = []
+        returns = []
+        conviction_counts = {'HIGH': 0, 'MEDIUM': 0, 'LOW': 0}
+
+        for trade in trades:
+            try:
+                exit_date = datetime.strptime(trade['Exit_Date'], '%Y-%m-%d')
+                return_pct = float(trade.get('Return_Percent', 0))
+                returns.append(return_pct)
+
+                # Conviction tracking
+                conviction = trade.get('Conviction_Level', 'MEDIUM')
+                if conviction in conviction_counts:
+                    conviction_counts[conviction] += 1
+
+                if exit_date >= ytd_start:
+                    ytd_trades.append(return_pct)
+
+                if exit_date >= mtd_start:
+                    mtd_trades.append(return_pct)
+            except (ValueError, KeyError):
+                continue
+
+        # Calculate performance metrics
+        total_trades = len(returns)
+        winners = [r for r in returns if r > 0]
+        losers = [r for r in returns if r < 0]
+
+        win_rate = (len(winners) / total_trades * 100) if total_trades > 0 else 0
+        avg_gain = np.mean(winners) if winners else 0
+        avg_loss = np.mean(losers) if losers else 0
+
+        # YTD/MTD returns (cumulative)
+        ytd_return = sum(ytd_trades)
+        mtd_return = sum(mtd_trades)
+
+        # Max drawdown calculation
+        cumulative_returns = np.cumsum(returns)
+        running_max = np.maximum.accumulate(cumulative_returns)
+        drawdowns = cumulative_returns - running_max
+        max_drawdown = abs(np.min(drawdowns)) if len(drawdowns) > 0 else 0
+
+        # Sharpe ratio (annualized, assuming ~50 trades/year)
+        if len(returns) > 1:
+            std_dev = np.std(returns)
+            sharpe_ratio = (np.mean(returns) / std_dev) * np.sqrt(50) if std_dev > 0 else 0
+        else:
+            sharpe_ratio = 0
+
+        return jsonify({
+            'ytd_return': round(ytd_return, 2),
+            'mtd_return': round(mtd_return, 2),
+            'total_trades': total_trades,
+            'win_rate': round(win_rate, 1),
+            'avg_gain': round(avg_gain, 2),
+            'avg_loss': round(avg_loss, 2),
+            'max_drawdown': round(max_drawdown, 2),
+            'sharpe_ratio': round(sharpe_ratio, 2),
+            'total_conviction': conviction_counts,
+            'last_updated': trades[-1]['Exit_Date'] if trades else None
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/portfolio/regime-performance')
+@require_auth
+def regime_performance():
+    """Get performance across different market regimes"""
+    try:
+        trades_file = PROJECT_DIR / 'trade_history' / 'completed_trades.csv'
+
+        if not trades_file.exists():
+            return jsonify({
+                'vix_regimes': {},
+                'market_breadth_regimes': {},
+                'sector_performance': {}
+            })
+
+        trades = []
+        with open(trades_file) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('Trade_ID') and row.get('Exit_Date'):
+                    trades.append(row)
+
+        # Group by VIX regime
+        vix_regimes = {}
+        breadth_regimes = {}
+        sector_performance = {}
+
+        for trade in trades:
+            try:
+                return_pct = float(trade.get('Return_Percent', 0))
+
+                # VIX regime analysis
+                vix = float(trade.get('VIX_At_Entry', 0))
+                if vix > 0:
+                    if vix < 15:
+                        regime = 'VERY_LOW (<15)'
+                    elif vix < 20:
+                        regime = 'LOW (15-20)'
+                    elif vix < 25:
+                        regime = 'ELEVATED (20-25)'
+                    elif vix < 30:
+                        regime = 'HIGH (25-30)'
+                    else:
+                        regime = 'EXTREME (≥30)'
+
+                    if regime not in vix_regimes:
+                        vix_regimes[regime] = {'trades': 0, 'total_return': 0, 'wins': 0}
+
+                    vix_regimes[regime]['trades'] += 1
+                    vix_regimes[regime]['total_return'] += return_pct
+                    if return_pct > 0:
+                        vix_regimes[regime]['wins'] += 1
+
+                # Market breadth regime (if available in newer trades)
+                market_regime = trade.get('Market_Breadth_Regime', trade.get('Market_Regime', ''))
+                if market_regime and market_regime != 'Unknown':
+                    if market_regime not in breadth_regimes:
+                        breadth_regimes[market_regime] = {'trades': 0, 'total_return': 0, 'wins': 0}
+
+                    breadth_regimes[market_regime]['trades'] += 1
+                    breadth_regimes[market_regime]['total_return'] += return_pct
+                    if return_pct > 0:
+                        breadth_regimes[market_regime]['wins'] += 1
+
+                # Sector performance
+                sector = trade.get('Sector', 'Unknown')
+                if sector and sector != 'Unknown':
+                    if sector not in sector_performance:
+                        sector_performance[sector] = {'trades': 0, 'total_return': 0, 'wins': 0}
+
+                    sector_performance[sector]['trades'] += 1
+                    sector_performance[sector]['total_return'] += return_pct
+                    if return_pct > 0:
+                        sector_performance[sector]['wins'] += 1
+
+            except (ValueError, KeyError):
+                continue
+
+        # Calculate averages and win rates
+        for regime_dict in [vix_regimes, breadth_regimes, sector_performance]:
+            for key in regime_dict:
+                data = regime_dict[key]
+                data['avg_return'] = round(data['total_return'] / data['trades'], 2) if data['trades'] > 0 else 0
+                data['win_rate'] = round(data['wins'] / data['trades'] * 100, 1) if data['trades'] > 0 else 0
+
+        return jsonify({
+            'vix_regimes': vix_regimes,
+            'market_breadth_regimes': breadth_regimes,
+            'sector_performance': sector_performance
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     print("\n" + "="*60)
