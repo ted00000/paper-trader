@@ -83,31 +83,43 @@
 
 ---
 
-### Priority 1: Track Record & Evidence Layer (CRITICAL FOR MARKETING)
-**Status**: Running in paper trading, no public portfolio
-**Reviewer concern**: "Without 6-12 months live results, can't claim 'best-in-class'"
+### Priority 1: Dashboard Health Monitoring & Performance Display (CRITICAL FOR MARKETING)
+**Status**: Health checks running, need dashboard integration
+**Reviewer concern**: "Without 6-12 months live results, can't claim 'best-in-class'" + operational transparency
 
 **Implementation**:
-1. **Public Model Portfolio** (4-6 hours):
+1. **Admin Dashboard - System Health Tab** (3-4 hours):
+   - Real-time health status display (pulls from health_check.py)
+   - Last command execution times (GO/EXECUTE/ANALYZE)
+   - API status indicators (Polygon, Anthropic)
+   - Data freshness indicators
+   - Active positions count + P&L
+   - Disk space usage
+   - Recent Claude API failures (if any)
+   - Replace Discord webhook with dashboard alerts
+
+2. **Public Model Portfolio Tab** (4-6 hours):
    - Dashboard card showing YTD/MTD performance
    - Win rate, avg gain/loss, max drawdown, Sharpe
    - Trade count, conviction distribution
    - Updated daily at 5pm ET
-2. **Performance History** (2-3 hours):
+
+3. **Performance History** (2-3 hours):
    - Monthly snapshots saved to JSON
    - Performance across different regimes (VIX <20, 20-30, >30)
    - Sector attribution (which sectors performed best)
-3. **Out-of-Sample Results** (ongoing):
+
+4. **Out-of-Sample Results** (ongoing):
    - Run system for 6-12 months without tweaking
    - Document all regime changes (bull, bear, chop)
    - Prove consistency across market conditions
 
-**Effort**: 6-9 hours initial build, then ongoing data collection
+**Effort**: 9-13 hours initial build, then ongoing data collection
 **Cost**: $0
-**Expected impact**: **REQUIRED** for subscription product credibility
-**Timeline**: Need 6-12 months of continuous results
+**Expected impact**: **REQUIRED** for subscription product credibility + operational transparency
+**Timeline**: Dashboard updates NOW, then let it run for 6+ months
 
-**When to implement**: Dashboard updates NOW, then let it run for 6+ months
+**When to implement**: Dashboard updates THIS WEEK, then let system build track record
 
 ---
 
@@ -216,6 +228,29 @@
 **Trigger**: If >2 stops hit same day more than 2x per month, reduce HIGH conviction from 13% → 12%
 
 **When to revisit**: After 30 days of Phase 4 data
+
+---
+
+### 4. Discord Webhook Integration (OPTIONAL)
+**Status**: Infrastructure ready, deferred in favor of dashboard
+**What it is**: Send health check alerts to Discord channel instead of dashboard
+
+**Current approach**:
+- health_check.py has Discord webhook support built-in
+- Currently not configured (no DISCORD_WEBHOOK_URL in environment)
+- Dashboard integration preferred for operational transparency
+
+**If implemented**:
+- Set DISCORD_WEBHOOK_URL in server environment
+- Color-coded alerts: Red (critical), Orange (warnings), Green (healthy)
+- Daily 5pm ET health reports sent to Discord channel
+
+**Effort**: 5 minutes (just set environment variable)
+**Cost**: $0 (Discord webhooks are free)
+**Expected impact**: Mobile alerts for critical issues
+**Priority**: LOW (dashboard is better for admin monitoring)
+
+**When to revisit**: If user wants mobile push notifications for system issues
 
 ---
 

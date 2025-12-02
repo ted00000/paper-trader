@@ -278,6 +278,28 @@ class HealthChecker:
 
         return len(self.issues) == 0
 
+    def export_json(self):
+        """Export health check results as JSON for dashboard"""
+        if self.issues:
+            status = 'unhealthy'
+            status_color = 'red'
+        elif self.warnings:
+            status = 'degraded'
+            status_color = 'orange'
+        else:
+            status = 'healthy'
+            status_color = 'green'
+
+        return {
+            'status': status,
+            'status_color': status_color,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'stats': self.stats,
+            'issues': self.issues,
+            'warnings': self.warnings,
+            'healthy': len(self.issues) == 0
+        }
+
     def run(self):
         """Run all health checks"""
         print("Starting Tedbot Health Check...\n")
@@ -293,6 +315,17 @@ class HealthChecker:
 
         # Exit with appropriate code
         sys.exit(0 if healthy else 1)
+
+    def run_silent(self):
+        """Run health checks without printing, return JSON"""
+        self.check_command_execution()
+        self.check_api_connectivity()
+        self.check_data_freshness()
+        self.check_active_positions()
+        self.check_claude_api_failures()
+        self.check_disk_space()
+
+        return self.export_json()
 
 if __name__ == '__main__':
     checker = HealthChecker()
