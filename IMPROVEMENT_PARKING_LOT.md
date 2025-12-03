@@ -147,8 +147,223 @@
 
 **Timeline**: Dec 2, 2024 - Jun/Dec 2025 (6-12 months minimum)
 **Effort**: Ongoing monitoring, no code changes
-**Cost**: $0
-**Expected impact**: **REQUIRED** for subscription product credibility
+
+---
+
+## Priority 1 (v7.0): Post-v6.0 Validation & Simplification
+
+**Status**: DEFERRED until v6.0 results collection completes (50+ trades minimum)
+**Source**: Third-party analysis (Dec 2, 2024) - See [THIRD_PARTY_ANALYSIS_v6.0.md](THIRD_PARTY_ANALYSIS_v6.0.md)
+**Key Finding**: Complexity (26 enhancements) is highest risk factor (8/10 overfitting risk)
+**Goal**: Validate which features drive edge, simplify by 30-50% if possible
+
+### 1A. Ablation Testing Framework (CRITICAL - v7.0)
+**Issue**: 26 enhancements across 5 phases = too many knobs, unclear which drive edge
+**Risk**: 8/10 that system is more complex than realized edge justifies
+**Proposed Solution**:
+- Systematically remove feature families one at a time, measure performance degradation
+- Test scenarios:
+  - Remove momentum cluster (RS, sector strength) → measure impact
+  - Remove institutional cluster (options flow, dark pool) → measure impact
+  - Remove volume quality filters → measure impact
+  - Remove timing filters (entry quality, gap-aware) → measure impact
+  - Remove technical score → measure impact
+- **Target**: Kill 30-50% of complexity if features don't significantly improve out-of-sample results
+**Data Required**: 50+ trades minimum from v6.0 results collection
+**Analyst's Words**: "Be willing to kill 30-50% of the complexity if it doesn't significantly improve out-of-sample results"
+**Effort**: 3-5 days (after v6.0 completes)
+**Impact**: Simplification = reduced overfitting risk + easier to explain edge
+
+### 1B. LLM Contribution Analysis (CRITICAL - v7.0)
+**Issue**: Heavy dependence on Claude for news validation, GO decisions, exit reviews
+**Risk**: Can't isolate whether edge comes from rules vs LLM's behavior (7/10 risk)
+**Concerns**:
+- Model updates could alter behavior even if code is frozen
+- Edge source unclear: rules vs LLM's evolving behavior?
+- Single external cognitive dependency
+**Proposed Solution**:
+- Build simple baseline model (logistic regression or decision tree) on same features Claude sees
+- Test: "Can it reproduce 80% of Claude's edge with 20% of complexity?"
+- Run some days purely rules-based (no LLM news scoring) to quantify Claude's contribution
+**Target**: Quantify LLM's marginal edge contribution in basis points
+**Data Required**: 50+ trades with full feature snapshots from v6.0
+**Analyst's Words**: "Store structured numeric feature snapshot to test if simple model reproduces edge. Gradually move LLM into overlay/exception handler."
+**Effort**: 2-3 days (after v6.0 completes)
+**Impact**: Understand if edge is rules-based (durable) vs LLM-based (fragile)
+
+### 1C. Pre-Defined Success/Failure Metrics (CRITICAL - Define NOW)
+**Issue**: Targets stated (65-70% win rate) but decision criteria unclear
+**Risk**: Without pre-defined metrics, might rationalize bad results or change goal posts
+**Proposed Solution**: Define NOW what metrics trigger keep/simplify/retire decisions
+
+**DECISION CRITERIA** (defined Dec 2, 2024):
+- **KEEP v6.0 AS-IS**:
+  - Win rate ≥60%
+  - Sharpe ratio ≥1.0
+  - Max drawdown ≤-20%
+  - Minimum 50 trades
+  - **Conclusion**: System works, continue with v6.0 logic
+
+- **SIMPLIFY TO v7.0**:
+  - Win rate 50-60%
+  - Sharpe ratio 0.5-1.0
+  - Max drawdown -20% to -30%
+  - Minimum 50 trades
+  - **Conclusion**: Edge exists but complexity hurts, do ablation testing to find core 50%
+
+- **RETIRE/REDESIGN**:
+  - Win rate <50%
+  - Sharpe ratio <0.5
+  - Max drawdown >-30%
+  - **Conclusion**: No edge detected, fundamental rethink required
+
+**Action**: Document criteria NOW, apply after v6.0 results collection completes
+**Analyst's Words**: "Pre-define what metrics would make you keep, simplify, or retire the system"
+**Effort**: 0 hours (decision made)
+**Impact**: Rigorous evaluation framework prevents rationalization
+
+### 1D. Slippage Modeling (HIGH PRIORITY - v7.0)
+**Issue**: Paper trading assumes perfect fills, real trading has spreads and market impact
+**Risk**: Edge may disappear under realistic execution costs (7/10 risk)
+**Current Assumption**: Entry at exact market price, exit at exact price (0% slippage)
+**Realistic Assumption**: Entry at mid + 0.5-1% spread, exit at mid - 0.5-1% spread (1% round-trip drag)
+**Proposed Solution**:
+- Add estimated slippage to all v6.0 trades in post-analysis (assume 0.5% each side = 1% total)
+- If edge survives -1% drag, confidence increases significantly
+- Track VWAP vs actual fills when live trading starts
+- Build market impact model (position size / ADV ratio)
+**Target**: Validate edge exists after realistic execution costs
+**Data Required**: v6.0 trade history with entry/exit prices
+**Analyst's Words**: "Simulate realistic slippage & spread in analytics (e.g., entry at mid + 0.5-1 spread). If edge survives, confidence goes way up."
+**Effort**: 1 day (post-analysis after v6.0)
+**Impact**: Realistic performance expectations for live trading
+
+### 1E. Walk-Forward & Monte Carlo Analysis (HIGH PRIORITY - v7.0)
+**Issue**: Single equity curve doesn't prove robustness
+**Risk**: Lucky trade sequence could mask fragility (7/10 risk)
+**Proposed Solution**:
+- **Walk-Forward Analysis**: Divide v6.0 results into quarters, verify consistency
+  - Q1 (trades 1-N/4): Calculate Sharpe, DD, win rate
+  - Q2 (trades N/4 to N/2): Calculate same metrics
+  - Q3, Q4: Same
+  - Test: Are metrics consistent across quarters?
+- **Monte Carlo Simulation**: Randomize trade order 10,000x to estimate drawdown distribution
+  - Use actual v6.0 trade returns
+  - Shuffle order randomly
+  - Calculate max DD for each sequence
+  - Result: 95th percentile expected DD (worst realistic case)
+**Target**: Prove results aren't sequence-dependent
+**Data Required**: 50+ trades from v6.0
+**Analyst's Words**: "Walk-forward curves over multiple distinct time slices. Simulated drawdowns under randomized trade order."
+**Effort**: 1-2 days (after v6.0)
+**Impact**: Confidence in system robustness vs lucky sequence
+
+### 1F. Sensitivity Analysis Framework (MEDIUM PRIORITY - v7.0)
+**Issue**: Don't know which parameter changes break the system
+**Proposed Solution**: Test edge sensitivity to parameter changes
+- **Stop width variations**: -5%, -7%, -10% → measure impact on win rate, avg loss, Sharpe
+- **Catalyst tier variations**: Tier 1 only vs Tier 1+2 → measure trade frequency, win rate, returns
+- **Conviction threshold variations**: Skip <3 factors vs <2 factors vs <4 factors → measure impact
+- **Market breadth sizing**: Current (1.0x / 0.8x / 0.6x) vs more aggressive (1.0x / 0.9x / 0.7x) → measure DD impact
+**Target**: Identify fragile parameters vs robust parameters
+**Data Required**: v6.0 trade history
+**Analyst's Words**: "Sensitivity analysis: what if you widen/tighten stops, or trade only Tier 1 vs Tier 1+2 catalysts?"
+**Effort**: 2-3 days (after v6.0)
+**Impact**: Know which parameters are critical vs arbitrary
+
+---
+
+## Priority 2 (v7.0): Feature Enhancements - LOWER PRIORITY
+
+**Status**: DEFERRED until after Priority 1 validation completes
+**Rationale**: Third-party analysis recommends simplification before adding features
+
+### 2A. ATR-Based Stops (MEDIUM PRIORITY - v7.0)
+**Issue**: Fixed -7% stops don't account for volatility differences across stocks
+**Risk**: False stops on volatile names (6/10 risk)
+**Current**: Universal -7% stop (or -5% for gaps)
+**Proposed**: Calculate stops as 2x ATR(14) instead of fixed percentage
+**Benefits**:
+- Per-trade risk more consistent in standard deviations
+- Fewer false stops on volatile stocks
+- More appropriate sizing on calm stocks
+**Action During v6.0**: Track ATR(14) at entry in CSV for post-hoc analysis
+**Analyst's Words**: "Move toward volatility-based position sizing & stops so per-trade risk is more consistent"
+**Effort**: 1-2 days (v7.0)
+**Impact**: Reduce unnecessary stop-outs, improve risk consistency
+
+### 2B. Regime-Conditional Learning Stats (MEDIUM PRIORITY - v7.0)
+**Issue**: Learning loop can become pro-cyclical (exclude catalysts right before recovery)
+**Risk**: Catalyst exclusions may whipsaw (6/10 risk)
+**Current**: Single win rate threshold (40%) across all regimes
+**Proposed**: Track catalyst performance by VIX regime and market breadth separately
+- Example: "Tier 2 catalysts: 65% win rate in VIX <20, 35% win rate in VIX >25"
+- Exclude only in specific regimes, not universally
+**Benefits**:
+- Avoid whipsaw (dropping catalyst right before favorable regime)
+- More nuanced learning (what works when)
+- Less pro-cyclical bias
+**Action During v6.0**: Already tracking VIX regime and market breadth per trade
+**Analyst's Words**: "Use regime-conditional stats. Consider shrinkage approach rather than hard exclusions."
+**Effort**: 2-3 days (v7.0)
+**Impact**: Smarter learning system that adapts to regime changes
+
+### 2C. Feature Snapshot Storage for Every Decision (LOWER PRIORITY - v7.0)
+**Issue**: Can't reconstruct exact features Claude saw at decision time
+**Current**: 52-column CSV captures trade outcome, but not all raw features at decision point
+**Proposed**: Store structured JSON snapshot with every GO decision:
+- All screener features for each candidate (RS, volume, ADX, etc.)
+- VIX regime, market breadth, macro events
+- News validation scores
+- Claude's output (conviction, reasoning)
+**Benefits**: Enables post-hoc model training (logistic regression on exact features)
+**Effort**: 1 day (v7.0)
+**Impact**: Enables LLM contribution analysis (Priority 1B)
+
+---
+
+## Priority 3: Future Enhancements (v8.0+)
+
+**Status**: LOWEST PRIORITY - Only consider after v6.0 + v7.0 validation proves edge
+
+### 3A. Capacity Analysis & Scaling Model
+**Issue**: Unknown capacity constraints as account size grows
+**Proposed**: Model market impact as function of position size / ADV ratio
+**Trigger**: When account >$10,000 or preparing for real capital deployment
+
+### 3B. Multi-Model Ensemble (Advanced)
+**Issue**: Single LLM dependency
+**Proposed**: Ensemble of Claude + simple rules-based model + ML model
+**Trigger**: After proving LLM adds measurable edge (Priority 1B complete)
+
+### 3C. Sector Rotation with Macro Regime Awareness
+**Issue**: Current sector rotation is pure momentum (3-month performance)
+**Proposed**: Add macro regime awareness (Fed tightening = avoid growth, favor value)
+**Trigger**: After simplification (Priority 1A) proves sector rotation adds edge
+
+---
+
+## Summary: Priority Order for v7.0+
+
+1. **CRITICAL (Do First)**:
+   - 1A: Ablation testing (find which 50% of features drive edge)
+   - 1B: LLM contribution analysis (quantify Claude's edge)
+   - 1C: Apply success/failure metrics (keep/simplify/retire decision)
+   - 1D: Slippage modeling (validate edge survives execution costs)
+
+2. **HIGH PRIORITY (Do Second)**:
+   - 1E: Walk-forward & Monte Carlo (prove robustness)
+   - 1F: Sensitivity analysis (identify fragile parameters)
+
+3. **MEDIUM PRIORITY (Do Third)**:
+   - 2A: ATR-based stops (if v6.0 shows stop-out issues)
+   - 2B: Regime-conditional learning (if v6.0 shows pro-cyclical whipsaw)
+
+4. **LOWER PRIORITY (Do Last)**:
+   - 2C: Feature snapshot storage (nice to have for analysis)
+   - Priority 3 items (only if v6.0+v7.0 prove edge exists)
+
+**Guiding Principle**: "Treat v6.0 as an experiment to simplify and harden the system rather than keep piling on features" - Third-party analyst
 
 **Current approach**:
 - ✅ Code frozen at v6.0 (Dec 2, 2024)
