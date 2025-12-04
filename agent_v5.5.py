@@ -5303,6 +5303,16 @@ RECENT LESSONS LEARNED:
                     print(f"   ⚠️ {ticker}: Validation error ({e}) - keeping position with default tier")
                     buy_pos['catalyst_tier'] = 'Tier2'
                     buy_pos['position_size_pct'] = 10.0
+
+                    # CRITICAL: Ensure sector is preserved from screener data or Claude's recommendation
+                    if 'sector' not in buy_pos or not buy_pos['sector']:
+                        if ticker in screener_lookup:
+                            buy_pos['sector'] = screener_lookup[ticker].get('sector', 'Unknown')
+                            buy_pos['industry'] = screener_lookup[ticker].get('industry', 'Unknown')
+                        else:
+                            buy_pos['sector'] = 'Unknown'
+                            buy_pos['industry'] = 'Unknown'
+
                     validated_buys.append(buy_pos)
 
             # Replace buy_positions with validated list
