@@ -374,6 +374,19 @@ POSITION {i}: {ticker}
         - CONTINUATION GAP (2-4.9%): Tradeable, wait 15min
         - NORMAL (<2%): Enter at open
         """
+        # Handle None values gracefully
+        if previous_close is None or current_price is None:
+            return {
+                'gap_pct': 0,
+                'classification': 'UNKNOWN',
+                'entry_strategy': 'PROCEED',
+                'reasoning': 'Unable to calculate gap (missing price data)',
+                'recommended_action': 'Enter at current price',
+                'should_enter_at_open': True,
+                'should_exit_at_open': False,
+                'risk_level': 'MEDIUM'
+            }
+
         gap_pct = ((current_price - previous_close) / previous_close) * 100 if previous_close > 0 else 0
 
         if gap_pct >= 8.0:
@@ -2259,8 +2272,14 @@ POSITION {i}: {ticker}
                 from datetime import timedelta
                 blackout_start = event_date - timedelta(days=2)
                 blackout_end = event_date + timedelta(days=1)
+            elif event_type == 'NFP':
+                # NFP: Day of only (8:30 AM release, protect market open volatility)
+                # Changed from 1-day-before to be less conservative
+                from datetime import timedelta
+                blackout_start = event_date
+                blackout_end = event_date
             else:
-                # CPI, NFP, PCE: 1 day before → day of
+                # CPI, PCE: 1 day before → day of
                 from datetime import timedelta
                 blackout_start = event_date - timedelta(days=1)
                 blackout_end = event_date
