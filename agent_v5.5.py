@@ -5315,6 +5315,23 @@ RECENT LESSONS LEARNED:
 
                     validated_buys.append(buy_pos)
 
+                    # Add to daily picks for dashboard tracking (ACCEPTED with validation error note)
+                    all_picks.append({
+                        'ticker': ticker,
+                        'status': 'ACCEPTED',
+                        'conviction': buy_pos.get('confidence', 'N/A'),  # Use Claude's confidence
+                        'position_size_pct': 10.0,
+                        'catalyst': catalyst_type,
+                        'catalyst_tier': 'Tier2',
+                        'tier_name': 'Tier 2 (Default - Validation Error)',
+                        'news_score': 0,
+                        'relative_strength': 0,
+                        'vix': vix_result['vix'],
+                        'supporting_factors': 0,
+                        'reasoning': buy_pos.get('thesis', 'Validation error - kept with defaults'),
+                        'rejection_reasons': []
+                    })
+
             # Replace buy_positions with validated list
             buy_positions = validated_buys
             print(f"   ✓ Validated: {len(validated_buys)} BUY positions passed checks\n")
