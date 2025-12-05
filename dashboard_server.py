@@ -477,6 +477,49 @@ def data_integrity_health():
             'warnings': []
         }), 500
 
+def extract_system_alerts(operation):
+    """Extract important system alerts from terminal log files (macro blackouts, VIX, market regime)"""
+    alerts = []
+
+    try:
+        log_file = PROJECT_DIR / 'logs' / f'{operation}.log'
+        if not log_file.exists():
+            return alerts
+
+        # Get today's date
+        today = datetime.now().strftime('%Y-%m-%d')
+
+        # Read log and look for alert patterns
+        with open(log_file) as f:
+            lines = f.readlines()
+
+        # Find today's section and extract alerts
+        for line in lines:
+            # Skip lines not from today
+            if today not in line and not any(alert_marker in line for alert_marker in ['🚨', '⚠️', 'BLACKOUT', 'SHUTDOWN']):
+                continue
+
+            # Extract macro blackout alerts
+            if '🚨 MACRO BLACKOUT' in line:
+                alerts.append(line.strip())
+
+            # Extract VIX warnings
+            elif 'VIX' in line and ('SHUTDOWN' in line or '>30' in line):
+                alerts.append(line.strip())
+
+            # Extract market regime warnings
+            elif '⚠️ Market UNHEALTHY' in line or '⚠️ Market DEGRADED' in line:
+                alerts.append(line.strip())
+
+            # Extract blocking messages
+            elif '✗ Blocking ALL' in line and 'BUY recommendations' in line:
+                alerts.append(line.strip())
+
+    except Exception as e:
+        print(f"Error extracting system alerts: {e}")
+
+    return alerts
+
 @app.route('/api/operations/logs/<operation>')
 @require_auth
 def view_log(operation):
@@ -529,12 +572,18 @@ def view_log(operation):
 
                     cleaned_text = '\n'.join(filtered_lines)
 
+                    # Extract system alerts from terminal log (macro blackouts, VIX warnings, etc.)
+                    system_alerts = extract_system_alerts(operation.lower())
+                    alerts_section = ""
+                    if system_alerts:
+                        alerts_section = "=== SYSTEM ALERTS ===\n" + "\n".join(system_alerts) + "\n\n" + "="*60 + "\n\n"
+
                     return jsonify({
                         'operation': operation,
                         'log_file': str(latest_file),
                         'lines_returned': len(cleaned_text.split('\n')),
                         'total_lines': len(cleaned_text.split('\n')),
-                        'content': f"(Showing today's most recent run: {timestamp})\n\n{cleaned_text}"
+                        'content': f"(Showing today's most recent run: {timestamp})\n\n{alerts_section}{cleaned_text}"
                     })
 
         # Fallback to log file for older behavior or if JSON not found
