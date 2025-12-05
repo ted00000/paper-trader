@@ -493,27 +493,42 @@ def extract_system_alerts(operation):
         with open(log_file) as f:
             lines = f.readlines()
 
-        # Find today's section and extract alerts
-        for line in lines:
-            # Skip lines not from today
-            if today not in line and not any(alert_marker in line for alert_marker in ['🚨', '⚠️', 'BLACKOUT', 'SHUTDOWN']):
-                continue
+        # Find most recent section separator for today
+        section_start = -1
+        for i in range(len(lines) - 1, -1, -1):
+            if '=' * 20 in lines[i] and today in lines[i-1:i+10]:
+                section_start = i
+                break
+
+        # If no section found, search from end of file (last 200 lines)
+        if section_start == -1:
+            section_start = max(0, len(lines) - 200)
+
+        # Extract alerts from most recent section only
+        seen_alerts = set()
+        for line in lines[section_start:]:
+            alert_text = None
 
             # Extract macro blackout alerts
             if '🚨 MACRO BLACKOUT' in line:
-                alerts.append(line.strip())
+                alert_text = line.strip()
 
             # Extract VIX warnings
             elif 'VIX' in line and ('SHUTDOWN' in line or '>30' in line):
-                alerts.append(line.strip())
+                alert_text = line.strip()
 
             # Extract market regime warnings
             elif '⚠️ Market UNHEALTHY' in line or '⚠️ Market DEGRADED' in line:
-                alerts.append(line.strip())
+                alert_text = line.strip()
 
             # Extract blocking messages
             elif '✗ Blocking ALL' in line and 'BUY recommendations' in line:
-                alerts.append(line.strip())
+                alert_text = line.strip()
+
+            # Add only unique alerts
+            if alert_text and alert_text not in seen_alerts:
+                alerts.append(alert_text)
+                seen_alerts.add(alert_text)
 
     except Exception as e:
         print(f"Error extracting system alerts: {e}")
