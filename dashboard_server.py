@@ -493,20 +493,29 @@ def extract_system_alerts(operation):
         with open(log_file) as f:
             lines = f.readlines()
 
-        # Find most recent section separator for today
+        # Find today's section by looking for "Time: YYYY-MM-DD" timestamp
         section_start = -1
         for i in range(len(lines) - 1, -1, -1):
-            if '=' * 20 in lines[i] and today in lines[i-1:i+10]:
-                section_start = i
+            if f'Time: {today}' in lines[i]:
+                # Found today's timestamp, go back to find section start
+                section_start = max(0, i - 5)
                 break
 
-        # If no section found, search from end of file (last 200 lines)
+        # If no section found, don't return any alerts (no run today)
         if section_start == -1:
-            section_start = max(0, len(lines) - 200)
+            return alerts
 
-        # Extract alerts from most recent section only
+        # Find the end of today's section (next timestamp or end of file)
+        section_end = len(lines)
+        for i in range(section_start + 10, len(lines)):
+            if 'Time: 20' in lines[i] and today not in lines[i]:
+                # Found next day's section
+                section_end = i
+                break
+
+        # Extract alerts from today's section only
         seen_alerts = set()
-        for line in lines[section_start:]:
+        for line in lines[section_start:section_end]:
             alert_text = None
 
             # Extract macro blackout alerts
