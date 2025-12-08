@@ -493,27 +493,51 @@ def extract_system_alerts(operation):
         with open(log_file) as f:
             lines = f.readlines()
 
-        # Find today's section and extract alerts
-        for line in lines:
-            # Skip lines not from today
-            if today not in line and not any(alert_marker in line for alert_marker in ['🚨', '⚠️', 'BLACKOUT', 'SHUTDOWN']):
-                continue
+        # Find today's section by looking for "Time: YYYY-MM-DD" timestamp
+        section_start = -1
+        for i in range(len(lines) - 1, -1, -1):
+            if f'Time: {today}' in lines[i]:
+                # Found today's timestamp, go back to find section start
+                section_start = max(0, i - 5)
+                break
+
+        # If no section found, don't return any alerts (no run today)
+        if section_start == -1:
+            return alerts
+
+        # Find the end of today's section (next timestamp or end of file)
+        section_end = len(lines)
+        for i in range(section_start + 10, len(lines)):
+            if 'Time: 20' in lines[i] and today not in lines[i]:
+                # Found next day's section
+                section_end = i
+                break
+
+        # Extract alerts from today's section only
+        seen_alerts = set()
+        for line in lines[section_start:section_end]:
+            alert_text = None
 
             # Extract macro blackout alerts
             if '🚨 MACRO BLACKOUT' in line:
-                alerts.append(line.strip())
+                alert_text = line.strip()
 
             # Extract VIX warnings
             elif 'VIX' in line and ('SHUTDOWN' in line or '>30' in line):
-                alerts.append(line.strip())
+                alert_text = line.strip()
 
             # Extract market regime warnings
             elif '⚠️ Market UNHEALTHY' in line or '⚠️ Market DEGRADED' in line:
-                alerts.append(line.strip())
+                alert_text = line.strip()
 
             # Extract blocking messages
             elif '✗ Blocking ALL' in line and 'BUY recommendations' in line:
-                alerts.append(line.strip())
+                alert_text = line.strip()
+
+            # Add only unique alerts
+            if alert_text and alert_text not in seen_alerts:
+                alerts.append(alert_text)
+                seen_alerts.add(alert_text)
 
     except Exception as e:
         print(f"Error extracting system alerts: {e}")
