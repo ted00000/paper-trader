@@ -107,7 +107,7 @@ class HealthChecker:
         """Check active positions status"""
         print("\n4. Checking active positions...")
 
-        positions_file = self.project_dir / 'active_positions.json'
+        positions_file = self.project_dir / 'portfolio_data' / 'current_portfolio.json'
 
         if not positions_file.exists():
             print("   ✓ No active positions")
@@ -116,13 +116,14 @@ class HealthChecker:
 
         try:
             with open(positions_file) as f:
-                positions = json.load(f)
-                count = len(positions)
+                portfolio = json.load(f)
+                count = portfolio.get('total_positions', 0)
                 print(f"   ✓ {count} active position(s)")
                 self.stats['active_positions'] = count
 
                 # Calculate total P&L
                 total_pnl = 0
+                positions = portfolio.get('positions', [])
                 for pos in positions:
                     if 'current_price' in pos and 'entry_price' in pos:
                         pnl_pct = ((pos['current_price'] - pos['entry_price']) / pos['entry_price']) * 100
