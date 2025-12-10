@@ -127,8 +127,9 @@ v5.3.0 - PHASE 3: VIX FILTER + MACRO CALENDAR (2025-10-31):
   - VIX <30: NORMAL operations
 - Implemented macro event calendar with blackout windows
   - check_macro_calendar(): Checks for FOMC, CPI, NFP, PCE events
-  - FOMC: 2 days before → 1 day after (4-day blackout)
-  - CPI/NFP/PCE: 1 day before → day of (2-day blackout)
+  - ALL EVENTS: Day-of only (event-day blackout, aligned with institutional best practices)
+  - FOMC: Day of (2:00 PM announcement + presser)
+  - CPI/NFP/PCE: Day of (8:30 AM releases, 9:45 AM entries are post-volatility)
   - Auto-blocks ALL entries during blackout periods
 - GO command regime-aware filtering (Phase 3 integration):
   - Checks VIX and macro calendar BEFORE individual validation
@@ -2212,11 +2213,14 @@ POSITION {i}: {ticker}
         """
         Check if a date falls within blackout windows for major macro events
 
-        Major events with blackout windows:
-        - FOMC Meeting: 2 days before → 1 day after
-        - CPI Release: 1 day before → day of
-        - NFP (Jobs Report): 1 day before → day of
-        - PCE (Inflation): 1 day before → day of
+        Major events with blackout windows (EVENT-DAY ONLY):
+        - FOMC Meeting: Day of only (2:00 PM announcement + press conference)
+        - CPI Release: Day of only (8:30 AM release)
+        - NFP (Jobs Report): Day of only (8:30 AM release)
+        - PCE (Inflation): Day of only (8:30 AM release)
+
+        Note: Day-before restrictions removed (aligned with institutional best practices).
+        Comprehensive screening process (RS, technical, institutional signals) handles volatility.
 
         Args:
             check_date: Date to check (datetime object, defaults to today)
@@ -2266,22 +2270,19 @@ POSITION {i}: {ticker}
         for event_date_str, event_type, description in macro_events_2025:
             event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
 
-            # Define blackout windows
+            # Define blackout windows - EVENT-DAY ONLY (aligned with institutional best practices)
+            # Comprehensive screening (RS, technical filters, institutional signals) handles volatility
+            from datetime import timedelta
+
             if event_type == 'FOMC':
-                # 2 days before → 1 day after
-                from datetime import timedelta
-                blackout_start = event_date - timedelta(days=2)
-                blackout_end = event_date + timedelta(days=1)
-            elif event_type == 'NFP':
-                # NFP: Day of only (8:30 AM release, protect market open volatility)
-                # Changed from 1-day-before to be less conservative
-                from datetime import timedelta
+                # FOMC: Day of only (2:00 PM announcement + press conference)
+                # Avoid new entries during presser volatility, but allow day before/after
                 blackout_start = event_date
                 blackout_end = event_date
             else:
-                # CPI, PCE: 1 day before → day of
-                from datetime import timedelta
-                blackout_start = event_date - timedelta(days=1)
+                # CPI, NFP, PCE: Day of only (8:30 AM releases)
+                # 9:45 AM entries are 75 min after release - volatility settled
+                blackout_start = event_date
                 blackout_end = event_date
 
             # Check if check_date falls in blackout window
