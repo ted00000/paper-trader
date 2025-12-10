@@ -1006,7 +1006,7 @@ POSITION {i}: {ticker}
             'relative_strength': position.get('relative_strength', 0.0),
             'stock_return_3m': position.get('stock_return_3m', 0.0),
             'sector_etf': position.get('sector_etf', 'Unknown'),
-            'conviction_level': position.get('conviction_level', 'MEDIUM'),
+            'conviction_level': position.get('conviction_level') or position.get('confidence', 'MEDIUM').upper(),
             'supporting_factors': position.get('supporting_factors', 0),
             'sector': position.get('sector', ''),
             'confidence': position.get('confidence', ''),
@@ -4284,6 +4284,7 @@ RECENT LESSONS LEARNED:
                 trade_data.get('macro_event_near', 'None'),
                 trade_data.get('vix_regime', 'UNKNOWN'),  # Phase 4 VIX regime
                 trade_data.get('market_breadth_regime', 'UNKNOWN'),  # Phase 4 market breadth
+                trade_data.get('system_version', SYSTEM_VERSION),  # Phase 4.7 - Track code version
                 trade_data.get('relative_strength', 0.0),
                 trade_data.get('stock_return_3m', 0.0),
                 trade_data.get('sector_etf', 'Unknown'),
