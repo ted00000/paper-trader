@@ -594,7 +594,7 @@ POSITION {i}: {ticker}
 
             response = requests.get(
                 f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
-                params={'apiKey': self.polygon_api_key, 'limit': 50000}
+                params={'apiKey': POLYGON_API_KEY, 'limit': 50000}
             )
 
             if response.status_code != 200:
@@ -782,7 +782,7 @@ POSITION {i}: {ticker}
 
             response = requests.get(
                 f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
-                params={'apiKey': self.polygon_api_key, 'limit': 50}
+                params={'apiKey': POLYGON_API_KEY, 'limit': 50}
             )
 
             if response.status_code != 200 or 'results' not in response.json():
@@ -5605,7 +5605,7 @@ RECENT LESSONS LEARNED:
                     # Fetch 2-day history to get previous close
                     bars = requests.get(
                         f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")}/{datetime.now().strftime("%Y-%m-%d")}',
-                        params={'apiKey': self.polygon_api_key}
+                        params={'apiKey': POLYGON_API_KEY}
                     ).json()
                     if bars.get('results') and len(bars['results']) >= 2:
                         previous_closes[ticker] = bars['results'][-2]['c']  # Previous day close
