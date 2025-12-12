@@ -2164,8 +2164,8 @@ POSITION {i}: {ticker}
                 candidates = screener_data['candidates']
                 total = len(candidates)
 
-                # Count how many are above 50-day MA (we have this data in screener)
-                above_50d = sum(1 for c in candidates if c.get('technical_filters', {}).get('above_50d_sma', False))
+                # Count how many are above 50-day MA (check technical_setup for above_50d_sma)
+                above_50d = sum(1 for c in candidates if c.get('technical_setup', {}).get('above_50d_sma', False))
                 breadth_pct = (above_50d / total * 100) if total > 0 else 0
 
             # Determine market regime

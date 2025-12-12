@@ -983,9 +983,9 @@ class MarketScreener:
 
     def get_technical_setup(self, ticker):
         """
-        Check proximity to 52-week high
+        Check proximity to 52-week high and calculate 50-day MA for market breadth
 
-        Returns: Dict with technical metrics
+        Returns: Dict with technical metrics including above_50d_sma for breadth calculation
         """
         try:
             end_date = datetime.now()
@@ -998,7 +998,7 @@ class MarketScreener:
             response = requests.get(url, timeout=15)
             data = response.json()
 
-            if data.get('status') in ['OK', 'DELAYED'] and 'results' in data and len(data['results']) >= 2:
+            if data.get('status') in ['OK', 'DELAYED'] and 'results' in data and len(data['results']) >= 50:
                 results = data['results']
 
                 # Find 52-week high
@@ -1008,18 +1008,26 @@ class MarketScreener:
                 distance_pct = ((high_52w - current_price) / high_52w) * 100
                 is_near_high = distance_pct <= 5.0  # Within 5%
 
+                # Calculate 50-day MA for market breadth (Phase 4.2 requirement)
+                if len(results) >= 50:
+                    ma_50 = sum(r['c'] for r in results[-50:]) / 50
+                    above_50d_sma = current_price > ma_50
+                else:
+                    above_50d_sma = False
+
                 return {
                     'distance_from_52w_high_pct': round(distance_pct, 2),
                     'is_near_high': is_near_high,
                     'high_52w': round(high_52w, 2),
                     'current_price': round(current_price, 2),
+                    'above_50d_sma': above_50d_sma,  # Required for market breadth calculation
                     'score': max(100 - (distance_pct * 2), 0)  # Closer = higher score
                 }
 
-            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'score': 0}
+            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
 
         except Exception:
-            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'score': 0}
+            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
 
     def get_earnings_calendar(self):
         """
