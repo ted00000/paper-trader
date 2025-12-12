@@ -998,7 +998,7 @@ class MarketScreener:
             response = requests.get(url, timeout=15)
             data = response.json()
 
-            if data.get('status') in ['OK', 'DELAYED'] and 'results' in data and len(data['results']) >= 50:
+            if data.get('status') in ['OK', 'DELAYED'] and 'results' in data and len(data['results']) >= 2:
                 results = data['results']
 
                 # Find 52-week high
