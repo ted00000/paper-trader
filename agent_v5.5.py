@@ -5092,6 +5092,9 @@ RECENT LESSONS LEARNED:
                     print(f"   📊 Checking technical setup for {ticker}...")
                     tech_result = self.calculate_technical_score(ticker)
 
+                    # Extract current price from technical result for later use
+                    current_price = tech_result.get('details', {}).get('price', 0)
+
                     # Check if technical setup passed (must pass ALL 4 filters)
                     if not tech_result['passed']:
                         validation_passed = False
