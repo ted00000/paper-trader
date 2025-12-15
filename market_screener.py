@@ -46,10 +46,14 @@ SECTOR_ETF_MAP = {
 }
 
 # Screening Parameters
-MIN_RS_PCT = 3.0  # Minimum relative strength
-MIN_PRICE = 5.0   # Minimum stock price
+# DEEP RESEARCH ALIGNMENT: RS is a SCORING factor, not a HARD FILTER
+# Hard filters: Price >$10, Liquidity >$50M, Catalyst presence
+# Scoring factors: RS, technical setup, catalyst quality (0-100 point scorecard)
+MIN_RS_PCT = None  # REMOVED - RS now used for scoring only, not filtering
+MIN_PRICE = 10.0   # Minimum stock price (Deep Research: >$10)
 MIN_MARKET_CAP = 1_000_000_000  # $1B minimum
-TOP_N_CANDIDATES = 150  # Number to output (Minervini-style funnel: wide screening, AI filters hard)
+MIN_DAILY_VOLUME_USD = 50_000_000  # $50M minimum (Deep Research: >$50M)
+TOP_N_CANDIDATES = 150  # Number to output (wide screening, AI filters hard)
 
 
 # ============================================================================
@@ -570,17 +574,33 @@ class MarketScreener:
         # Store stock return for later percentile calculation
         self.all_stock_returns[ticker] = stock_return
 
-        # FILTER: Compare to market (SPY), not sector (IBD/Minervini methodology)
+        # SCORING: Compare to market (SPY) for Entry Quality Scorecard
+        # Deep Research: RS is a scoring factor (0-5 points), NOT a hard filter
         rs = stock_return - spy_return
 
+        # Entry Quality Scorecard - Technical Setup - Relative Strength (0-5 points)
+        # +1-3% sector outperformance: 2 points
+        # +3-5%: 3 points
+        # >5%: 5 points
+        # Bonus: +2 if in top 3 sectors
+        if rs > 5.0:
+            rs_score_points = 5
+        elif rs >= 3.0:
+            rs_score_points = 3
+        elif rs >= 1.0:
+            rs_score_points = 2
+        else:
+            rs_score_points = 0
+
         return {
-            'rs_pct': round(rs, 2),  # RS vs market (used for filter)
+            'rs_pct': round(rs, 2),  # RS vs market (scoring factor)
             'stock_return_3m': stock_return,
             'sector_return_3m': sector_return,  # Informational only
             'spy_return_3m': spy_return,  # Informational - market baseline
             'sector_etf': sector_etf,
-            'passed_filter': rs >= MIN_RS_PCT,  # Beating market by 3%+
-            'score': min(rs / 15 * 100, 100) if rs > 0 else 0,  # 15%+ RS = perfect score
+            'passed_filter': True,  # ALWAYS PASS - RS is scoring factor, not filter
+            'score': min(rs / 15 * 100, 100) if rs > 0 else 0,  # Composite score (legacy)
+            'rs_score_points': rs_score_points,  # Entry Quality Scorecard points (0-5)
             'rs_percentile': None  # Will be calculated after full scan
         }
 
@@ -1845,10 +1865,8 @@ class MarketScreener:
             sec_8k_result.get('catalyst_type_8k') in ['M&A_8k', 'contract_8k']  # 8-K filings
         )
 
-        # BYPASS RS filter if has TODAY's/yesterday's M&A/FDA news OR recent 8-K filing
-        # Otherwise apply normal RS ≥3% filter
-        if not rs_result['passed_filter'] and not has_fresh_tier1:
-            return None  # Reject only if no fresh catalyst AND weak RS
+        # DEEP RESEARCH ALIGNMENT: RS is scoring factor, not filter
+        # No RS filtering here - all stocks proceed to catalyst evaluation
 
         # STEP 2: Check for other Tier 1 & Tier 2 catalysts (now that RS check passed or was bypassed)
         analyst_result = self.get_analyst_ratings(ticker)
@@ -1876,34 +1894,29 @@ class MarketScreener:
             earnings_surprise_result.get('catalyst_type') == 'earnings_beat'
         )
 
-        # CATALYST FILTER LOGIC:
-        # - If has Tier 1 catalyst -> Continue to full analysis
-        # - If has Tier 2 catalyst -> Continue to full analysis
-        # - If strong RS (>7%) -> Continue (pure momentum play)
-        # - Otherwise -> REJECT (no catalyst + weak momentum)
+        # DEEP RESEARCH CATALYST FILTER:
+        # Hard filter: Catalyst presence required (any tier)
+        # Deep Research Line 84: "rule-based filters for catalyst presence eliminate low-quality opportunities"
 
         has_any_catalyst = has_tier1_catalyst or has_tier2_catalyst
-        strong_momentum = rs_result['rs_pct'] >= 7.0
 
-        if not has_any_catalyst and not strong_momentum:
-            return None  # REJECT: No catalyst and weak momentum
+        if not has_any_catalyst:
+            return None  # REJECT: No catalyst detected (Deep Research hard filter)
 
         # STEP 3: Full technical analysis (only for catalyst stocks or strong momentum)
         time.sleep(0.1)  # Rate limit
         volume_result = self.get_volume_analysis(ticker)
         technical_result = self.get_technical_setup(ticker)
 
-        # PHASE 4.4: Liquidity filter - Reject stocks with insufficient dollar volume
-        # This prevents slippage issues on low-liquidity names (typically 1-3% slippage)
-        # Minimum: $20M average daily dollar volume
+        # DEEP RESEARCH LIQUIDITY FILTER (Line 84: >$50M daily volume)
+        # Hard filter prevents slippage on low-liquidity names
         avg_volume = volume_result.get('avg_volume_20d', 0)
         current_price = technical_result.get('current_price', 0)
 
         if avg_volume > 0 and current_price > 0:
             avg_dollar_volume = avg_volume * current_price
-            MIN_DOLLAR_VOLUME = 20_000_000  # $20M minimum
 
-            if avg_dollar_volume < MIN_DOLLAR_VOLUME:
+            if avg_dollar_volume < MIN_DAILY_VOLUME_USD:  # $50M minimum (Deep Research)
                 # REJECT: Insufficient liquidity
                 return None  # Skip low-liquidity stocks to avoid slippage
 
