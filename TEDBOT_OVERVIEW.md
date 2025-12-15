@@ -19,14 +19,22 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 ┌─────────────────────────────────────────────────────────────────┐
 │                    STAGE 1: IDENTIFICATION                       │
 │                      (Market Screener)                           │
-│  • Scans 3000+ stocks continuously                              │
-│  • Detects Tier 1/2/3 catalysts (M&A, FDA, earnings beats)     │
-│  • Applies technical filters (price > 50 MA, ADX >20)          │
-│  • Calculates RS percentile rank (0-100, IBD-style)            │
+│  DEEP RESEARCH ALIGNMENT - Wide Screening, AI Filters Hard:     │
+│  • Scans 993 S&P 1500 stocks continuously                       │
+│  • HARD FILTERS (GO/NO-GO):                                     │
+│    - Price >$10 (Deep Research spec)                            │
+│    - Liquidity >$50M daily volume (Deep Research spec)          │
+│    - Catalyst presence required (Tier 1 or Tier 2)             │
+│  • SCORING FACTORS (Entry Quality Scorecard):                   │
+│    - Catalyst quality (0-30 pts)                                │
+│    - Technical setup (0-25 pts) - includes RS as 0-5 pts       │
+│    - Sector/market context (0-20 pts)                           │
+│    - Historical patterns (0-15 pts)                             │
+│    - Conviction/risk (0-10 pts)                                 │
+│  • Calculates RS vs SPY (scoring factor, not hard filter)      │
 │  • Tracks sector rotation (11 sectors vs SPY)                  │
 │  • Detects institutional activity (options flow + dark pool)   │
-│  • Filters for liquidity (min $20M daily volume)               │
-│  OUTPUT: 50-100 candidates → screener_candidates.json          │
+│  OUTPUT: 300-500 catalyst stocks → screener_candidates.json    │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -185,20 +193,27 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
    - **GOOD** (1.5x+ average): Acceptable minimum
    - **Volume trending up**: Recent 5-day avg > prior 20-day by 20%+
 
-4. **Relative Strength Analysis** (Phase 3.1 - IBD-Style)
-   - **3-Month Performance**: Stock vs sector ETF
-   - **RS Percentile Rank** (0-100, market-wide comparison):
-     - 95+: Elite (top 5% of all stocks)
-     - 90-94: Excellent (top 10%)
-     - 80-89: Strong (top 20%)
-     - 70-79: Above Average
-     - <70: Filter out (only trade market leaders)
-   - **Traditional RS %**: Stock outperformance vs sector
-     - 95: Elite (RS ≥15%)
-     - 85: Strong (RS 10-15%)
-     - 75: Very Good (RS 7-10%)
-     - 65: Good (RS 5-7%)
-     - 55: Acceptable (RS 3-5%)
+4. **Entry Quality Scorecard** (Deep Research - Dec 15, 2025)
+   - **100-Point Systematic Framework** (scoring factor, not hard filter):
+     - **Catalyst Quality** (0-30 pts): Earnings surprise, revenue beat, freshness, secondary catalysts
+     - **Technical Setup** (0-25 pts): Trend alignment, RS vs SPY (0-5 pts), volume, price action
+     - **Sector/Market** (0-20 pts): Sector strength, market regime, diversification, event timing
+     - **Historical Patterns** (0-15 pts): Catalyst tier, sector positioning, gap setup, timing
+     - **Conviction/Risk** (0-10 pts): Entry conviction, volatility, risk-reward ratio
+   - **RS as Scoring Component** (NOT hard filter):
+     - RS >5% vs SPY: 5 points (excellent)
+     - RS 3-5% vs SPY: 3 points (good)
+     - RS 1-3% vs SPY: 2 points (modest)
+     - RS <1% vs SPY: 0 points (weak)
+     - Allows negative-RS stocks if strong catalyst present
+   - **Score Thresholds**:
+     - 80-100: Exceptional (full size, 70-75% win rate target)
+     - 60-79: Good (75-100% size, 60-70% win rate)
+     - 40-59: Acceptable (50% size, 50-60% win rate)
+   - **RS Percentile Rank** (informational, shown on dashboard):
+     - 90+: Top 10% of market
+     - 80-89: Top 20%
+     - 70-79: Top 30%
 
 5. **Stage 2 Alignment** (Minervini Criteria)
    - Stock above 150-day and 200-day MAs
@@ -256,14 +271,20 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
    - **Policy**: Blocks ALL new entries on event day only (aligned with institutional best practices)
    - **Rationale**: Comprehensive screening process (RS, technical, institutional signals) handles volatility
 
-4. **Market Breadth & Trend Filter** (Phase 4.2)
+4. **Market Breadth & Regime Filter** (Deep Research Alignment - Dec 15)
    - **Market Breadth**: % of stocks above 50-day MA (from screener data)
-   - **Three Regimes** (breadth-based only - aligned with institutional best practices):
-     - **HEALTHY** (breadth ≥50%): 100% position sizing - majority of stocks in uptrends
-     - **DEGRADED** (breadth 40-49%): 80% position sizing - rotational/mixed market
-     - **UNHEALTHY** (breadth <40%): 60% position sizing - defensive/weak market
-   - Comprehensive screening (Stage 2, RS top 20%, Tier 1 catalysts, 7% stops) provides better protection than blunt SPY filter
-   - SPY can lag individual stocks during sector rotation - breadth-only approach allows trading strong setups
+   - **Three Regimes** (breadth-based only):
+     - **HEALTHY** (breadth ≥50%): 100% position sizing, 1.1x VIX multiplier
+     - **DEGRADED** (breadth 40-49%): 80% position sizing, 1.0x VIX multiplier
+     - **UNHEALTHY** (breadth <40%): 60% position sizing, 0.7x VIX multiplier
+   - **Hard Filters** (GO/NO-GO eliminate low-quality opportunities):
+     - Price >$10 (Deep Research spec)
+     - Liquidity >$50M daily volume (Deep Research spec)
+     - Catalyst presence required (any Tier 1 or Tier 2)
+   - **Scoring Factors** (100-point Entry Quality Scorecard):
+     - RS vs SPY is scoring factor (0-5 pts), NOT hard filter
+     - Allows negative-RS stocks if strong catalyst present
+     - AI evaluates full scorecard, selects best opportunities
    - Applied as multiplier to base conviction sizing
 
 5. **Conviction Scoring** (Phase 4.1 - Cluster-Based)
@@ -802,7 +823,14 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 - ✅ Phase 4.7: Operational monitoring (health checks, dashboard alerts, version tracking)
 - ✅ Phase 4.8: Public model portfolio display (YTD/MTD metrics, regime analysis, transparency)
 - ✅ **Blackout Policy Update (Dec 10)**: Changed to event-day only (FOMC, CPI, NFP, PCE) - aligned with institutional best practices, reduces December blackout days from 57% to 29%
-- ✅ **Breadth-Only Regime Filter (Dec 15)**: Removed SPY MA requirements - breadth-only approach aligned with institutional catalyst-driven strategies. SPY can lag individual stocks during sector rotation; comprehensive screening (Stage 2, RS top 20%, Tier 1 catalysts, 7% stops) provides better protection than blunt SPY filter
+- ✅ **Deep Research Implementation (Dec 15)**: Complete architectural shift to Entry Quality Scorecard methodology
+  - **BREAKING CHANGE**: RS is now scoring factor (0-5 pts), NOT hard filter
+  - Hard filters: Price >$10, Liquidity >$50M, Catalyst presence required
+  - Screener outputs 300-500 catalyst stocks (was 126-131)
+  - AI evaluates 100-point scorecard for best opportunities
+  - Target: 60-70% win rate, 8-12% monthly returns (academic PEAD research)
+  - Aligns with Deep Research: "rule-based filters eliminate low-quality opportunities, then AI analyzes sentiment"
+  - Prevents filtering out NVDA/LLY/ORCL with weak 3M RS but strong catalysts
 
 **Previous Updates**:
 - ✅ Phase 3: IBD-style RS percentile ranking, sector rotation detection, institutional signals
