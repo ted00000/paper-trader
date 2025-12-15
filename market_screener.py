@@ -552,7 +552,10 @@ class MarketScreener:
 
     def calculate_relative_strength(self, ticker, sector):
         """
-        PHASE 3.1: Calculate stock's RS vs sector ETF + IBD-style percentile rank
+        PHASE 3.1: Calculate stock's RS vs MARKET (SPY) + IBD-style percentile rank
+
+        Professional methodology (IBD/Minervini): Compare to market index, not sector.
+        Prevents filtering out sector leaders when their sectors are strong.
 
         Returns: Dict with RS metrics including percentile rank (0-100)
 
@@ -561,19 +564,22 @@ class MarketScreener:
         sector_etf = SECTOR_ETF_MAP.get(sector, 'SPY')
 
         stock_return = self.get_3month_return(ticker)
-        sector_return = self.get_3month_return(sector_etf)
+        spy_return = self.get_3month_return('SPY')  # Compare to market, not sector
+        sector_return = self.get_3month_return(sector_etf)  # Keep for informational purposes
 
         # Store stock return for later percentile calculation
         self.all_stock_returns[ticker] = stock_return
 
-        rs = stock_return - sector_return
+        # FILTER: Compare to market (SPY), not sector (IBD/Minervini methodology)
+        rs = stock_return - spy_return
 
         return {
-            'rs_pct': round(rs, 2),
+            'rs_pct': round(rs, 2),  # RS vs market (used for filter)
             'stock_return_3m': stock_return,
-            'sector_return_3m': sector_return,
+            'sector_return_3m': sector_return,  # Informational only
+            'spy_return_3m': spy_return,  # Informational - market baseline
             'sector_etf': sector_etf,
-            'passed_filter': rs >= MIN_RS_PCT,
+            'passed_filter': rs >= MIN_RS_PCT,  # Beating market by 3%+
             'score': min(rs / 15 * 100, 100) if rs > 0 else 0,  # 15%+ RS = perfect score
             'rs_percentile': None  # Will be calculated after full scan
         }
