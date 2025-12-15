@@ -49,7 +49,7 @@ SECTOR_ETF_MAP = {
 MIN_RS_PCT = 3.0  # Minimum relative strength
 MIN_PRICE = 5.0   # Minimum stock price
 MIN_MARKET_CAP = 1_000_000_000  # $1B minimum
-TOP_N_CANDIDATES = 50  # Number to output
+TOP_N_CANDIDATES = 150  # Number to output (Minervini-style funnel: wide screening, AI filters hard)
 
 
 # ============================================================================
@@ -2040,13 +2040,21 @@ class MarketScreener:
             if 3 <= days_until <= 7:
                 catalyst_score += 5 * catalyst_weight_multiplier
 
-        # PENALTY: Insider buying ONLY (no other catalyst + weak news)
-        # This prevents AEO, A, BFLY from ranking high on insider alone
-        if (catalyst_tier == 'Tier 3' and
-            news_result['scaled_score'] < 10 and
-            rs_result['score'] < 60):
-            catalyst_score -= 20  # Heavy penalty for weak insider-only picks
-            # print(f"   ⚠️ {ticker}: Insider-only penalty applied (weak news + weak RS)")
+        # ENHANCED TIER 3 PENALTIES (Prevent insider-only stocks from crowding out Tier 1)
+        # Academic research: insider buying predicts 6-12 month returns, not 3-7 day swings
+        if catalyst_tier == 'Tier 3':
+            # Penalty 1: Weak news + weak RS (EXISTING)
+            if news_result['scaled_score'] < 10 and rs_result['score'] < 60:
+                catalyst_score -= 20
+
+            # Penalty 2: No Tier 1/Tier 2 support (NEW - pure insider buying)
+            if not has_tier1_catalyst and not has_tier2_catalyst:
+                catalyst_score -= 15  # Pure insider buying = heavily penalized
+
+            # Penalty 3: Multiple insiders but weak technicals (NEW - red flag)
+            if (insider_result.get('buy_count', 0) >= 3 and
+                technical_result['score'] < 50):
+                catalyst_score -= 10  # Lots of insiders but bad setup = suspicious
 
         # ============================================================================
         # PHASE 2.4: MAGNITUDE-BASED SCORING ADJUSTMENTS
@@ -2308,11 +2316,31 @@ class MarketScreener:
         print("=" * 60)
         sector_rotation = self.detect_sector_rotation()
 
-        # Sort by composite score
-        candidates.sort(key=lambda x: x['composite_score'], reverse=True)
+        # TIER-BASED QUOTA SELECTION (Professional Best Practice)
+        # Separate by tier to prevent Tier 3 from crowding out Tier 1
+        tier1 = [c for c in candidates if c.get('catalyst_tier', '').startswith('Tier 1')]
+        tier2 = [c for c in candidates if c.get('catalyst_tier', '').startswith('Tier 2')]
+        tier3 = [c for c in candidates if c.get('catalyst_tier', '').startswith('Tier 3')]
+        no_catalyst = [c for c in candidates if c.get('catalyst_tier', '') == 'No Catalyst']
 
-        # Take top N
-        top_candidates = candidates[:TOP_N_CANDIDATES]
+        # Sort each tier by composite score (rank WITHIN tier, not across)
+        tier1.sort(key=lambda x: x['composite_score'], reverse=True)
+        tier2.sort(key=lambda x: x['composite_score'], reverse=True)
+        tier3.sort(key=lambda x: x['composite_score'], reverse=True)
+        no_catalyst.sort(key=lambda x: x['composite_score'], reverse=True)
+
+        # Enforce quotas: Guarantee Tier 1 representation (IBD/Minervini approach)
+        # Top 60 Tier 1, Top 50 Tier 2, Top 40 Tier 3 (prevents insider-only crowding)
+        top_candidates = tier1[:60] + tier2[:50] + tier3[:40]
+
+        # If we don't have enough candidates, backfill with remaining highest-scored
+        if len(top_candidates) < TOP_N_CANDIDATES:
+            remaining = [c for c in candidates if c not in top_candidates]
+            remaining.sort(key=lambda x: x['composite_score'], reverse=True)
+            top_candidates.extend(remaining[:TOP_N_CANDIDATES - len(top_candidates)])
+
+        # Trim to exactly TOP_N_CANDIDATES if we have too many
+        top_candidates = top_candidates[:TOP_N_CANDIDATES]
 
         # Add rank
         for rank, candidate in enumerate(top_candidates, 1):
