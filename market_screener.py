@@ -49,7 +49,7 @@ SECTOR_ETF_MAP = {
 MIN_RS_PCT = 3.0  # Minimum relative strength
 MIN_PRICE = 5.0   # Minimum stock price
 MIN_MARKET_CAP = 1_000_000_000  # $1B minimum
-TOP_N_CANDIDATES = 50  # Number to output
+TOP_N_CANDIDATES = 150  # Number to output (Minervini-style funnel: wide screening, AI filters hard)
 
 
 # ============================================================================
@@ -552,7 +552,10 @@ class MarketScreener:
 
     def calculate_relative_strength(self, ticker, sector):
         """
-        PHASE 3.1: Calculate stock's RS vs sector ETF + IBD-style percentile rank
+        PHASE 3.1: Calculate stock's RS vs MARKET (SPY) + IBD-style percentile rank
+
+        Professional methodology (IBD/Minervini): Compare to market index, not sector.
+        Prevents filtering out sector leaders when their sectors are strong.
 
         Returns: Dict with RS metrics including percentile rank (0-100)
 
@@ -561,19 +564,22 @@ class MarketScreener:
         sector_etf = SECTOR_ETF_MAP.get(sector, 'SPY')
 
         stock_return = self.get_3month_return(ticker)
-        sector_return = self.get_3month_return(sector_etf)
+        spy_return = self.get_3month_return('SPY')  # Compare to market, not sector
+        sector_return = self.get_3month_return(sector_etf)  # Keep for informational purposes
 
         # Store stock return for later percentile calculation
         self.all_stock_returns[ticker] = stock_return
 
-        rs = stock_return - sector_return
+        # FILTER: Compare to market (SPY), not sector (IBD/Minervini methodology)
+        rs = stock_return - spy_return
 
         return {
-            'rs_pct': round(rs, 2),
+            'rs_pct': round(rs, 2),  # RS vs market (used for filter)
             'stock_return_3m': stock_return,
-            'sector_return_3m': sector_return,
+            'sector_return_3m': sector_return,  # Informational only
+            'spy_return_3m': spy_return,  # Informational - market baseline
             'sector_etf': sector_etf,
-            'passed_filter': rs >= MIN_RS_PCT,
+            'passed_filter': rs >= MIN_RS_PCT,  # Beating market by 3%+
             'score': min(rs / 15 * 100, 100) if rs > 0 else 0,  # 15%+ RS = perfect score
             'rs_percentile': None  # Will be calculated after full scan
         }
@@ -983,9 +989,9 @@ class MarketScreener:
 
     def get_technical_setup(self, ticker):
         """
-        Check proximity to 52-week high
+        Check proximity to 52-week high and calculate 50-day MA for market breadth
 
-        Returns: Dict with technical metrics
+        Returns: Dict with technical metrics including above_50d_sma for breadth calculation
         """
         try:
             end_date = datetime.now()
@@ -1008,18 +1014,26 @@ class MarketScreener:
                 distance_pct = ((high_52w - current_price) / high_52w) * 100
                 is_near_high = distance_pct <= 5.0  # Within 5%
 
+                # Calculate 50-day MA for market breadth (Phase 4.2 requirement)
+                if len(results) >= 50:
+                    ma_50 = sum(r['c'] for r in results[-50:]) / 50
+                    above_50d_sma = current_price > ma_50
+                else:
+                    above_50d_sma = False
+
                 return {
                     'distance_from_52w_high_pct': round(distance_pct, 2),
                     'is_near_high': is_near_high,
                     'high_52w': round(high_52w, 2),
                     'current_price': round(current_price, 2),
+                    'above_50d_sma': above_50d_sma,  # Required for market breadth calculation
                     'score': max(100 - (distance_pct * 2), 0)  # Closer = higher score
                 }
 
-            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'score': 0}
+            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
 
         except Exception:
-            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'score': 0}
+            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
 
     def get_earnings_calendar(self):
         """
@@ -2032,13 +2046,21 @@ class MarketScreener:
             if 3 <= days_until <= 7:
                 catalyst_score += 5 * catalyst_weight_multiplier
 
-        # PENALTY: Insider buying ONLY (no other catalyst + weak news)
-        # This prevents AEO, A, BFLY from ranking high on insider alone
-        if (catalyst_tier == 'Tier 3' and
-            news_result['scaled_score'] < 10 and
-            rs_result['score'] < 60):
-            catalyst_score -= 20  # Heavy penalty for weak insider-only picks
-            # print(f"   ⚠️ {ticker}: Insider-only penalty applied (weak news + weak RS)")
+        # ENHANCED TIER 3 PENALTIES (Prevent insider-only stocks from crowding out Tier 1)
+        # Academic research: insider buying predicts 6-12 month returns, not 3-7 day swings
+        if catalyst_tier == 'Tier 3':
+            # Penalty 1: Weak news + weak RS (EXISTING)
+            if news_result['scaled_score'] < 10 and rs_result['score'] < 60:
+                catalyst_score -= 20
+
+            # Penalty 2: No Tier 1/Tier 2 support (NEW - pure insider buying)
+            if not has_tier1_catalyst and not has_tier2_catalyst:
+                catalyst_score -= 15  # Pure insider buying = heavily penalized
+
+            # Penalty 3: Multiple insiders but weak technicals (NEW - red flag)
+            if (insider_result.get('buy_count', 0) >= 3 and
+                technical_result['score'] < 50):
+                catalyst_score -= 10  # Lots of insiders but bad setup = suspicious
 
         # ============================================================================
         # PHASE 2.4: MAGNITUDE-BASED SCORING ADJUSTMENTS
@@ -2300,11 +2322,31 @@ class MarketScreener:
         print("=" * 60)
         sector_rotation = self.detect_sector_rotation()
 
-        # Sort by composite score
-        candidates.sort(key=lambda x: x['composite_score'], reverse=True)
+        # TIER-BASED QUOTA SELECTION (Professional Best Practice)
+        # Separate by tier to prevent Tier 3 from crowding out Tier 1
+        tier1 = [c for c in candidates if c.get('catalyst_tier', '').startswith('Tier 1')]
+        tier2 = [c for c in candidates if c.get('catalyst_tier', '').startswith('Tier 2')]
+        tier3 = [c for c in candidates if c.get('catalyst_tier', '').startswith('Tier 3')]
+        no_catalyst = [c for c in candidates if c.get('catalyst_tier', '') == 'No Catalyst']
 
-        # Take top N
-        top_candidates = candidates[:TOP_N_CANDIDATES]
+        # Sort each tier by composite score (rank WITHIN tier, not across)
+        tier1.sort(key=lambda x: x['composite_score'], reverse=True)
+        tier2.sort(key=lambda x: x['composite_score'], reverse=True)
+        tier3.sort(key=lambda x: x['composite_score'], reverse=True)
+        no_catalyst.sort(key=lambda x: x['composite_score'], reverse=True)
+
+        # Enforce quotas: Guarantee Tier 1 representation (IBD/Minervini approach)
+        # Top 60 Tier 1, Top 50 Tier 2, Top 40 Tier 3 (prevents insider-only crowding)
+        top_candidates = tier1[:60] + tier2[:50] + tier3[:40]
+
+        # If we don't have enough candidates, backfill with remaining highest-scored
+        if len(top_candidates) < TOP_N_CANDIDATES:
+            remaining = [c for c in candidates if c not in top_candidates]
+            remaining.sort(key=lambda x: x['composite_score'], reverse=True)
+            top_candidates.extend(remaining[:TOP_N_CANDIDATES - len(top_candidates)])
+
+        # Trim to exactly TOP_N_CANDIDATES if we have too many
+        top_candidates = top_candidates[:TOP_N_CANDIDATES]
 
         # Add rank
         for rank, candidate in enumerate(top_candidates, 1):

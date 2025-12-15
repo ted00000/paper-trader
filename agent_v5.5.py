@@ -127,8 +127,9 @@ v5.3.0 - PHASE 3: VIX FILTER + MACRO CALENDAR (2025-10-31):
   - VIX <30: NORMAL operations
 - Implemented macro event calendar with blackout windows
   - check_macro_calendar(): Checks for FOMC, CPI, NFP, PCE events
-  - FOMC: 2 days before → 1 day after (4-day blackout)
-  - CPI/NFP/PCE: 1 day before → day of (2-day blackout)
+  - ALL EVENTS: Day-of only (event-day blackout, aligned with institutional best practices)
+  - FOMC: Day of (2:00 PM announcement + presser)
+  - CPI/NFP/PCE: Day of (8:30 AM releases, 9:45 AM entries are post-volatility)
   - Auto-blocks ALL entries during blackout periods
 - GO command regime-aware filtering (Phase 3 integration):
   - Checks VIX and macro calendar BEFORE individual validation
@@ -593,7 +594,7 @@ POSITION {i}: {ticker}
 
             response = requests.get(
                 f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
-                params={'apiKey': self.polygon_api_key, 'limit': 50000}
+                params={'apiKey': POLYGON_API_KEY, 'limit': 50000}
             )
 
             if response.status_code != 200:
@@ -781,7 +782,7 @@ POSITION {i}: {ticker}
 
             response = requests.get(
                 f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
-                params={'apiKey': self.polygon_api_key, 'limit': 50}
+                params={'apiKey': POLYGON_API_KEY, 'limit': 50}
             )
 
             if response.status_code != 200 or 'results' not in response.json():
@@ -1006,7 +1007,7 @@ POSITION {i}: {ticker}
             'relative_strength': position.get('relative_strength', 0.0),
             'stock_return_3m': position.get('stock_return_3m', 0.0),
             'sector_etf': position.get('sector_etf', 'Unknown'),
-            'conviction_level': position.get('conviction_level', 'MEDIUM'),
+            'conviction_level': position.get('conviction_level') or position.get('confidence', 'MEDIUM').upper(),
             'supporting_factors': position.get('supporting_factors', 0),
             'sector': position.get('sector', ''),
             'confidence': position.get('confidence', ''),
@@ -2163,27 +2164,30 @@ POSITION {i}: {ticker}
                 candidates = screener_data['candidates']
                 total = len(candidates)
 
-                # Count how many are above 50-day MA (we have this data in screener)
-                above_50d = sum(1 for c in candidates if c.get('technical_filters', {}).get('above_50d_sma', False))
+                # Count how many are above 50-day MA (check technical_setup for above_50d_sma)
+                above_50d = sum(1 for c in candidates if c.get('technical_setup', {}).get('above_50d_sma', False))
                 breadth_pct = (above_50d / total * 100) if total > 0 else 0
 
-            # Determine market regime
-            # HEALTHY: SPY above both MAs AND breadth >50%
-            # DEGRADED: SPY above 50d MA OR breadth 40-50%
-            # UNHEALTHY: SPY below both MAs AND breadth <40%
+            # Determine market regime (BREADTH-BASED ONLY - aligned with institutional best practices)
+            # Comprehensive individual stock screening (Stage 2, RS top 20%, Tier 1 catalysts, 7% stops)
+            # provides better protection than blunt SPY filter for catalyst-driven strategy
+            #
+            # HEALTHY: Breadth ≥50% (majority of stocks in uptrends)
+            # DEGRADED: Breadth 40-49% (mixed/rotational market)
+            # UNHEALTHY: Breadth <40% (defensive/weak market)
 
-            if spy_above_50d and spy_above_200d and breadth_pct >= 50:
+            if breadth_pct >= 50:
                 regime = 'HEALTHY'
                 adjustment = 1.0
-                message = f'✓ Market HEALTHY: SPY above 50d/200d, breadth {breadth_pct:.0f}%'
-            elif spy_above_50d and breadth_pct >= 40:
+                message = f'✓ Market HEALTHY: Breadth {breadth_pct:.0f}% (majority in uptrends)'
+            elif breadth_pct >= 40:
                 regime = 'DEGRADED'
                 adjustment = 0.8  # Reduce position sizes by 20%
-                message = f'⚠️ Market DEGRADED: SPY above 50d, breadth {breadth_pct:.0f}% - reducing size 20%'
+                message = f'⚠️ Market DEGRADED: Breadth {breadth_pct:.0f}% (rotational market) - reducing size 20%'
             else:
                 regime = 'UNHEALTHY'
                 adjustment = 0.6  # Reduce position sizes by 40%
-                message = f'⚠️ Market UNHEALTHY: Low breadth ({breadth_pct:.0f}%), SPY trend weak - reducing size 40%'
+                message = f'⚠️ Market UNHEALTHY: Breadth {breadth_pct:.0f}% (defensive market) - reducing size 40%'
 
             return {
                 'spy_above_50d': spy_above_50d,
@@ -2212,11 +2216,14 @@ POSITION {i}: {ticker}
         """
         Check if a date falls within blackout windows for major macro events
 
-        Major events with blackout windows:
-        - FOMC Meeting: 2 days before → 1 day after
-        - CPI Release: 1 day before → day of
-        - NFP (Jobs Report): 1 day before → day of
-        - PCE (Inflation): 1 day before → day of
+        Major events with blackout windows (EVENT-DAY ONLY):
+        - FOMC Meeting: Day of only (2:00 PM announcement + press conference)
+        - CPI Release: Day of only (8:30 AM release)
+        - NFP (Jobs Report): Day of only (8:30 AM release)
+        - PCE (Inflation): Day of only (8:30 AM release)
+
+        Note: Day-before restrictions removed (aligned with institutional best practices).
+        Comprehensive screening process (RS, technical, institutional signals) handles volatility.
 
         Args:
             check_date: Date to check (datetime object, defaults to today)
@@ -2266,22 +2273,19 @@ POSITION {i}: {ticker}
         for event_date_str, event_type, description in macro_events_2025:
             event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
 
-            # Define blackout windows
+            # Define blackout windows - EVENT-DAY ONLY (aligned with institutional best practices)
+            # Comprehensive screening (RS, technical filters, institutional signals) handles volatility
+            from datetime import timedelta
+
             if event_type == 'FOMC':
-                # 2 days before → 1 day after
-                from datetime import timedelta
-                blackout_start = event_date - timedelta(days=2)
-                blackout_end = event_date + timedelta(days=1)
-            elif event_type == 'NFP':
-                # NFP: Day of only (8:30 AM release, protect market open volatility)
-                # Changed from 1-day-before to be less conservative
-                from datetime import timedelta
+                # FOMC: Day of only (2:00 PM announcement + press conference)
+                # Avoid new entries during presser volatility, but allow day before/after
                 blackout_start = event_date
                 blackout_end = event_date
             else:
-                # CPI, PCE: 1 day before → day of
-                from datetime import timedelta
-                blackout_start = event_date - timedelta(days=1)
+                # CPI, NFP, PCE: Day of only (8:30 AM releases)
+                # 9:45 AM entries are 75 min after release - volatility settled
+                blackout_start = event_date
                 blackout_end = event_date
 
             # Check if check_date falls in blackout window
@@ -4284,6 +4288,7 @@ RECENT LESSONS LEARNED:
                 trade_data.get('macro_event_near', 'None'),
                 trade_data.get('vix_regime', 'UNKNOWN'),  # Phase 4 VIX regime
                 trade_data.get('market_breadth_regime', 'UNKNOWN'),  # Phase 4 market breadth
+                trade_data.get('system_version', SYSTEM_VERSION),  # Phase 4.7 - Track code version
                 trade_data.get('relative_strength', 0.0),
                 trade_data.get('stock_return_3m', 0.0),
                 trade_data.get('sector_etf', 'Unknown'),
@@ -5090,6 +5095,9 @@ RECENT LESSONS LEARNED:
                     print(f"   📊 Checking technical setup for {ticker}...")
                     tech_result = self.calculate_technical_score(ticker)
 
+                    # Extract current price from technical result for later use
+                    current_price = tech_result.get('details', {}).get('price', 0)
+
                     # Check if technical setup passed (must pass ALL 4 filters)
                     if not tech_result['passed']:
                         validation_passed = False
@@ -5603,7 +5611,7 @@ RECENT LESSONS LEARNED:
                     # Fetch 2-day history to get previous close
                     bars = requests.get(
                         f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")}/{datetime.now().strftime("%Y-%m-%d")}',
-                        params={'apiKey': self.polygon_api_key}
+                        params={'apiKey': POLYGON_API_KEY}
                     ).json()
                     if bars.get('results') and len(bars['results']) >= 2:
                         previous_closes[ticker] = bars['results'][-2]['c']  # Previous day close

@@ -248,18 +248,22 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
    - **VIX 25-30**: ORANGE (elevated risk, Tier 1 only)
    - **VIX > 30**: RED (SHUTDOWN - no new trades)
 
-3. **Macro Event Check**
-   - Scans for Fed meetings, CPI reports, FOMC within 48 hours
-   - Adjusts position sizing or skips trades during high-impact events
+3. **Macro Event Check** (Event-Day Only Blackouts)
+   - **FOMC Meeting**: Day of only (2:00 PM announcement + press conference)
+   - **CPI Release**: Day of only (8:30 AM release, 9:45 AM entries are post-volatility)
+   - **NFP (Jobs Report)**: Day of only (8:30 AM release)
+   - **PCE (Inflation)**: Day of only (8:30 AM release)
+   - **Policy**: Blocks ALL new entries on event day only (aligned with institutional best practices)
+   - **Rationale**: Comprehensive screening process (RS, technical, institutional signals) handles volatility
 
 4. **Market Breadth & Trend Filter** (Phase 4.2)
-   - **SPY Trend Check**: Price above 50-day and 200-day MAs
    - **Market Breadth**: % of stocks above 50-day MA (from screener data)
-   - **Three Regimes**:
-     - **HEALTHY** (SPY uptrend + breadth ≥50%): 100% position sizing
-     - **DEGRADED** (SPY above 50d + breadth ≥40%): 80% position sizing
-     - **UNHEALTHY** (otherwise): 60% position sizing
-   - Prevents trading during rotational/choppy markets
+   - **Three Regimes** (breadth-based only - aligned with institutional best practices):
+     - **HEALTHY** (breadth ≥50%): 100% position sizing - majority of stocks in uptrends
+     - **DEGRADED** (breadth 40-49%): 80% position sizing - rotational/mixed market
+     - **UNHEALTHY** (breadth <40%): 60% position sizing - defensive/weak market
+   - Comprehensive screening (Stage 2, RS top 20%, Tier 1 catalysts, 7% stops) provides better protection than blunt SPY filter
+   - SPY can lag individual stocks during sector rotation - breadth-only approach allows trading strong setups
    - Applied as multiplier to base conviction sizing
 
 5. **Conviction Scoring** (Phase 4.1 - Cluster-Based)
@@ -653,7 +657,7 @@ Analyzes past performance across multiple dimensions:
 - **Market breadth filter** (Phase 4.2): Reduces exposure in rotational/choppy markets
 - **Liquidity floor** (Phase 4.4): Min $20M daily dollar volume (prevents slippage)
 - **Market regime**: SHUTDOWN at VIX >30
-- **Macro events**: Reduce sizing during Fed/CPI
+- **Macro events**: Event-day only blackouts (FOMC, CPI, NFP, PCE) - aligned with institutional best practices
 
 ### Trade-Level Risk:
 - **No revenge trading**: Each trade is independent
@@ -784,7 +788,7 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: December 2, 2024
+**Last Updated**: December 10, 2024
 **Version**: v6.0 (Phase 0-4 Complete: 26 Enhancements - CODE FROZEN)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
@@ -797,6 +801,8 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 - ✅ Phase 4.6: AI robustness & failover (graceful degradation when Claude API fails)
 - ✅ Phase 4.7: Operational monitoring (health checks, dashboard alerts, version tracking)
 - ✅ Phase 4.8: Public model portfolio display (YTD/MTD metrics, regime analysis, transparency)
+- ✅ **Blackout Policy Update (Dec 10)**: Changed to event-day only (FOMC, CPI, NFP, PCE) - aligned with institutional best practices, reduces December blackout days from 57% to 29%
+- ✅ **Breadth-Only Regime Filter (Dec 15)**: Removed SPY MA requirements - breadth-only approach aligned with institutional catalyst-driven strategies. SPY can lag individual stocks during sector rotation; comprehensive screening (Stage 2, RS top 20%, Tier 1 catalysts, 7% stops) provides better protection than blunt SPY filter
 
 **Previous Updates**:
 - ✅ Phase 3: IBD-style RS percentile ranking, sector rotation detection, institutional signals

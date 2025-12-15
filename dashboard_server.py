@@ -526,8 +526,13 @@ def extract_system_alerts(operation):
             elif 'VIX' in line and ('SHUTDOWN' in line or '>30' in line):
                 alert_text = line.strip()
 
-            # Extract market regime warnings
-            elif '⚠️ Market UNHEALTHY' in line or '⚠️ Market DEGRADED' in line:
+            # Extract market regime messages (HEALTHY, DEGRADED, UNHEALTHY)
+            # Note: Only keep the MOST RECENT regime message (not all historical ones)
+            elif ('✓ Market HEALTHY' in line or '⚠️ Market DEGRADED' in line or
+                  '⚠️ Market UNHEALTHY' in line):
+                # Replace any previous market regime alert with the most recent one
+                # Remove old market regime messages
+                alerts = [a for a in alerts if not any(x in a for x in ['Market HEALTHY', 'Market DEGRADED', 'Market UNHEALTHY'])]
                 alert_text = line.strip()
 
             # Extract blocking messages
