@@ -2168,23 +2168,26 @@ POSITION {i}: {ticker}
                 above_50d = sum(1 for c in candidates if c.get('technical_setup', {}).get('above_50d_sma', False))
                 breadth_pct = (above_50d / total * 100) if total > 0 else 0
 
-            # Determine market regime
-            # HEALTHY: SPY above both MAs AND breadth >50%
-            # DEGRADED: SPY above 50d MA OR breadth 40-50%
-            # UNHEALTHY: SPY below both MAs AND breadth <40%
+            # Determine market regime (BREADTH-BASED ONLY - aligned with institutional best practices)
+            # Comprehensive individual stock screening (Stage 2, RS top 20%, Tier 1 catalysts, 7% stops)
+            # provides better protection than blunt SPY filter for catalyst-driven strategy
+            #
+            # HEALTHY: Breadth ≥50% (majority of stocks in uptrends)
+            # DEGRADED: Breadth 40-49% (mixed/rotational market)
+            # UNHEALTHY: Breadth <40% (defensive/weak market)
 
-            if spy_above_50d and spy_above_200d and breadth_pct >= 50:
+            if breadth_pct >= 50:
                 regime = 'HEALTHY'
                 adjustment = 1.0
-                message = f'✓ Market HEALTHY: SPY above 50d/200d, breadth {breadth_pct:.0f}%'
-            elif spy_above_50d and breadth_pct >= 40:
+                message = f'✓ Market HEALTHY: Breadth {breadth_pct:.0f}% (majority in uptrends)'
+            elif breadth_pct >= 40:
                 regime = 'DEGRADED'
                 adjustment = 0.8  # Reduce position sizes by 20%
-                message = f'⚠️ Market DEGRADED: SPY above 50d, breadth {breadth_pct:.0f}% - reducing size 20%'
+                message = f'⚠️ Market DEGRADED: Breadth {breadth_pct:.0f}% (rotational market) - reducing size 20%'
             else:
                 regime = 'UNHEALTHY'
                 adjustment = 0.6  # Reduce position sizes by 40%
-                message = f'⚠️ Market UNHEALTHY: Low breadth ({breadth_pct:.0f}%), SPY trend weak - reducing size 40%'
+                message = f'⚠️ Market UNHEALTHY: Breadth {breadth_pct:.0f}% (defensive market) - reducing size 40%'
 
             return {
                 'spy_above_50d': spy_above_50d,
