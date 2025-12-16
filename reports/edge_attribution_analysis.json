@@ -1,0 +1,116 @@
+{
+  "report_version": "v7.1.1",
+  "generated_at": "2025-12-16",
+  "trades_analyzed": 1,
+  "overall_expectancy": {
+    "count": 1,
+    "win_rate": 100.0,
+    "avg_win": 10.28,
+    "avg_loss": 0,
+    "expectancy": 10.28,
+    "total_return": 10.28,
+    "avg_return": 10.28
+  },
+  "edge_by_catalyst": {
+    "by_tier": {
+      "Unknown": {
+        "count": 1,
+        "win_rate": 100.0,
+        "avg_win": 10.28,
+        "avg_loss": 0,
+        "expectancy": 10.28,
+        "total_return": 10.28,
+        "avg_return": 10.28
+      }
+    },
+    "by_type": {}
+  },
+  "edge_by_rs_rating": {
+    "elite_90_plus": {
+      "count": 0,
+      "win_rate": 0,
+      "avg_win": 0,
+      "avg_loss": 0,
+      "expectancy": 0,
+      "total_return": 0
+    },
+    "good_70_89": {
+      "count": 0,
+      "win_rate": 0,
+      "avg_win": 0,
+      "avg_loss": 0,
+      "expectancy": 0,
+      "total_return": 0
+    },
+    "weak_below_70": {
+      "count": 1,
+      "win_rate": 100.0,
+      "avg_win": 10.28,
+      "avg_loss": 0,
+      "expectancy": 10.28,
+      "total_return": 10.28,
+      "avg_return": 10.28
+    }
+  },
+  "edge_by_volume_quality": {
+    "": {
+      "count": 1,
+      "win_rate": 100.0,
+      "avg_win": 10.28,
+      "avg_loss": 0,
+      "expectancy": 10.28,
+      "total_return": 10.28,
+      "avg_return": 10.28
+    }
+  },
+  "edge_by_conviction": {
+    "MEDIUM": {
+      "count": 1,
+      "win_rate": 100.0,
+      "avg_win": 10.28,
+      "avg_loss": 0,
+      "expectancy": 10.28,
+      "total_return": 10.28,
+      "avg_return": 10.28
+    }
+  },
+  "edge_by_vix_regime": {
+    "UNKNOWN": {
+      "count": 1,
+      "win_rate": 100.0,
+      "avg_win": 10.28,
+      "avg_loss": 0,
+      "expectancy": 10.28,
+      "total_return": 10.28,
+      "avg_return": 10.28
+    }
+  },
+  "edge_by_market_breadth": {
+    "UNKNOWN": {
+      "count": 1,
+      "win_rate": 100.0,
+      "avg_win": 10.28,
+      "avg_loss": 0,
+      "expectancy": 10.28,
+      "total_return": 10.28,
+      "avg_return": 10.28
+    }
+  },
+  "edge_by_supporting_factors": {
+    "<3 (LOW)": {
+      "count": 1,
+      "win_rate": 100.0,
+      "avg_win": 10.28,
+      "avg_loss": 0,
+      "expectancy": 10.28,
+      "total_return": 10.28,
+      "avg_return": 10.28
+    }
+  },
+  "interpretation": {
+    "expectancy": "Expected profit per trade (positive = edge)",
+    "target_win_rate": "65-70% after enhancements",
+    "positive_expectancy": "Win Rate \u00d7 Avg Win > Loss Rate \u00d7 Avg Loss",
+    "best_edge": "Identify which factors drive highest expectancy"
+  }
+}
