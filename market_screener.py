@@ -2304,6 +2304,11 @@ class MarketScreener:
         tickers = self.get_sp1500_tickers()
         universe_size = len(tickers)
 
+        # v7.1.1: Save universe for version tracking (breadth stability)
+        universe_file = Path(__file__).parent / 'universe_tickers.json'
+        with open(universe_file, 'w') as f:
+            json.dump({'tickers': sorted(tickers), 'fetched_at': self.today, 'count': len(tickers)}, f, indent=2)
+
         print(f"Scanning {universe_size} stocks...")
         print("(This will take 5-10 minutes due to API rate limits)\n")
 

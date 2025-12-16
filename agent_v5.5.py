@@ -357,6 +357,45 @@ QUALITY OVER QUANTITY:
 # Calculate ruleset version at module load time
 RULESET_VERSION = get_ruleset_version()
 
+def get_universe_version():
+    """
+    Calculate hash of S&P 1500 universe tickers (v7.1.1 - Universe stability tracking)
+
+    Prevents breadth drift due to constituent changes. For example:
+    - Dec 2025: 993 stocks in universe → v7.1.1-abc123de
+    - Jan 2026: 1012 stocks (IPOs added) → v7.1.1-xyz789ab
+
+    This enables analysis like: "Did performance change due to strategy or universe shift?"
+
+    Returns: universe version string (e.g., v7.1.1-abc123de)
+    """
+    try:
+        # Load universe tickers from screener output
+        universe_file = PROJECT_DIR / 'universe_tickers.json'
+
+        if not universe_file.exists():
+            return f"{SYSTEM_VERSION}-no_universe"
+
+        with open(universe_file, 'r') as f:
+            universe_data = json.load(f)
+
+        # Sort tickers for consistent hashing (order doesn't matter)
+        tickers = sorted(universe_data.get('tickers', []))
+
+        # Calculate SHA256 hash (first 8 chars)
+        hash_obj = hashlib.sha256(','.join(tickers).encode('utf-8'))
+        hash_short = hash_obj.hexdigest()[:8]
+
+        return f"{SYSTEM_VERSION}-{hash_short}"
+
+    except Exception as e:
+        # Fallback if hash calculation fails
+        print(f"⚠️ Warning: Could not calculate universe version: {e}")
+        return f"{SYSTEM_VERSION}-unknown"
+
+# Calculate universe version at module load time
+UNIVERSE_VERSION = get_universe_version()
+
 class TradingAgent:
     """Production-ready trading agent v4.3 - Complete implementation"""
 
@@ -393,6 +432,7 @@ class TradingAgent:
                     'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
                     'System_Version',  # Enhancement 4.7 - Track code version per trade
                     'Ruleset_Version',  # v7.1 - Track trading rules version (policy drift prevention)
+                    'Universe_Version',  # v7.1.1 - Track S&P 1500 constituent list (breadth stability)
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
@@ -1177,6 +1217,7 @@ POSITION {i}: {ticker}
             'market_breadth_regime': trade.get('market_breadth_regime', 'UNKNOWN'),
             'system_version': SYSTEM_VERSION,
             'ruleset_version': RULESET_VERSION,  # v7.1 - Track trading rules version
+            'universe_version': UNIVERSE_VERSION,  # v7.1.1 - Track S&P 1500 constituent list
             'relative_strength': trade.get('relative_strength', 0.0),
             'stock_return_3m': trade.get('stock_return_3m', 0.0),
             'sector_etf': trade.get('sector_etf', 'Unknown'),
@@ -4499,6 +4540,7 @@ RECENT LESSONS LEARNED:
                     'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
                     'System_Version',  # Enhancement 4.7 - Track code version per trade
                     'Ruleset_Version',  # v7.1 - Track trading rules version (policy drift prevention)
+                    'Universe_Version',  # v7.1.1 - Track S&P 1500 constituent list (breadth stability)
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
@@ -4558,6 +4600,7 @@ RECENT LESSONS LEARNED:
                 trade_data.get('market_breadth_regime', 'UNKNOWN'),  # Phase 4 market breadth
                 trade_data.get('system_version', SYSTEM_VERSION),  # Phase 4.7 - Track code version
                 trade_data.get('ruleset_version', RULESET_VERSION),  # v7.1 - Track trading rules version
+                trade_data.get('universe_version', UNIVERSE_VERSION),  # v7.1.1 - Track S&P 1500 constituent list
                 trade_data.get('relative_strength', 0.0),
                 trade_data.get('stock_return_3m', 0.0),
                 trade_data.get('sector_etf', 'Unknown'),
