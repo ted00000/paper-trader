@@ -253,6 +253,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import traceback
 import pytz
+import hashlib
 
 # Configuration
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
@@ -263,7 +264,98 @@ CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
 PROJECT_DIR = Path(__file__).parent
 
 # System version tracking (Enhancement 4.7)
-SYSTEM_VERSION = 'v7.0'  # Deep Research + Execution Realism (ATR stops, spread checks, breadth timing)
+SYSTEM_VERSION = 'v7.1'  # Validation Improvements (ruleset versioning, slippage tracking, exit policy clarity)
+
+# v7.1: Ruleset versioning for policy drift prevention
+def get_ruleset_version():
+    """
+    Calculate hash of trading rules to prevent policy drift (v7.1 validation improvement)
+
+    Returns ruleset version string like: v7.0-3f2a1c8d
+
+    Hash includes:
+    - GO command prompt template (swing trading rules, technical filters, output format)
+    - strategy_evolution/strategy_rules.md (entry/exit criteria, risk management)
+    - strategy_evolution/catalyst_exclusions.json (excluded catalysts list)
+
+    This enables tracking if strategy changes mid-evaluation period, preventing
+    confounding variables when assessing system performance.
+    """
+    try:
+        combined_content = ""
+
+        # Component 1: GO command prompt template (lines 3648-3770 in call_claude_api)
+        # Extract the EXACT text used in GO command prompts
+        go_prompt_portfolio_review = """SWING TRADING RULES (STRICTLY ENFORCE):
+1. Minimum hold: 2 days (unless stop/target hit or catalyst invalidated)
+2. Maximum hold: 21 days (time stop)
+3. Exit triggers ONLY:
+   - Stop loss hit or approaching (-7%)
+   - Price target hit (+10-15%)
+   - Catalyst invalidated (news, guidance cut, sector reversal)
+   - Time stop (21 days with <3% gain)
+   - Better opportunity exists AND position is flat/small loss AND age >= 2 days
+4. DO NOT exit profitable positions just because it's a new day
+5. DO NOT churn daily - let swings work (3-7 days typical)
+6. If position is working (profitable, catalyst intact), HOLD it
+
+**NEW POSITIONS: TIER 1 CATALYSTS ONLY**
+- Any new BUY recommendations MUST have Tier 1 catalysts (earnings beat + guidance, FDA, major M&A)
+- Tier 2/3 stocks will be REJECTED by validation - don't recommend them
+- Quality over quantity: Better to add 0-3 Tier 1 stocks than fill slots with Tier 2/3
+
+**TECHNICAL FILTERS (4 REQUIRED - ALL MUST PASS):**
+- Stock must be above 50-day moving average (uptrend confirmation)
+- 5 EMA must be above 20 EMA (momentum acceleration)
+- ADX must be >20 (strong trend, not choppy)
+- Volume must be >1.5x average (institutional participation)
+- Stocks failing ANY technical filter will be REJECTED automatically"""
+
+        go_prompt_initial_build = """**CRITICAL: TIER 1 CATALYSTS ONLY - NO EXCEPTIONS**
+
+We ONLY trade stocks with Tier 1 catalysts. This is non-negotiable:
+- ✅ Tier 1: Earnings beats with raised guidance, FDA approvals, major M&A, multi-catalyst events
+- ❌ Tier 2: Analyst upgrades, sector momentum alone, technical breakouts - REJECT THESE
+- ❌ Tier 3: Minor news, earnings meets (no beat), guidance in-line - REJECT THESE
+
+QUALITY OVER QUANTITY:
+- Better to recommend 0-5 Tier 1 stocks than 10 mediocre Tier 2/3 stocks
+- If fewer than 10 Tier 1 opportunities exist today, that's OK - only recommend what qualifies
+- Every recommendation must have a clear, specific Tier 1 catalyst you can articulate
+- Validation will reject any non-Tier 1 stocks, so don't waste time on them
+
+**TECHNICAL REQUIREMENTS (4 FILTERS - ALL MUST PASS):**
+- Stock MUST be above 50-day moving average (no downtrends)
+- 5 EMA MUST be above 20 EMA (momentum accelerating)
+- ADX MUST be >20 (strong trend, avoiding chop)
+- Volume MUST be >1.5x 20-day average (institutional participation)
+- ANY stock failing these will be auto-rejected - only recommend technically sound setups"""
+
+        combined_content += go_prompt_portfolio_review + "\n" + go_prompt_initial_build
+
+        # Component 2: strategy_rules.md
+        strategy_file = PROJECT_DIR / 'strategy_evolution' / 'strategy_rules.md'
+        if strategy_file.exists():
+            combined_content += "\n" + strategy_file.read_text()
+
+        # Component 3: catalyst_exclusions.json
+        exclusions_file = PROJECT_DIR / 'strategy_evolution' / 'catalyst_exclusions.json'
+        if exclusions_file.exists():
+            combined_content += "\n" + exclusions_file.read_text()
+
+        # Calculate SHA256 hash (first 8 chars for readability)
+        hash_obj = hashlib.sha256(combined_content.encode('utf-8'))
+        hash_short = hash_obj.hexdigest()[:8]
+
+        return f"{SYSTEM_VERSION}-{hash_short}"
+
+    except Exception as e:
+        # Fallback if hash calculation fails
+        print(f"⚠️ Warning: Could not calculate ruleset version: {e}")
+        return f"{SYSTEM_VERSION}-unknown"
+
+# Calculate ruleset version at module load time
+RULESET_VERSION = get_ruleset_version()
 
 class TradingAgent:
     """Production-ready trading agent v4.3 - Complete implementation"""
@@ -293,18 +385,21 @@ class TradingAgent:
                 writer.writerow([
                     'Trade_ID', 'Entry_Date', 'Exit_Date', 'Ticker',
                     'Premarket_Price', 'Entry_Price', 'Exit_Price', 'Gap_Percent',
+                    'Entry_Bid', 'Entry_Ask', 'Entry_Mid_Price', 'Entry_Spread_Pct', 'Slippage_Bps',  # v7.1 - Execution cost tracking
                     'Shares', 'Position_Size', 'Position_Size_Percent', 'Hold_Days', 'Return_Percent', 'Return_Dollars',
                     'Exit_Reason', 'Exit_Type', 'Catalyst_Type', 'Catalyst_Tier', 'Catalyst_Age_Days',
                     'News_Validation_Score', 'News_Exit_Triggered',
                     'VIX_At_Entry', 'Market_Regime', 'Macro_Event_Near',
                     'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
                     'System_Version',  # Enhancement 4.7 - Track code version per trade
+                    'Ruleset_Version',  # v7.1 - Track trading rules version (policy drift prevention)
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
                     'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Keywords_Matched', 'News_Sources', 'News_Article_Count',  # Enhancement 2.5: Catalyst learning
                     'Sector', 'Stop_Loss', 'Price_Target',
+                    'Trailing_Stop_Activated', 'Trailing_Stop_Price', 'Peak_Return_Pct',  # v7.1 - Exit policy tracking
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
                 ])
@@ -1046,6 +1141,11 @@ POSITION {i}: {ticker}
             'entry_price': trade['entry_price'],
             'exit_price': trade['exit_price'],
             'gap_percent': trade.get('gap_percent', 0),
+            'entry_bid': trade.get('entry_bid', 0),  # v7.1 - Execution cost tracking
+            'entry_ask': trade.get('entry_ask', 0),
+            'entry_mid_price': trade.get('entry_mid_price', 0),
+            'entry_spread_pct': trade.get('entry_spread_pct', 0),
+            'slippage_bps': trade.get('slippage_bps', 0),
             'shares': trade['shares'],
             'position_size': trade['position_size'],
             'position_size_percent': trade.get('position_size_percent', 0),
@@ -1065,6 +1165,7 @@ POSITION {i}: {ticker}
             'vix_regime': trade.get('vix_regime', 'UNKNOWN'),
             'market_breadth_regime': trade.get('market_breadth_regime', 'UNKNOWN'),
             'system_version': SYSTEM_VERSION,
+            'ruleset_version': RULESET_VERSION,  # v7.1 - Track trading rules version
             'relative_strength': trade.get('relative_strength', 0.0),
             'stock_return_3m': trade.get('stock_return_3m', 0.0),
             'sector_etf': trade.get('sector_etf', 'Unknown'),
@@ -1085,6 +1186,9 @@ POSITION {i}: {ticker}
             'sector': trade.get('sector', ''),
             'stop_loss': trade.get('stop_loss', 0),
             'price_target': trade.get('price_target', 0),
+            'trailing_stop_activated': trade.get('trailing_stop_active', False),  # v7.1 - Exit policy tracking
+            'trailing_stop_price': trade.get('trailing_stop_price', 0),
+            'peak_return_pct': trade.get('peak_return_pct', 0),
             'thesis': trade.get('thesis', ''),
             'what_worked': '',  # Will be filled by learning system
             'what_failed': '',  # Will be filled by learning system
@@ -4375,18 +4479,21 @@ RECENT LESSONS LEARNED:
                 writer.writerow([
                     'Trade_ID', 'Entry_Date', 'Exit_Date', 'Ticker',
                     'Premarket_Price', 'Entry_Price', 'Exit_Price', 'Gap_Percent',
+                    'Entry_Bid', 'Entry_Ask', 'Entry_Mid_Price', 'Entry_Spread_Pct', 'Slippage_Bps',  # v7.1 - Execution cost tracking
                     'Shares', 'Position_Size', 'Position_Size_Percent', 'Hold_Days', 'Return_Percent', 'Return_Dollars',
                     'Exit_Reason', 'Exit_Type', 'Catalyst_Type', 'Catalyst_Tier', 'Catalyst_Age_Days',
                     'News_Validation_Score', 'News_Exit_Triggered',
                     'VIX_At_Entry', 'Market_Regime', 'Macro_Event_Near',
                     'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
                     'System_Version',  # Enhancement 4.7 - Track code version per trade
+                    'Ruleset_Version',  # v7.1 - Track trading rules version (policy drift prevention)
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
                     'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Keywords_Matched', 'News_Sources', 'News_Article_Count',  # Enhancement 2.5: Catalyst learning
                     'Sector', 'Stop_Loss', 'Price_Target',
+                    'Trailing_Stop_Activated', 'Trailing_Stop_Price', 'Peak_Return_Pct',  # v7.1 - Exit policy tracking
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
                 ])
@@ -4414,6 +4521,11 @@ RECENT LESSONS LEARNED:
                 trade_data.get('entry_price', 0),
                 trade_data.get('exit_price', 0),
                 trade_data.get('gap_percent', 0),
+                trade_data.get('entry_bid', 0),  # v7.1 - Execution cost tracking
+                trade_data.get('entry_ask', 0),
+                trade_data.get('entry_mid_price', 0),
+                trade_data.get('entry_spread_pct', 0),
+                trade_data.get('slippage_bps', 0),
                 trade_data.get('shares', 0),
                 trade_data.get('position_size', 0),
                 trade_data.get('position_size_percent', 0),
@@ -4433,6 +4545,7 @@ RECENT LESSONS LEARNED:
                 trade_data.get('vix_regime', 'UNKNOWN'),  # Phase 4 VIX regime
                 trade_data.get('market_breadth_regime', 'UNKNOWN'),  # Phase 4 market breadth
                 trade_data.get('system_version', SYSTEM_VERSION),  # Phase 4.7 - Track code version
+                trade_data.get('ruleset_version', RULESET_VERSION),  # v7.1 - Track trading rules version
                 trade_data.get('relative_strength', 0.0),
                 trade_data.get('stock_return_3m', 0.0),
                 trade_data.get('sector_etf', 'Unknown'),
@@ -4452,6 +4565,9 @@ RECENT LESSONS LEARNED:
                 trade_data.get('sector', ''),
                 trade_data.get('stop_loss', 0),
                 trade_data.get('price_target', 0),
+                trade_data.get('trailing_stop_activated', False),  # v7.1 - Exit policy tracking
+                trade_data.get('trailing_stop_price', 0),
+                trade_data.get('peak_return_pct', 0),
                 trade_data.get('thesis', ''),
                 trade_data.get('what_worked', ''),
                 trade_data.get('what_failed', ''),
@@ -5776,6 +5892,12 @@ RECENT LESSONS LEARNED:
                         print(f"      Illiquid stock - market order could be costly")
                         continue  # Skip this entry
 
+                    # v7.1: Store bid/ask for slippage tracking (execution cost validation)
+                    entry_bid = spread_check.get('bid', 0)
+                    entry_ask = spread_check.get('ask', 0)
+                    entry_mid_price = spread_check.get('mid_price', entry_price)
+                    entry_spread_pct = spread_check.get('spread_pct', 0)
+
                     # Enhancement 0.1: Gap-aware entry logic
                     gap_analysis = self.analyze_premarket_gap(ticker, entry_price, previous_close)
 
@@ -5814,6 +5936,24 @@ RECENT LESSONS LEARNED:
                     pos['days_held'] = 0
                     pos['position_size'] = position_size_dollars  # Store actual dollar amount
                     pos['shares'] = position_size_dollars / entry_price
+
+                    # v7.1: Calculate slippage (execution cost beyond spread)
+                    # Slippage = (fill_price - mid_price) / mid_price * 10000 bps
+                    # Positive = paid more than mid, negative = paid less than mid
+                    if entry_mid_price > 0:
+                        slippage_bps = ((entry_price - entry_mid_price) / entry_mid_price) * 10000
+                        pos['entry_bid'] = entry_bid
+                        pos['entry_ask'] = entry_ask
+                        pos['entry_mid_price'] = entry_mid_price
+                        pos['entry_spread_pct'] = entry_spread_pct
+                        pos['slippage_bps'] = round(slippage_bps, 2)
+                    else:
+                        # Fallback if mid_price unavailable
+                        pos['entry_bid'] = 0
+                        pos['entry_ask'] = 0
+                        pos['entry_mid_price'] = entry_price
+                        pos['entry_spread_pct'] = 0
+                        pos['slippage_bps'] = 0
 
                     # v7.0: ATR-based stops (2.5x ATR, capped at -7%)
                     atr = self.calculate_atr(ticker, period=14)
