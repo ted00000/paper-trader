@@ -809,20 +809,24 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: December 10, 2024
-**Version**: v6.0 (Phase 0-4 Complete: 26 Enhancements - CODE FROZEN)
+**Last Updated**: December 15, 2025
+**Version**: v7.0 (Deep Research + Execution Realism)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Updates (Phase 4 - Risk Optimization & Institutional Enhancements)**:
-- ✅ Phase 4.1: Cluster-based conviction scoring (prevents double-counting correlated signals)
-- ✅ Phase 4.2: Market breadth & trend filter (regime-based position sizing)
-- ✅ Phase 4.3: Sector concentration reduction (max 2 per sector, 3 in leading sectors)
-- ✅ Phase 4.4: Liquidity filter (min $20M daily volume prevents slippage)
-- ✅ Phase 4.5: VIX regime logging (tracks market conditions for learning & attribution)
-- ✅ Phase 4.6: AI robustness & failover (graceful degradation when Claude API fails)
-- ✅ Phase 4.7: Operational monitoring (health checks, dashboard alerts, version tracking)
-- ✅ Phase 4.8: Public model portfolio display (YTD/MTD metrics, regime analysis, transparency)
-- ✅ **Blackout Policy Update (Dec 10)**: Changed to event-day only (FOMC, CPI, NFP, PCE) - aligned with institutional best practices, reduces December blackout days from 57% to 29%
+**Latest Updates (v7.0 - Execution Realism & Deep Research)**:
+- ✅ **v7.0 Execution Improvements (Dec 15)**: Addressing third-party analysis feedback on execution realism
+  - **ATR-Based Stops**: 2.5x ATR(14) instead of fixed -7%, capped at -7% maximum for safety
+    - Volatile stocks get wider stops (adapt to natural movement)
+    - Stable stocks get tighter stops (better risk control)
+    - Example: ATR=$5, entry=$100 → stop=$87.50 (-12.5%)
+  - **Spread/Slippage Checking**: Skip trades if bid-ask spread >0.5%
+    - Prevents expensive execution on illiquid catalyst names
+    - Market orders at 9:45 AM no longer erode edge on wide spreads
+    - Preserves theoretical alpha by avoiding execution cost
+  - **Breadth Timing Fix**: Market breadth calculated at 7:00 AM (screener time), used at 9:00 AM (GO time)
+    - Prevents lookahead bias from using end-of-day breadth for intraday decisions
+    - Timestamped in screener output for transparency
+    - GO command uses pre-calculated breadth value
 - ✅ **Deep Research Implementation (Dec 15)**: Complete architectural shift to Entry Quality Scorecard methodology
   - **BREAKING CHANGE**: RS is now scoring factor (0-5 pts), NOT hard filter
   - Hard filters: Price >$10, Liquidity >$50M, Catalyst presence required
@@ -831,6 +835,17 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
   - Target: 60-70% win rate, 8-12% monthly returns (academic PEAD research)
   - Aligns with Deep Research: "rule-based filters eliminate low-quality opportunities, then AI analyzes sentiment"
   - Prevents filtering out NVDA/LLY/ORCL with weak 3M RS but strong catalysts
+- ✅ **Blackout Policy Update (Dec 10)**: Changed to event-day only (FOMC, CPI, NFP, PCE) - aligned with institutional best practices, reduces December blackout days from 57% to 29%
+
+**Previous Updates (Phase 4 - Risk Optimization & Institutional Enhancements)**:
+- ✅ Phase 4.1: Cluster-based conviction scoring (prevents double-counting correlated signals)
+- ✅ Phase 4.2: Market breadth & trend filter (regime-based position sizing)
+- ✅ Phase 4.3: Sector concentration reduction (max 2 per sector, 3 in leading sectors)
+- ✅ Phase 4.4: Liquidity filter (min $20M daily volume prevents slippage)
+- ✅ Phase 4.5: VIX regime logging (tracks market conditions for learning & attribution)
+- ✅ Phase 4.6: AI robustness & failover (graceful degradation when Claude API fails)
+- ✅ Phase 4.7: Operational monitoring (health checks, dashboard alerts, version tracking)
+- ✅ Phase 4.8: Public model portfolio display (YTD/MTD metrics, regime analysis, transparency)
 
 **Previous Updates**:
 - ✅ Phase 3: IBD-style RS percentile ranking, sector rotation detection, institutional signals

@@ -970,10 +970,24 @@ def system_status():
             health_color = 'green'
             health_text = 'Healthy'
 
+        # v7.0: Get system version from agent
+        system_version = 'unknown'
+        try:
+            agent_file = PROJECT_DIR / 'agent_v5.5.py'
+            if agent_file.exists():
+                with open(agent_file) as f:
+                    for line in f:
+                        if line.strip().startswith('SYSTEM_VERSION ='):
+                            system_version = line.split('=')[1].split('#')[0].strip().strip("'\"")
+                            break
+        except:
+            pass
+
         return jsonify({
             'status': health_status,
             'status_color': health_color,
             'status_text': health_text,
+            'system_version': system_version,  # v7.0: Include system version
             'processes': {
                 'screener': screener_status or 'N/A',
                 'go': go_info or 'N/A',
