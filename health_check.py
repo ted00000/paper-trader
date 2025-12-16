@@ -29,6 +29,24 @@ class HealthChecker:
         # Discord webhook URL (optional - set in .env)
         self.discord_webhook = os.getenv('DISCORD_WEBHOOK_URL', '')
 
+        # v7.0: Read system version from agent
+        self.stats['system_version'] = self._get_system_version()
+
+    def _get_system_version(self):
+        """Read SYSTEM_VERSION from agent_v5.5.py"""
+        try:
+            agent_file = self.project_dir / 'agent_v5.5.py'
+            if agent_file.exists():
+                with open(agent_file) as f:
+                    for line in f:
+                        if line.strip().startswith('SYSTEM_VERSION ='):
+                            # Extract version string: SYSTEM_VERSION = 'v7.0'  # comment
+                            version = line.split('=')[1].split('#')[0].strip().strip("'\"")
+                            return version
+            return 'unknown'
+        except Exception:
+            return 'unknown'
+
     def check_command_execution(self):
         """Check if GO, EXECUTE, ANALYZE ran today"""
         print("1. Checking command execution...")

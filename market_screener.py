@@ -2365,10 +2365,23 @@ class MarketScreener:
         for rank, candidate in enumerate(top_candidates, 1):
             candidate['rank'] = rank
 
+        # v7.0: Calculate market breadth at screener time (prevent lookahead bias)
+        # Breadth = % of screened stocks above 50-day MA
+        # This is calculated at 7:00 AM and used by GO command at 9:00 AM
+        # Ensures we don't use end-of-day breadth data for intraday decisions
+        total_stocks = len(top_candidates)
+        above_50d_count = sum(1 for c in top_candidates if c.get('technical_setup', {}).get('above_50d_sma', False))
+        breadth_pct = (above_50d_count / total_stocks * 100) if total_stocks > 0 else 0
+        breadth_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S ET')
+
         # Build output
         scan_output = {
             'scan_date': self.today,
             'scan_time': datetime.now().strftime('%H:%M:%S ET'),
+            'breadth_pct': round(breadth_pct, 1),  # v7.0: Pre-calculate breadth at screener time
+            'breadth_timestamp': breadth_timestamp,  # v7.0: Timestamp when breadth was calculated
+            'breadth_above_50d': above_50d_count,  # v7.0: Count for transparency
+            'breadth_total': total_stocks,  # v7.0: Total for transparency
             'universe_size': universe_size,
             'rs_pass_count': rs_pass_count,
             'candidates_found': len(top_candidates),

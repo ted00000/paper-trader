@@ -263,7 +263,7 @@ CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
 PROJECT_DIR = Path(__file__).parent
 
 # System version tracking (Enhancement 4.7)
-SYSTEM_VERSION = 'v6.0'  # Phase 0-4 Complete: 24 Enhancements
+SYSTEM_VERSION = 'v7.0'  # Deep Research + Execution Realism (ATR stops, spread checks, breadth timing)
 
 class TradingAgent:
     """Production-ready trading agent v4.3 - Complete implementation"""
@@ -1256,6 +1256,140 @@ POSITION {i}: {ticker}
 
         return prices
 
+    def calculate_atr(self, ticker, period=14):
+        """
+        Calculate Average True Range for volatility-aware stops (v7.0)
+
+        ATR measures stock volatility in dollars, enabling dynamic stops that
+        adapt to each stock's natural price movement. A 2.5x ATR stop gives
+        room for normal volatility while protecting against adverse moves.
+
+        Args:
+            ticker: Stock ticker symbol
+            period: Lookback period in days (default 14, industry standard)
+
+        Returns:
+            float: ATR value in dollars, or None if data unavailable
+
+        Example:
+            ATR = $5.00, entry = $100
+            Stop = $100 - (2.5 * $5) = $87.50 (-12.5%)
+
+            For volatile stocks (high ATR), stop is wider
+            For stable stocks (low ATR), stop is tighter
+        """
+        if not POLYGON_API_KEY:
+            return None
+
+        try:
+            # Fetch OHLC data for past period+1 days (need previous close for TR)
+            from datetime import timedelta
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=period + 10)  # Extra buffer for weekends
+
+            # Use Polygon aggregates endpoint (bars)
+            url = f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date.strftime("%Y-%m-%d")}/{end_date.strftime("%Y-%m-%d")}?adjusted=true&sort=asc&apiKey={POLYGON_API_KEY}'
+            response = requests.get(url, timeout=10)
+            data = response.json()
+
+            if data.get('status') == 'OK' and 'results' in data:
+                bars = data['results']
+
+                if len(bars) < period + 1:
+                    return None  # Not enough data
+
+                # Calculate True Range for each day
+                true_ranges = []
+                for i in range(1, len(bars)):
+                    high = bars[i]['h']
+                    low = bars[i]['l']
+                    prev_close = bars[i-1]['c']
+
+                    # TR = max(high-low, abs(high-prev_close), abs(low-prev_close))
+                    tr = max(
+                        high - low,
+                        abs(high - prev_close),
+                        abs(low - prev_close)
+                    )
+                    true_ranges.append(tr)
+
+                # ATR = average of last 'period' true ranges
+                if len(true_ranges) >= period:
+                    atr = sum(true_ranges[-period:]) / period
+                    return round(atr, 2)
+                else:
+                    return None
+            else:
+                return None
+
+        except Exception as e:
+            print(f"   ⚠️ ATR calculation failed for {ticker}: {e}")
+            return None
+
+    def check_bid_ask_spread(self, ticker):
+        """
+        Check bid-ask spread to prevent expensive execution (v7.0)
+
+        Wide spreads indicate illiquid stocks where market orders can be costly.
+        Skip trades if spread >0.5% to avoid giving away edge to market makers.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            dict: {
+                'spread_pct': float,     # Spread as % of mid-price
+                'should_skip': bool,     # True if spread >0.5%
+                'mid_price': float,      # (bid + ask) / 2
+                'bid': float,
+                'ask': float
+            }
+
+        Example:
+            Bid: $99.80, Ask: $100.20, Mid: $100.00
+            Spread: $0.40 / $100 = 0.40% → should_skip=False (OK to trade)
+
+            Bid: $99.00, Ask: $101.00, Mid: $100.00
+            Spread: $2.00 / $100 = 2.00% → should_skip=True (too expensive)
+        """
+        if not POLYGON_API_KEY:
+            return {'spread_pct': 0.0, 'should_skip': False, 'mid_price': None, 'bid': None, 'ask': None}
+
+        try:
+            # Use Polygon snapshot endpoint for real-time quotes
+            url = f'https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/{ticker}?apiKey={POLYGON_API_KEY}'
+            response = requests.get(url, timeout=10)
+            data = response.json()
+
+            if data.get('status') == 'OK' and 'ticker' in data:
+                ticker_data = data['ticker']
+
+                # Get bid/ask from lastQuote
+                if 'lastQuote' in ticker_data:
+                    bid = ticker_data['lastQuote'].get('p')  # bid price
+                    ask = ticker_data['lastQuote'].get('P')  # ask price
+
+                    if bid and ask and bid > 0 and ask > 0:
+                        mid_price = (bid + ask) / 2
+                        spread_dollars = ask - bid
+                        spread_pct = (spread_dollars / mid_price) * 100
+
+                        return {
+                            'spread_pct': round(spread_pct, 3),
+                            'should_skip': spread_pct > 0.5,  # Skip if >0.5%
+                            'mid_price': round(mid_price, 2),
+                            'bid': round(bid, 2),
+                            'ask': round(ask, 2)
+                        }
+
+            # If no bid/ask data, allow trade (assume reasonable spread)
+            return {'spread_pct': 0.0, 'should_skip': False, 'mid_price': None, 'bid': None, 'ask': None}
+
+        except Exception as e:
+            print(f"   ⚠️ Spread check failed for {ticker}: {e}")
+            # On error, allow trade (don't block on data failure)
+            return {'spread_pct': 0.0, 'should_skip': False, 'mid_price': None, 'bid': None, 'ask': None}
+
     # =====================================================================
     # NEWS MONITORING SYSTEM (Phase 1)
     # =====================================================================
@@ -2156,17 +2290,26 @@ POSITION {i}: {ticker}
                     spy_above_50d = current_price > ma_50
                     spy_above_200d = current_price > ma_200
 
-            # Calculate breadth from screener data (% of stocks above 50-day MA)
+            # v7.0: Use pre-calculated breadth from screener (prevent lookahead bias)
+            # Screener calculates breadth at 7:00 AM and saves to screener_candidates.json
+            # GO command (9:00 AM) uses that pre-calculated value
+            # This ensures we don't use end-of-day breadth data for intraday decisions
             screener_data = self.load_screener_candidates()
             breadth_pct = 0
+            breadth_timestamp = 'unknown'
 
-            if screener_data and screener_data.get('candidates'):
-                candidates = screener_data['candidates']
-                total = len(candidates)
-
-                # Count how many are above 50-day MA (check technical_setup for above_50d_sma)
-                above_50d = sum(1 for c in candidates if c.get('technical_setup', {}).get('above_50d_sma', False))
-                breadth_pct = (above_50d / total * 100) if total > 0 else 0
+            if screener_data:
+                # v7.0: Use pre-calculated breadth if available (preferred)
+                if 'breadth_pct' in screener_data:
+                    breadth_pct = screener_data['breadth_pct']
+                    breadth_timestamp = screener_data.get('breadth_timestamp', screener_data.get('scan_time', 'unknown'))
+                # Fallback: Calculate from candidates (legacy support)
+                elif screener_data.get('candidates'):
+                    candidates = screener_data['candidates']
+                    total = len(candidates)
+                    above_50d = sum(1 for c in candidates if c.get('technical_setup', {}).get('above_50d_sma', False))
+                    breadth_pct = (above_50d / total * 100) if total > 0 else 0
+                    breadth_timestamp = screener_data.get('scan_time', 'unknown')
 
             # Determine market regime (BREADTH-BASED ONLY - aligned with institutional best practices)
             # Comprehensive individual stock screening (Stage 2, RS top 20%, Tier 1 catalysts, 7% stops)
@@ -2179,20 +2322,21 @@ POSITION {i}: {ticker}
             if breadth_pct >= 50:
                 regime = 'HEALTHY'
                 adjustment = 1.0
-                message = f'✓ Market HEALTHY: Breadth {breadth_pct:.0f}% (majority in uptrends)'
+                message = f'✓ Market HEALTHY: Breadth {breadth_pct:.0f}% (majority in uptrends) [as of {breadth_timestamp}]'
             elif breadth_pct >= 40:
                 regime = 'DEGRADED'
                 adjustment = 0.8  # Reduce position sizes by 20%
-                message = f'⚠️ Market DEGRADED: Breadth {breadth_pct:.0f}% (rotational market) - reducing size 20%'
+                message = f'⚠️ Market DEGRADED: Breadth {breadth_pct:.0f}% (rotational market) - reducing size 20% [as of {breadth_timestamp}]'
             else:
                 regime = 'UNHEALTHY'
                 adjustment = 0.6  # Reduce position sizes by 40%
-                message = f'⚠️ Market UNHEALTHY: Breadth {breadth_pct:.0f}% (defensive market) - reducing size 40%'
+                message = f'⚠️ Market UNHEALTHY: Breadth {breadth_pct:.0f}% (defensive market) - reducing size 40% [as of {breadth_timestamp}]'
 
             return {
                 'spy_above_50d': spy_above_50d,
                 'spy_above_200d': spy_above_200d,
                 'breadth_pct': round(breadth_pct, 1),
+                'breadth_timestamp': breadth_timestamp,  # v7.0: Include timestamp for transparency
                 'market_healthy': regime == 'HEALTHY',
                 'regime': regime,
                 'position_size_adjustment': adjustment,
@@ -5624,6 +5768,14 @@ RECENT LESSONS LEARNED:
                     entry_price = market_prices[ticker]
                     previous_close = previous_closes.get(ticker, entry_price * 0.98)  # Fallback estimate
 
+                    # v7.0: Check bid-ask spread to prevent expensive execution
+                    spread_check = self.check_bid_ask_spread(ticker)
+                    if spread_check['should_skip']:
+                        print(f"   ⚠️ SKIPPED {ticker}: Spread too wide ({spread_check['spread_pct']:.2%}) - would erode edge")
+                        print(f"      Bid: ${spread_check['bid']:.2f}, Ask: ${spread_check['ask']:.2f}, Mid: ${spread_check['mid_price']:.2f}")
+                        print(f"      Illiquid stock - market order could be costly")
+                        continue  # Skip this entry
+
                     # Enhancement 0.1: Gap-aware entry logic
                     gap_analysis = self.analyze_premarket_gap(ticker, entry_price, previous_close)
 
@@ -5662,7 +5814,22 @@ RECENT LESSONS LEARNED:
                     pos['days_held'] = 0
                     pos['position_size'] = position_size_dollars  # Store actual dollar amount
                     pos['shares'] = position_size_dollars / entry_price
-                    pos['stop_loss'] = round(entry_price * 0.93, 2)  # -7%
+
+                    # v7.0: ATR-based stops (2.5x ATR, capped at -7%)
+                    atr = self.calculate_atr(ticker, period=14)
+                    if atr and atr > 0:
+                        # Stop = entry - (2.5 * ATR), but not wider than -7%
+                        atr_stop_distance = atr * 2.5
+                        atr_stop = entry_price - atr_stop_distance
+                        max_stop = entry_price * 0.93  # -7% cap for safety
+                        pos['stop_loss'] = round(max(atr_stop, max_stop), 2)  # Use tighter of the two
+                        stop_pct = ((pos['stop_loss'] - entry_price) / entry_price) * 100
+                        print(f"      Stop: ${pos['stop_loss']:.2f} ({stop_pct:.1f}%) - ATR-based (ATR=${atr:.2f}, 2.5x=${atr_stop_distance:.2f})")
+                    else:
+                        # Fallback to -7% if ATR unavailable
+                        pos['stop_loss'] = round(entry_price * 0.93, 2)
+                        print(f"      Stop: ${pos['stop_loss']:.2f} (-7.0%) - Fixed (ATR unavailable)")
+
                     pos['price_target'] = round(entry_price * (1 + dynamic_target_pct/100), 2)  # Dynamic target
                     pos['target_pct'] = dynamic_target_pct  # Store for reference
                     pos['target_rationale'] = target_rationale

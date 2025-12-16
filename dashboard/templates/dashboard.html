@@ -794,7 +794,7 @@
                 <img src="{{ url_for('static', filename='img/Tedbot Logo 3.png') }}" alt="Tedbot" class="robot-logo">
                 <span class="header-title">Tedbot</span>
             </div>
-            <span class="header-subtitle">Admin Dashboard</span>
+            <span class="header-subtitle">Admin Dashboard <span id="system-version-header" style="color: #00ff41; font-weight: 600;"></span></span>
         </div>
         <div class="header-right">
             <span class="user-info">Logged in as: <strong>{{ username }}</strong></span>
@@ -1244,6 +1244,11 @@
                         '<div class="stat-value">' + value + '</div>' +
                         '<div class="stat-label">' + displayKey + '</div>' +
                         '</div>';
+
+                    // v7.0: Update header with system version
+                    if (key === 'system_version') {
+                        document.getElementById('system-version-header').textContent = '(' + value + ')';
+                    }
                 }
             }
 
