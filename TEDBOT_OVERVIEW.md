@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v7.1 (Validation Improvements) - Live in production paper trading
+**Current Version**: v7.1.1 (Validation + Reporting) - Live in production paper trading
 
 ---
 
@@ -636,16 +636,17 @@ Analyzes past performance across multiple dimensions:
 7. **`learning_data/*.json`** - Performance attribution reports
 8. **`daily_picks.json`** - Dashboard display (accepted + rejected picks)
 
-### CSV Trade History Columns (50+ fields):
+### CSV Trade History Columns (54 fields):
 - Basic: Ticker, Entry/Exit Date, Entry/Exit Price, Return %, Hold Days
 - Position: Shares, Position Size $, Account Value Before/After
 - Catalyst: Type, Tier, News Score, Catalyst Details
-- Risk: Stop Loss, Price Target, Max Drawdown
+- Risk: Stop Loss, Stop_Pct (v7.1.1), Price Target, Max Drawdown
 - Technical: 50-day MA, 5/20 EMA, ADX, Volume Ratio, Volume Quality, RS Rating
 - Conviction: Level, Supporting Factors Count
 - Market: VIX at Entry, Market Regime, Macro Events, VIX_Regime, Market_Breadth_Regime (Phase 4.5)
-- System: System_Version (Phase 4.7 - tracks which code version generated trade)
-- Exit: Reason, What Worked, What Failed
+- System: System_Version (v4.7), Ruleset_Version (v7.1), Universe_Version (v7.1.1)
+- Execution: Entry_Bid, Entry_Ask, Entry_Mid_Price, Entry_Spread_Pct, Slippage_Bps (v7.1)
+- Exit: Reason, Trailing_Stop_Activated, Trailing_Stop_Price, Peak_Return_Pct (v7.1), What Worked, What Failed
 - Rotation: Rotation Into Ticker, Rotation Reason (if applicable)
 
 ---
@@ -814,11 +815,37 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: December 15, 2025
-**Version**: v7.1 (Validation Improvements)
+**Last Updated**: December 16, 2025
+**Version**: v7.1.1 (Validation + Reporting)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Updates (v7.1 - Validation Improvements - Dec 15)**:
+**Latest Updates (v7.1.1 - Reporting & Analysis Tools - Dec 16)**:
+- ✅ **Stop_Pct Column**: Added to CSV for stop distance distribution analysis
+  - Tracks actual stop percentage used per trade (e.g., -5.2%, -7.0%)
+  - Enables analysis: "What % of trades use ATR vs -7% cap?"
+  - Distribution metrics: median, P25, P75, P90 stop distances
+- ✅ **Universe_Version Tracking**: SHA256 hash of S&P 1500 constituent list
+  - Prevents breadth drift due to constituent changes (IPOs, delistings)
+  - Example: Dec 2025 (993 stocks) → v7.1.1-abc123de, Jan 2026 (1012 stocks) → v7.1.1-xyz789ab
+  - Enables analysis: "Did performance change due to universe shift?"
+- ✅ **Execution Cost Report**: Slippage distribution analysis by regime/spread
+  - Script: reports/execution_cost_report.py
+  - Analyzes median, P90, P99 slippage across: VIX regime, market breadth, entry spread, catalyst tier
+  - Benchmarks: Median <5 bps (good), P90 <20 bps (acceptable)
+- ✅ **Exit Quality Report**: Trailing stop effectiveness analysis
+  - Script: reports/exit_quality_report.py
+  - Analyzes: activation rate, peak returns, giveback distribution, capture rate
+  - Benchmarks: 80%+ capture rate, <3% median giveback, 40%+ activation rate
+- ✅ **Edge Attribution Report**: Expectancy analysis by multiple dimensions
+  - Script: reports/edge_attribution_report.py
+  - Expectancy = (Win% × Avg Win) - (Loss% × Avg Loss)
+  - Analyzes edge by: catalyst tier/type, RS rating, volume quality, conviction, VIX regime, market breadth
+  - Identifies which factors drive highest edge
+- ✅ **ATR Stop Terminology Fix**: Changed "floor" to "cap" with explicit formula
+  - Formula: stop_pct = -min(2.5*ATR/entry_price, 0.07)
+  - Clarifies: -7% is maximum loss cap, system uses tighter of ATR vs cap
+
+**Previous Updates (v7.1 - Validation Improvements - Dec 15)**:
 - ✅ **RULESET_VERSION Tracking**: SHA256 hash of trading rules (prevents policy drift)
   - Hash includes: GO prompt + strategy_rules.md + catalyst_exclusions.json
   - Logged to CSV: Ruleset_Version (e.g., v7.1-31cd61c9)
