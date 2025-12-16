@@ -1223,7 +1223,6 @@ POSITION {i}: {ticker}
             'sector_etf': trade.get('sector_etf', 'Unknown'),
             'conviction_level': trade.get('conviction_level', 'MEDIUM'),
             'supporting_factors': trade.get('supporting_factors', 0),
-            'rs_rating': trade.get('rs_rating', 0),  # Enhancement 2.1
             'technical_score': trade.get('technical_score', 0),  # Phase 5.6
             'technical_sma50': trade.get('technical_sma50', 0.0),
             'technical_ema5': trade.get('technical_ema5', 0.0),

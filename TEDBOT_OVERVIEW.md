@@ -91,7 +91,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │              STAGE 4: LEARNING (Continuous Improvement)         │
 │                                                                  │
 │  TRADE COMPLETION (when position exits):                        │
-│  • Logs 54-column CSV with complete trade attribution:         │
+│  • Logs 63-column CSV with complete trade attribution:         │
 │    - Technical: SMA50, EMA5, EMA20, ADX, Volume Ratio, Score   │
 │    - Volume: Quality (EXCELLENT/STRONG/GOOD), Trending (T/F)   │
 │    - Keywords: Matched keywords from news                       │
@@ -147,7 +147,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 - Version tracking: System_Version column tracks which code generated each trade
 
 **Learning**: Closed-loop continuous improvement
-- Trade → CSV (54 columns) → Learning (daily/weekly/monthly) → Insights (exclusions, lessons, rules) → Claude Context → Decision → Trade
+- Trade → CSV (63 columns) → Learning (daily/weekly/monthly) → Insights (exclusions, lessons, rules) → Claude Context → Decision → Trade
 - Historical performance directly informs future decisions
 - Catalyst exclusions presented as warnings with accountability tracking
 - Deviations from learning recommendations require explanation and are logged
@@ -638,7 +638,7 @@ Analyzes past performance across multiple dimensions:
 7. **`learning_data/*.json`** - Performance attribution reports
 8. **`daily_picks.json`** - Dashboard display (accepted + rejected picks)
 
-### CSV Trade History Columns (54 fields):
+### CSV Trade History Columns (63 fields):
 - Basic: Ticker, Entry/Exit Date, Entry/Exit Price, Return %, Hold Days
 - Position: Shares, Position Size $, Account Value Before/After
 - Catalyst: Type, Tier, News Score, Catalyst Details
