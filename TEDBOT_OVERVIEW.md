@@ -82,7 +82,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │  • Checks price targets (activates trailing stops)             │
 │  • Monitors time limits (3 weeks max hold)                     │
 │  • Checks news sentiment deterioration                         │
-│  • Trailing stops: 50% profit (trail -5%), 100% (trail -3%)   │
+│  • Trailing stop: Locks +8%, trails -2% from peak (v7.1)      │
 │  • Exits positions meeting criteria                             │
 │  OUTPUT: Updates current_portfolio.json, logs to CSV           │
 └─────────────────────────────────────────────────────────────────┘
