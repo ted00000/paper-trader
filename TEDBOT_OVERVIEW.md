@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v6.0 (26 enhancements across 5 phases) - CODE FROZEN for 6-12 month results collection
+**Current Version**: v7.0 (Deep Research + Execution Realism) - Live in production paper trading
 
 ---
 
@@ -71,13 +71,14 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │                                                                  │
 │  EXECUTE (9:45 AM - after market open):                         │
 │  • Validates gap-aware entry (<3%: enter, 3-8%: caution, >8%: skip) │
+│  • Checks bid-ask spread (skip if >0.5% - v7.0)                │
 │  • Calculates position size (conviction × market breadth adj)  │
-│  • Sets stop loss (-7% standard, -5% for gaps)                 │
+│  • Sets ATR-based stop loss (2.5x ATR, capped at -7% - v7.0)  │
 │  • Sets price target (dynamic based on catalyst type)          │
 │  • Enters positions at market open prices                      │
 │                                                                  │
 │  ANALYZE (4:30 PM - after market close):                        │
-│  • Checks stop losses (-7% hard stop)                          │
+│  • Checks ATR-based stop losses (2.5x ATR, max -7% - v7.0)    │
 │  • Checks price targets (activates trailing stops)             │
 │  • Monitors time limits (3 weeks max hold)                     │
 │  • Checks news sentiment deterioration                         │
@@ -99,7 +100,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │    - Supporting Factors: Cluster-based conviction count        │
 │    - VIX Regime: 5 levels (VERY_LOW → EXTREME)                 │
 │    - Market Breadth Regime: 3 levels (HEALTHY/DEGRADED/UNHEALTHY) │
-│    - System Version: v6.0+ (tracks code version per trade)     │
+│    - System Version: v7.0 (tracks code version per trade)      │
 │                                                                  │
 │  SCHEDULED LEARNING ANALYSIS:                                   │
 │  • DAILY (5:00 PM): 7-day tactical analysis (quick losers)     │
@@ -463,7 +464,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 2. **Exit Condition Checks**
 
    **AUTOMATIC EXITS** (Rule-Based):
-   - **Stop Loss Hit**: Price ≤ stop loss (-7% or -5% for gap entries)
+   - **Stop Loss Hit**: Price ≤ ATR-based stop (2.5x ATR, capped at -7% max - v7.0)
    - **Target Hit with Trailing Stop**:
      - If price ≥ target, activate trailing stop
      - Lock in minimum +8% gain
@@ -663,12 +664,16 @@ Analyzes past performance across multiple dimensions:
 ## Risk Management Framework
 
 ### Position-Level Risk:
-- **Position sizing** (Phase 4):
+- **Position sizing** (v7.0):
   - Base: 10-13% (MEDIUM to HIGH conviction)
   - Market breadth adjustment: 0.6x-1.0x multiplier
   - **Effective range**: 6% (MEDIUM in UNHEALTHY) to 13% (HIGH in HEALTHY)
   - **Typical max**: ~10-11% in normal/degraded markets
-- **Stop loss**: -7% standard, -5% for gap entries
+- **Stop loss** (v7.0 ATR-based): 2.5x ATR(14), capped at -7% maximum
+  - Volatile stocks: -7% cap (prevents excessively wide stops)
+  - Stable stocks: Tighter stops (e.g., -5% if ATR is low)
+  - Adapts to each stock's natural volatility
+- **Spread check** (v7.0): Skip trades if bid-ask spread >0.5%
 - **Max hold time**: 7 days standard, 60 days for PED
 
 ### Portfolio-Level Risk:
@@ -815,10 +820,10 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 **Latest Updates (v7.0 - Execution Realism & Deep Research)**:
 - ✅ **v7.0 Execution Improvements (Dec 15)**: Addressing third-party analysis feedback on execution realism
-  - **ATR-Based Stops**: 2.5x ATR(14) instead of fixed -7%, capped at -7% maximum for safety
-    - Volatile stocks get wider stops (adapt to natural movement)
-    - Stable stocks get tighter stops (better risk control)
-    - Example: ATR=$5, entry=$100 → stop=$87.50 (-12.5%)
+  - **ATR-Based Stops**: 2.5x ATR(14) with -7% maximum loss floor (system uses TIGHTER of the two)
+    - Volatile stocks: ATR may suggest -12%, system caps at -7% floor (limits max loss)
+    - Stable stocks: ATR may suggest -4%, system uses -4% (tighter than floor)
+    - Adapts to each stock's volatility while preventing excessive losses
   - **Spread/Slippage Checking**: Skip trades if bid-ask spread >0.5%
     - Prevents expensive execution on illiquid catalyst names
     - Market orders at 9:45 AM no longer erode edge on wide spreads
