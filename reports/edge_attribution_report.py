@@ -50,6 +50,8 @@ def calculate_expectancy(returns):
     """
     Calculate expectancy (expected value per trade)
     Expectancy = (Win% × Avg Win) - (Loss% × Avg Loss)
+
+    Includes sample size warnings for statistical confidence.
     """
     if not returns:
         return {
@@ -58,7 +60,8 @@ def calculate_expectancy(returns):
             'avg_win': 0,
             'avg_loss': 0,
             'expectancy': 0,
-            'total_return': 0
+            'total_return': 0,
+            'confidence': 'NO_DATA'
         }
 
     wins = [r for r in returns if r > 0]
@@ -73,6 +76,17 @@ def calculate_expectancy(returns):
     expectancy = (win_rate/100 * avg_win) - (loss_rate/100 * avg_loss)
     total_return = sum(returns)
 
+    # Statistical confidence assessment
+    n = len(returns)
+    if n >= 30:
+        confidence = 'HIGH'
+    elif n >= 20:
+        confidence = 'MEDIUM'
+    elif n >= 10:
+        confidence = 'LOW'
+    else:
+        confidence = 'INSUFFICIENT'
+
     return {
         'count': len(returns),
         'win_rate': round(win_rate, 1),
@@ -80,7 +94,8 @@ def calculate_expectancy(returns):
         'avg_loss': round(avg_loss, 2),
         'expectancy': round(expectancy, 2),
         'total_return': round(total_return, 2),
-        'avg_return': round(statistics.mean(returns), 2) if returns else 0
+        'avg_return': round(statistics.mean(returns), 2) if returns else 0,
+        'confidence': confidence
     }
 
 
@@ -291,6 +306,7 @@ def print_report(report):
     print(f"   Avg Loss:    -{overall['avg_loss']:.2f}%")
     print(f"   Expectancy:  {overall['expectancy']:+.2f}% per trade")
     print(f"   Total Return: {overall['total_return']:+.2f}%")
+    print(f"   Confidence:  {overall['confidence']} (n={overall['count']})")
 
     # By catalyst tier
     print(f"\n📋 EDGE BY CATALYST TIER:")
@@ -362,6 +378,14 @@ def print_report(report):
     print(f"   Expectancy >0: Trading edge exists (profitable over time)")
     print(f"   Target win rate: 65-70% (current: {overall['win_rate']:.1f}%)")
     print(f"   Best edge: Highest expectancy categories drive performance")
+
+    # Confidence warnings
+    print(f"\n⚠️  SAMPLE SIZE CONFIDENCE LEVELS:")
+    print(f"   HIGH (n≥30): Statistically significant")
+    print(f"   MEDIUM (n≥20): Moderate confidence")
+    print(f"   LOW (n≥10): Suggestive, needs more data")
+    print(f"   INSUFFICIENT (n<10): Too small for reliable conclusions")
+    print(f"\n   💡 Ignore buckets with INSUFFICIENT confidence (<10 trades)")
 
     print("\n" + "="*80)
 

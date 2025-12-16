@@ -384,9 +384,11 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
    - **Effective Range**: 6% (MEDIUM in UNHEALTHY) to 13% (HIGH in HEALTHY)
    - **Example**: HIGH conviction (13%) + DEGRADED market → 13% × 0.8 = 10.4% actual
 
-5. **Stop Loss Calculation**
-   - **Standard**: -7% from entry
-   - **Gap entries**: Tighter stops (-5%) to account for volatility
+5. **Stop Loss Calculation** (v7.0 ATR-Based)
+   - Formula: `stop_pct = -min(2.5*ATR/entry_price, 0.07)`
+   - Volatile stocks: ATR suggests wider stop → capped at -7%
+   - Stable stocks: ATR suggests tighter stop → used as-is (e.g., -4%, -5%)
+   - Logged to CSV: Stop_Loss (price), Stop_Pct (percentage)
 
 6. **Price Target Calculation**
    - Based on catalyst type (see Dynamic Profit Targets above)
