@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v7.0 (Deep Research + Execution Realism) - Live in production paper trading
+**Current Version**: v7.1 (Validation Improvements) - Live in production paper trading
 
 ---
 
@@ -815,11 +815,26 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 ---
 
 **Last Updated**: December 15, 2025
-**Version**: v7.0 (Deep Research + Execution Realism)
+**Version**: v7.1 (Validation Improvements)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Updates (v7.0 - Execution Realism & Deep Research)**:
-- ✅ **v7.0 Execution Improvements (Dec 15)**: Addressing third-party analysis feedback on execution realism
+**Latest Updates (v7.1 - Validation Improvements - Dec 15)**:
+- ✅ **RULESET_VERSION Tracking**: SHA256 hash of trading rules (prevents policy drift)
+  - Hash includes: GO prompt + strategy_rules.md + catalyst_exclusions.json
+  - Logged to CSV: Ruleset_Version (e.g., v7.1-31cd61c9)
+  - Enables clean A/B testing without confounding variables
+- ✅ **Slippage Modeling**: Track execution costs beyond bid-ask spread
+  - Added 5 CSV columns: Entry_Bid, Entry_Ask, Entry_Mid_Price, Entry_Spread_Pct, Slippage_Bps
+  - Calculate: slippage_bps = (fill_price - mid_price) / mid_price * 10000
+  - Enables distribution analysis: median, P90, P99 slippage
+- ✅ **Canonical Exit Policy**: ONE authoritative trailing stop policy documented
+  - Fixed THREE contradictory policies in docs
+  - Canonical: Lock +8%, trail -2% from peak
+  - Added 3 CSV columns: Trailing_Stop_Activated, Trailing_Stop_Price, Peak_Return_Pct
+  - Complete audit trail of exit decisions
+
+**Previous Updates (v7.0 - Execution Realism & Deep Research - Dec 15)**:
+- ✅ **v7.0 Execution Improvements**: Addressing third-party analysis feedback on execution realism
   - **ATR-Based Stops**: 2.5x ATR(14) with -7% maximum loss floor (system uses TIGHTER of the two)
     - Volatile stocks: ATR may suggest -12%, system caps at -7% floor (limits max loss)
     - Stable stocks: ATR may suggest -4%, system uses -4% (tighter than floor)
