@@ -820,10 +820,10 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 **Latest Updates (v7.0 - Execution Realism & Deep Research)**:
 - ✅ **v7.0 Execution Improvements (Dec 15)**: Addressing third-party analysis feedback on execution realism
-  - **ATR-Based Stops**: 2.5x ATR(14) instead of fixed -7%, capped at -7% maximum for safety
-    - Volatile stocks get wider stops (adapt to natural movement)
-    - Stable stocks get tighter stops (better risk control)
-    - Example: ATR=$5, entry=$100 → stop=$87.50 (-12.5%)
+  - **ATR-Based Stops**: 2.5x ATR(14) with -7% maximum loss floor (system uses TIGHTER of the two)
+    - Volatile stocks: ATR may suggest -12%, system caps at -7% floor (limits max loss)
+    - Stable stocks: ATR may suggest -4%, system uses -4% (tighter than floor)
+    - Adapts to each stock's volatility while preventing excessive losses
   - **Spread/Slippage Checking**: Skip trades if bid-ask spread >0.5%
     - Prevents expensive execution on illiquid catalyst names
     - Market orders at 9:45 AM no longer erode edge on wide spreads
