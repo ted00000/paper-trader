@@ -89,12 +89,14 @@ echo "Market Screener Starting: $(date)" >> "$LOG_FILE"
 echo "============================================================" >> "$LOG_FILE"
 
 if python3 "$SCREENER_SCRIPT" >> "$LOG_FILE" 2>&1; then
-    # Success - Extract stats from screener_candidates.json
+    # Success - Extract stats from screener_candidates.json (v7.0 metrics)
     CANDIDATES_FILE="$SCRIPT_DIR/screener_candidates.json"
     if [ -f "$CANDIDATES_FILE" ]; then
         UNIVERSE_SIZE=$(python3 -c "import json; d=json.load(open('$CANDIDATES_FILE')); print(d.get('universe_size', 0))" 2>/dev/null || echo "0")
-        RS_PASS=$(python3 -c "import json; d=json.load(open('$CANDIDATES_FILE')); print(d.get('rs_pass_count', 0))" 2>/dev/null || echo "0")
         CANDIDATES=$(python3 -c "import json; d=json.load(open('$CANDIDATES_FILE')); print(d.get('candidates_found', 0))" 2>/dev/null || echo "0")
+        # v7.0: Market breadth replaces RS pass rate (RS is now scoring factor, not filter)
+        BREADTH_PCT=$(python3 -c "import json; d=json.load(open('$CANDIDATES_FILE')); print(d.get('breadth_pct', 0))" 2>/dev/null || echo "0")
+        BREADTH_TIMESTAMP=$(python3 -c "import json; d=json.load(open('$CANDIDATES_FILE')); print(d.get('breadth_timestamp', 'unknown'))" 2>/dev/null || echo "unknown")
 
         # Update status with stats
         TIMESTAMP=$(date -Iseconds)
@@ -107,9 +109,9 @@ if python3 "$SCREENER_SCRIPT" >> "$LOG_FILE" 2>&1; then
   "error": "",
   "stats": {
     "universe_size": $UNIVERSE_SIZE,
-    "rs_pass_count": $RS_PASS,
     "candidates_found": $CANDIDATES,
-    "rs_pass_rate_pct": $(python3 -c "print(round($RS_PASS / $UNIVERSE_SIZE * 100, 1) if $UNIVERSE_SIZE > 0 else 0)" 2>/dev/null || echo "0")
+    "breadth_pct": $BREADTH_PCT,
+    "breadth_timestamp": "$BREADTH_TIMESTAMP"
   }
 }
 EOF
