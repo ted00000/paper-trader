@@ -78,7 +78,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │  • Enters positions at market open prices                      │
 │                                                                  │
 │  ANALYZE (4:30 PM - after market close):                        │
-│  • Checks ATR-based stop losses (2.5x ATR, max -7% - v7.0)    │
+│  • Checks ATR-based stops (stop_pct = -min(2.5*ATR/price, 0.07)) │
 │  • Checks price targets (activates trailing stops)             │
 │  • Monitors time limits (3 weeks max hold)                     │
 │  • Checks news sentiment deterioration                         │
@@ -91,7 +91,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │              STAGE 4: LEARNING (Continuous Improvement)         │
 │                                                                  │
 │  TRADE COMPLETION (when position exits):                        │
-│  • Logs 52-column CSV with complete trade attribution:         │
+│  • Logs 54-column CSV with complete trade attribution:         │
 │    - Technical: SMA50, EMA5, EMA20, ADX, Volume Ratio, Score   │
 │    - Volume: Quality (EXCELLENT/STRONG/GOOD), Trending (T/F)   │
 │    - Keywords: Matched keywords from news                       │
@@ -147,7 +147,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 - Version tracking: System_Version column tracks which code generated each trade
 
 **Learning**: Closed-loop continuous improvement
-- Trade → CSV (52 columns) → Learning (daily/weekly/monthly) → Insights (exclusions, lessons, rules) → Claude Context → Decision → Trade
+- Trade → CSV (54 columns) → Learning (daily/weekly/monthly) → Insights (exclusions, lessons, rules) → Claude Context → Decision → Trade
 - Historical performance directly informs future decisions
 - Catalyst exclusions presented as warnings with accountability tracking
 - Deviations from learning recommendations require explanation and are logged
