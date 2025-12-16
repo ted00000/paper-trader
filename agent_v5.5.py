@@ -398,7 +398,7 @@ class TradingAgent:
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
                     'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Keywords_Matched', 'News_Sources', 'News_Article_Count',  # Enhancement 2.5: Catalyst learning
-                    'Sector', 'Stop_Loss', 'Price_Target',
+                    'Sector', 'Stop_Loss', 'Stop_Pct', 'Price_Target',  # v7.1.1 - Added Stop_Pct for distribution analysis
                     'Trailing_Stop_Activated', 'Trailing_Stop_Price', 'Peak_Return_Pct',  # v7.1 - Exit policy tracking
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -1108,9 +1108,20 @@ POSITION {i}: {ticker}
             'confidence': position.get('confidence', ''),
             'thesis': position.get('thesis', ''),
             'stop_loss': position.get('stop_loss', 0),
+            'stop_pct': position.get('stop_pct', 0),  # v7.1.1 - Stop distance percentage
             'price_target': position.get('price_target', 0),
             'premarket_price': position.get('premarket_price', entry_price),
-            'gap_percent': position.get('gap_percent', 0)
+            'gap_percent': position.get('gap_percent', 0),
+            # v7.1 - Execution cost tracking fields
+            'entry_bid': position.get('entry_bid', 0),
+            'entry_ask': position.get('entry_ask', 0),
+            'entry_mid_price': position.get('entry_mid_price', 0),
+            'entry_spread_pct': position.get('entry_spread_pct', 0),
+            'slippage_bps': position.get('slippage_bps', 0),
+            # v7.1 - Exit policy tracking fields
+            'trailing_stop_active': position.get('trailing_stop_active', False),
+            'trailing_stop_price': position.get('trailing_stop_price', 0),
+            'peak_return_pct': position.get('peak_return_pct', 0)
         }
 
         return trade
@@ -1185,6 +1196,7 @@ POSITION {i}: {ticker}
             'news_article_count': trade.get('news_article_count', 0),  # Enhancement 2.5
             'sector': trade.get('sector', ''),
             'stop_loss': trade.get('stop_loss', 0),
+            'stop_pct': trade.get('stop_pct', 0),  # v7.1.1 - Stop distance percentage
             'price_target': trade.get('price_target', 0),
             'trailing_stop_activated': trade.get('trailing_stop_active', False),  # v7.1 - Exit policy tracking
             'trailing_stop_price': trade.get('trailing_stop_price', 0),
@@ -4492,7 +4504,7 @@ RECENT LESSONS LEARNED:
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
                     'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Keywords_Matched', 'News_Sources', 'News_Article_Count',  # Enhancement 2.5: Catalyst learning
-                    'Sector', 'Stop_Loss', 'Price_Target',
+                    'Sector', 'Stop_Loss', 'Stop_Pct', 'Price_Target',  # v7.1.1 - Added Stop_Pct for distribution analysis
                     'Trailing_Stop_Activated', 'Trailing_Stop_Price', 'Peak_Return_Pct',  # v7.1 - Exit policy tracking
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -4564,6 +4576,7 @@ RECENT LESSONS LEARNED:
                 trade_data.get('news_article_count', 0),  # Enhancement 2.5
                 trade_data.get('sector', ''),
                 trade_data.get('stop_loss', 0),
+                trade_data.get('stop_pct', 0),  # v7.1.1 - Stop distance percentage
                 trade_data.get('price_target', 0),
                 trade_data.get('trailing_stop_activated', False),  # v7.1 - Exit policy tracking
                 trade_data.get('trailing_stop_price', 0),
@@ -5964,10 +5977,12 @@ RECENT LESSONS LEARNED:
                         max_stop = entry_price * 0.93  # -7% cap for safety
                         pos['stop_loss'] = round(max(atr_stop, max_stop), 2)  # Use tighter of the two
                         stop_pct = ((pos['stop_loss'] - entry_price) / entry_price) * 100
+                        pos['stop_pct'] = round(stop_pct, 2)  # v7.1.1 - Track stop distance for distribution analysis
                         print(f"      Stop: ${pos['stop_loss']:.2f} ({stop_pct:.1f}%) - ATR-based (ATR=${atr:.2f}, 2.5x=${atr_stop_distance:.2f})")
                     else:
                         # Fallback to -7% if ATR unavailable
                         pos['stop_loss'] = round(entry_price * 0.93, 2)
+                        pos['stop_pct'] = -7.0  # v7.1.1 - Fixed stop percentage
                         print(f"      Stop: ${pos['stop_loss']:.2f} (-7.0%) - Fixed (ATR unavailable)")
 
                     pos['price_target'] = round(entry_price * (1 + dynamic_target_pct/100), 2)  # Dynamic target
