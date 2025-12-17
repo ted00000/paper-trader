@@ -39,7 +39,7 @@
 - Position sizing tied to conviction & regime (6-13% range, scaled by market breadth)
 - Hard stops (-7% standard, -5% for gaps)
 - Max positions (10), sector caps (2 per sector, 3 if leading)
-- Minimum liquidity ($20M ADV)
+- Minimum liquidity ($50M ADV per Deep Research v7.0)
 - VIX shutdown >30, three-tier market breadth regimes, macro event awareness
 - No revenge trading, no averaging down, no new trades when AI fails
 - **Quote**: "This is far better risk framing than most retail algos ever see"
@@ -163,7 +163,7 @@
 ### 3. Execution Realism (Risk Level: 7/10)
 
 **Analyst's Concern**:
-> "In paper trading: Market orders at near-open prices, No partial fills, No hidden liquidity issues beyond $20M ADV filter. But in live trading: Even at $20M ADV, impact/slippage can be meaningful in stressed conditions, Near-open fills are often nasty (worse spreads), Scaling beyond small account runs into capacity constraints."
+> "In paper trading: Market orders at near-open prices, No partial fills, No hidden liquidity issues beyond $50M ADV filter (v7.0). But in live trading: Even at $50M ADV, impact/slippage can be meaningful in stressed conditions, Near-open fills are often nasty (worse spreads), Scaling beyond small account runs into capacity constraints."
 
 **Specific Risks**:
 - Slippage not modeled (spreads, market impact)
@@ -176,7 +176,7 @@
 **System Response**: ⚠️ **VALID CONCERN** - Execution assumptions optimistic
 
 **Current Mitigation**:
-- $20M ADV minimum liquidity filter
+- $50M ADV minimum liquidity filter (v7.0 Deep Research)
 - Small account size ($1,000) reduces market impact
 - 15-minute delayed entry (9:45 AM vs 9:30 AM open) provides price discovery
 

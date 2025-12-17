@@ -241,7 +241,7 @@ buy_pos['news_article_count'] = len(top_articles)  # ✅ Enhancement 2.5
 - ✅ Options Flow Detection (Parking Lot #1) - [market_screener.py:1411-1520](market_screener.py#L1411)
 - ✅ Dark Pool Activity Tracking (Parking Lot #3) - [market_screener.py:1522-1630](market_screener.py#L1522)
 - ✅ Sector Rotation Analysis - Integrated
-- ✅ Liquidity Filter (Enhancement 4.4) - Min $20M daily volume
+- ✅ Liquidity Filter (Enhancement 4.4, updated v7.0) - Min $50M daily volume
 
 **Note**: Current screener output (screener_candidates.json from Nov 25) does NOT contain options_flow or dark_pool data. This is likely because:
 1. No candidates triggered these signals on that scan date, OR

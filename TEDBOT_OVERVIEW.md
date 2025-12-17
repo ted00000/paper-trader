@@ -137,7 +137,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 - Market breadth filter: Reduces sizing by 40% in UNHEALTHY markets
 - Cluster-based conviction: Prevents double-counting correlated signals (max 11 factors)
 - Sector concentration: Max 2 per sector (3 in leading sectors)
-- Liquidity filter: Min $20M daily volume prevents slippage
+- Liquidity filter: Min $50M daily volume prevents slippage
 
 **Transparency**: Complete performance visibility
 - Public dashboard: YTD/MTD returns, win rate, Sharpe ratio, max drawdown
@@ -235,10 +235,10 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
    - Adds conviction when institutions are buying
 
 8. **Liquidity Filter** (Phase 4.4)
-   - **Minimum $20M average daily dollar volume**
+   - **Minimum $50M average daily dollar volume**
    - Prevents execution slippage on low-liquidity stocks
    - Filters at screener level before GO command sees candidates
-   - Typical slippage on sub-$20M names: 1-3% per trade
+   - Typical slippage on sub-$50M names: 1-3% per trade
 
 **Output**: List of catalyst-driven candidates saved to `screener_candidates.json` with enhanced metadata
 
@@ -564,7 +564,7 @@ Day 6: $112.70 → TRAILING STOP HIT, EXIT at $112.70 (+12.7%)
    - Max 2 positions per sector (down from 3)
    - Exception: Allow 3 in top 2 leading sectors (+2% vs SPY)
 4. **Liquidity Filter** (Enhancement 4.4) - Prevent execution slippage
-   - Minimum $20M average daily dollar volume
+   - Minimum $50M average daily dollar volume
    - Filters low-liquidity stocks at screener level
 5. **VIX Regime Logging** (Enhancement 4.5) - Track market conditions for learning & attribution
    - Classifies VIX into 5 regimes: VERY_LOW (<15), LOW (15-20), ELEVATED (20-25), HIGH (25-30), EXTREME (≥30)
@@ -684,7 +684,7 @@ Analyzes past performance across multiple dimensions:
 - **Sector concentration** (Phase 4.3): Max 2 positions per sector (3 allowed in top 2 leading sectors)
 - **Sector rotation aware**: Prioritize leading sectors (+2% vs SPY)
 - **Market breadth filter** (Phase 4.2): Reduces exposure in rotational/choppy markets
-- **Liquidity floor** (Phase 4.4): Min $20M daily dollar volume (prevents slippage)
+- **Liquidity floor** (Phase 4.4): Min $50M daily dollar volume (prevents slippage)
 - **Market regime**: SHUTDOWN at VIX >30
 - **Macro events**: Event-day only blackouts (FOMC, CPI, NFP, PCE) - aligned with institutional best practices
 
@@ -719,7 +719,7 @@ Analyzes past performance across multiple dimensions:
 6. **Cluster-Based Conviction**: Prevents double-counting correlated signals (max 11 factors, down from 14+)
 7. **Market Breadth Filter**: Regime-based position sizing (HEALTHY/DEGRADED/UNHEALTHY)
 8. **Adaptive Position Sizing**: 6-13% sizing based on conviction + market conditions
-9. **Liquidity-Aware**: $20M minimum volume filter prevents execution slippage
+9. **Liquidity-Aware**: $50M minimum volume filter prevents execution slippage
 10. **Let Winners Run**: Trailing stops capture extended moves
 11. **Quantitative + Qualitative**: Combines technical filters with AI reasoning
 12. **Full Transparency**: Every decision logged and traceable
@@ -890,7 +890,7 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 - ✅ Phase 4.1: Cluster-based conviction scoring (prevents double-counting correlated signals)
 - ✅ Phase 4.2: Market breadth & trend filter (regime-based position sizing)
 - ✅ Phase 4.3: Sector concentration reduction (max 2 per sector, 3 in leading sectors)
-- ✅ Phase 4.4: Liquidity filter (min $20M daily volume prevents slippage)
+- ✅ Phase 4.4: Liquidity filter (min $50M daily volume prevents slippage)
 - ✅ Phase 4.5: VIX regime logging (tracks market conditions for learning & attribution)
 - ✅ Phase 4.6: AI robustness & failover (graceful degradation when Claude API fails)
 - ✅ Phase 4.7: Operational monitoring (health checks, dashboard alerts, version tracking)

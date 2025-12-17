@@ -403,7 +403,7 @@
 **Reviewer concern**: "Model at least 0.2-0.5% slippage per trade in backtests"
 
 **Current reality**:
-- ✅ We filter for $20M+ daily volume (Phase 4.4)
+- ✅ We filter for $50M+ daily volume (Deep Research v7.0)
 - ✅ Typical slippage on liquid names: 0.1-0.3%
 - ❌ Not explicitly modeled in P&L calculations
 
