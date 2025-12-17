@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Globe, TrendingUp, Award, Target } from 'lucide-react'
+import { TrendingUp, Award, Target } from 'lucide-react'
 import axios from 'axios'
 import EquityCurveChart from '../components/EquityCurveChart'
 
@@ -43,7 +43,11 @@ function PublicView() {
       {/* Hero Section */}
       <div className="text-center py-12">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <Globe className="text-tedbot-accent" size={48} />
+          <img
+            src="/tedbot-logo.png"
+            alt="Tedbot Logo"
+            className="w-16 h-16 rounded-lg"
+          />
           <h1 className="text-5xl font-bold gradient-text">Tedbot</h1>
         </div>
         <p className="text-xl text-tedbot-gray-400 mb-2">Autonomous Trading System</p>
