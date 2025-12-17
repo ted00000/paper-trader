@@ -92,6 +92,32 @@ def load_screener_candidates():
         return json.load(f)
 
 # =====================================================================
+# ROOT & DOCUMENTATION
+# =====================================================================
+
+@app.route('/', methods=['GET'])
+def root():
+    """API Documentation - Root endpoint"""
+    return jsonify({
+        'name': 'TEDBOT Enhanced Dashboard API',
+        'version': '2.0',
+        'description': 'Read-only API for TEDBOT trading dashboard',
+        'frontend': 'http://localhost:3000',
+        'endpoints': {
+            'health': '/api/v2/health',
+            'overview': '/api/v2/overview',
+            'equity_curve': '/api/v2/equity-curve',
+            'catalyst_performance': '/api/v2/catalyst-performance',
+            'trades': '/api/v2/trades',
+            'risk_positions': '/api/v2/risk/positions',
+            'monthly_returns': '/api/v2/analytics/monthly-returns',
+            'learning_insights': '/api/v2/learning/insights'
+        },
+        'note': 'This is a READ-ONLY API. It never modifies trading data.',
+        'docs': 'See README.md in dashboard_v2/ for full documentation'
+    })
+
+# =====================================================================
 # ANALYTICS ENDPOINTS
 # =====================================================================
 
