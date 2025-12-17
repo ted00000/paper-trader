@@ -3,6 +3,12 @@
 Paper Trading Lab - Agent v5.6.1 - TECHNICAL INDICATORS ENABLED
 SWING TRADING SYSTEM WITH INTELLIGENT LEARNING & OPTIMIZATION
 
+**IMPORTANT NOTE (v7.1 - Dec 2025):**
+- RS (Relative Strength) is now used for SCORING ONLY, not filtering
+- RS >3% requirement was removed in v7.0 (Deep Research update)
+- RS is calculated and adds 0-5 points to composite score
+- Historical changelog references to "RS ≥3% filter" are from older versions
+
 MAJOR IMPROVEMENTS FROM v4.3:
 1. GO command reviews EXISTING portfolio with 15-min delayed premarket data
 2. Enforces swing trading rules: 2-day minimum hold, proper exit criteria
