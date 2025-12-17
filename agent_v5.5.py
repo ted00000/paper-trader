@@ -2728,7 +2728,7 @@ POSITION {i}: {ticker}
             'stock_return_3m': stock_return,
             'sector_return_3m': sector_return,
             'sector_etf': sector_etf,
-            'passed_filter': relative_strength >= 3.0  # Required threshold
+            'passed_filter': True  # v7.1: RS now scoring only, not a filter
         }
 
     # =====================================================================
@@ -3191,13 +3191,7 @@ POSITION {i}: {ticker}
             reasoning_parts.append(f"Market: {', '.join(market_parts)}")
 
         # REQUIRED FILTERS (auto-reject if failed)
-        if relative_strength < 3.0:
-            return {
-                'conviction': 'SKIP',
-                'position_size_pct': 0.0,
-                'reasoning': f'Failed RS filter ({relative_strength:.1f}% <3%)',
-                'supporting_factors': supporting_factors
-            }
+        # NOTE: RS filter removed in v7.0 - RS now used for scoring only
 
         if catalyst_tier != 'Tier1':
             return {
@@ -5411,11 +5405,7 @@ RECENT LESSONS LEARNED:
 
                     # PHASE 4: Relative Strength + Conviction Sizing
                     rs_result = self.calculate_relative_strength(ticker, sector)
-
-                    # Check relative strength filter (≥3% required)
-                    if not rs_result['passed_filter']:
-                        validation_passed = False
-                        rejection_reasons.append(f"Failed RS filter ({rs_result['relative_strength']:.1f}% <3%)")
+                    # NOTE: RS filter removed in v7.1 - RS now used for scoring only
 
                     # PHASE 5.6: Technical Filters (4 essential swing trading indicators)
                     print(f"   📊 Checking technical setup for {ticker}...")
