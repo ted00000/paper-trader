@@ -256,6 +256,7 @@ import pytz
 import hashlib
 
 # Configuration
+ET = pytz.timezone('America/New_York')  # Eastern Time for trading operations
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
 ALPHAVANTAGE_API_KEY = os.environ.get('ALPHAVANTAGE_API_KEY', '')
 POLYGON_API_KEY = os.environ.get('POLYGON_API_KEY', '')
@@ -724,17 +725,15 @@ POSITION {i}: {ticker}
         """
         try:
             # Fetch 260 trading days (~52 weeks + buffer)
-            end_date = datetime.now().strftime('%Y-%m-%d')
-            start_date = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')
+            end_date = datetime.now(ET).strftime('%Y-%m-%d')
+            start_date = (datetime.now(ET) - timedelta(days=400)).strftime('%Y-%m-%d')
 
             response = requests.get(
                 f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
-                params={'apiKey': POLYGON_API_KEY, 'limit': 50000}
+                params={'apiKey': POLYGON_API_KEY, 'limit': 50000},
+                timeout=15
             )
-
-            if response.status_code != 200:
-                return {'stage2': False, 'error': 'API error', 'ticker': ticker}
-
+            response.raise_for_status()
             data = response.json()
 
             if not data.get('results') or len(data['results']) < 200:
@@ -917,10 +916,13 @@ POSITION {i}: {ticker}
 
             response = requests.get(
                 f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
-                params={'apiKey': POLYGON_API_KEY, 'limit': 50}
+                params={'apiKey': POLYGON_API_KEY, 'limit': 50},
+                timeout=10
             )
+            response.raise_for_status()
+            data = response.json()
 
-            if response.status_code != 200 or 'results' not in response.json():
+            if 'results' not in data:
                 return {
                     'entry_quality': 'UNKNOWN',
                     'wait_for_pullback': False,
@@ -4054,7 +4056,8 @@ RECENT LESSONS LEARNED:
             with open(self.exclusions_file, 'r') as f:
                 data = json.load(f)
                 return data.get('excluded_catalysts', [])
-        except:
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to load exclusions from {self.exclusions_file}: {e}")
             return []
 
     def log_exclusion_override(self, ticker, catalyst, reasoning, exclusion_data):
@@ -4099,7 +4102,8 @@ RECENT LESSONS LEARNED:
         if json_match:
             try:
                 return json.loads(json_match.group(0))
-            except:
+            except Exception as e:
+                print(f"   ⚠️ Fallback JSON parsing error: {e}")
                 pass
         
         return None
@@ -5108,7 +5112,8 @@ RECENT LESSONS LEARNED:
             if log_file.exists():
                 try:
                     existing_logs = json.loads(log_file.read_text())
-                except:
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to load existing failure logs: {e}")
                     pass
 
             existing_logs.append(log_entry)
@@ -5926,11 +5931,13 @@ RECENT LESSONS LEARNED:
                     # Fetch 2-day history to get previous close
                     bars = requests.get(
                         f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")}/{datetime.now().strftime("%Y-%m-%d")}',
-                        params={'apiKey': POLYGON_API_KEY}
+                        params={'apiKey': POLYGON_API_KEY},
+                        timeout=10
                     ).json()
                     if bars.get('results') and len(bars['results']) >= 2:
                         previous_closes[ticker] = bars['results'][-2]['c']  # Previous day close
-                except:
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to fetch previous close for {ticker}: {e}")
                     previous_closes[ticker] = None
 
             for pos in buy_positions:
@@ -6316,7 +6323,8 @@ RECENT LESSONS LEARNED:
             if log_file.exists():
                 try:
                     existing_logs = json.loads(log_file.read_text())
-                except:
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to load existing failure logs: {e}")
                     pass
 
             existing_logs.append(log_entry)
