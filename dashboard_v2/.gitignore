@@ -1,0 +1,29 @@
+# Node
+node_modules/
+package-lock.json
+
+# Build output
+frontend/dist/
+
+# Logs
+*.log
+backend.log
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
