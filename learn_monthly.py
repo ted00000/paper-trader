@@ -504,12 +504,12 @@ class MonthlyLearning:
                 rs_perf = phase_metrics['relative_strength_performance']
                 if 'strong_rs' in rs_perf:
                     report.append(
-                        f"- Strong RS (≥3%): {rs_perf['strong_rs']['win_rate']:.1f}% win rate, "
+                        f"- Higher RS (≥3%): {rs_perf['strong_rs']['win_rate']:.1f}% win rate, "
                         f"{rs_perf['strong_rs']['avg_return']:.2f}% avg ({rs_perf['strong_rs']['count']} trades)\n"
                     )
                 if 'weak_rs' in rs_perf:
                     report.append(
-                        f"- Weak RS (<3%): {rs_perf['weak_rs']['win_rate']:.1f}% win rate, "
+                        f"- Lower RS (<3%): {rs_perf['weak_rs']['win_rate']:.1f}% win rate, "
                         f"{rs_perf['weak_rs']['avg_return']:.2f}% avg ({rs_perf['weak_rs']['count']} trades)\n"
                     )
                 report.append("\n")
