@@ -2292,7 +2292,8 @@ class MarketScreener:
         print("=" * 60)
         print(f"Date: {self.today}")
         print(f"Time: {datetime.now(ET).strftime('%H:%M:%S')} ET")
-        print(f"Filters: RS ≥{MIN_RS_PCT}%, Price ≥${MIN_PRICE}, MCap ≥${MIN_MARKET_CAP:,}\n")
+        print(f"Filters: Price ≥${MIN_PRICE}, MCap ≥${MIN_MARKET_CAP:,}")
+        print(f"         (RS used for scoring, not filtering)\n")
 
         # Load Finnhub earnings calendar (TIER 1 CATALYST DATA)
         if self.finnhub_key:
