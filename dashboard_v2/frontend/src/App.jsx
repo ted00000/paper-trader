@@ -37,9 +37,11 @@ function App() {
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-tedbot-accent rounded-lg flex items-center justify-center">
-                  <span className="text-2xl">Tedbot Logo 3</span>
-                </div>
+                <img
+                  src="/tedbot-logo.png"
+                  alt="Tedbot Logo"
+                  className="w-12 h-12 rounded-lg"
+                />
                 <div>
                   <h1 className="text-3xl font-bold gradient-text">Tedbot</h1>
                   <p className="text-sm text-tedbot-gray-500">Autonomous Trading Terminal</p>
