@@ -1,0 +1,49 @@
+{
+  "report_version": "v7.1.1",
+  "generated_at": "2025-12-16",
+  "trades_analyzed": 1,
+  "trailing_stop_analysis": {
+    "total_trades": 1,
+    "trailing_stop_activated_count": 0,
+    "trailing_stop_not_activated_count": 1,
+    "trailing_stop_activation_rate": 0.0,
+    "peak_returns": null,
+    "exit_returns": null,
+    "givebacks": null,
+    "capture_rate": 0
+  },
+  "exit_type_distribution": {
+    "Target_Reached": {
+      "count": 1,
+      "win_rate": 100.0,
+      "avg_return": 10.28,
+      "median_return": 10.28
+    }
+  },
+  "stop_distance_effectiveness": {
+    "tight_stops": {
+      "range": ">-6%",
+      "count": 0,
+      "avg_return": 0,
+      "win_rate": 0
+    },
+    "medium_stops": {
+      "range": "-6% to -7%",
+      "count": 0,
+      "avg_return": 0,
+      "win_rate": 0
+    },
+    "wide_stops": {
+      "range": "-7% (cap)",
+      "count": 0,
+      "avg_return": 0,
+      "win_rate": 0
+    }
+  },
+  "interpretation": {
+    "capture_rate": "% of peak profit captured at exit (target: 80%+)",
+    "giveback": "Peak - Exit return (lower is better, shows tight trailing)",
+    "trailing_stop_policy": "Lock +8%, trail -2% from peak (v7.1 canonical)",
+    "stop_distance": "ATR-based stops (tight) vs -7% cap (wide)"
+  }
+}

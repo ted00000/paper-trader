@@ -256,6 +256,7 @@ import pytz
 import hashlib
 
 # Configuration
+ET = pytz.timezone('America/New_York')  # Eastern Time for trading operations
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
 ALPHAVANTAGE_API_KEY = os.environ.get('ALPHAVANTAGE_API_KEY', '')
 POLYGON_API_KEY = os.environ.get('POLYGON_API_KEY', '')
@@ -357,6 +358,45 @@ QUALITY OVER QUANTITY:
 # Calculate ruleset version at module load time
 RULESET_VERSION = get_ruleset_version()
 
+def get_universe_version():
+    """
+    Calculate hash of S&P 1500 universe tickers (v7.1.1 - Universe stability tracking)
+
+    Prevents breadth drift due to constituent changes. For example:
+    - Dec 2025: 993 stocks in universe → v7.1.1-abc123de
+    - Jan 2026: 1012 stocks (IPOs added) → v7.1.1-xyz789ab
+
+    This enables analysis like: "Did performance change due to strategy or universe shift?"
+
+    Returns: universe version string (e.g., v7.1.1-abc123de)
+    """
+    try:
+        # Load universe tickers from screener output
+        universe_file = PROJECT_DIR / 'universe_tickers.json'
+
+        if not universe_file.exists():
+            return f"{SYSTEM_VERSION}-no_universe"
+
+        with open(universe_file, 'r') as f:
+            universe_data = json.load(f)
+
+        # Sort tickers for consistent hashing (order doesn't matter)
+        tickers = sorted(universe_data.get('tickers', []))
+
+        # Calculate SHA256 hash (first 8 chars)
+        hash_obj = hashlib.sha256(','.join(tickers).encode('utf-8'))
+        hash_short = hash_obj.hexdigest()[:8]
+
+        return f"{SYSTEM_VERSION}-{hash_short}"
+
+    except Exception as e:
+        # Fallback if hash calculation fails
+        print(f"⚠️ Warning: Could not calculate universe version: {e}")
+        return f"{SYSTEM_VERSION}-unknown"
+
+# Calculate universe version at module load time
+UNIVERSE_VERSION = get_universe_version()
+
 class TradingAgent:
     """Production-ready trading agent v4.3 - Complete implementation"""
 
@@ -393,12 +433,13 @@ class TradingAgent:
                     'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
                     'System_Version',  # Enhancement 4.7 - Track code version per trade
                     'Ruleset_Version',  # v7.1 - Track trading rules version (policy drift prevention)
+                    'Universe_Version',  # v7.1.1 - Track S&P 1500 constituent list (breadth stability)
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
                     'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Keywords_Matched', 'News_Sources', 'News_Article_Count',  # Enhancement 2.5: Catalyst learning
-                    'Sector', 'Stop_Loss', 'Price_Target',
+                    'Sector', 'Stop_Loss', 'Stop_Pct', 'Price_Target',  # v7.1.1 - Added Stop_Pct for distribution analysis
                     'Trailing_Stop_Activated', 'Trailing_Stop_Price', 'Peak_Return_Pct',  # v7.1 - Exit policy tracking
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -684,17 +725,15 @@ POSITION {i}: {ticker}
         """
         try:
             # Fetch 260 trading days (~52 weeks + buffer)
-            end_date = datetime.now().strftime('%Y-%m-%d')
-            start_date = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')
+            end_date = datetime.now(ET).strftime('%Y-%m-%d')
+            start_date = (datetime.now(ET) - timedelta(days=400)).strftime('%Y-%m-%d')
 
             response = requests.get(
                 f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
-                params={'apiKey': POLYGON_API_KEY, 'limit': 50000}
+                params={'apiKey': POLYGON_API_KEY, 'limit': 50000},
+                timeout=15
             )
-
-            if response.status_code != 200:
-                return {'stage2': False, 'error': 'API error', 'ticker': ticker}
-
+            response.raise_for_status()
             data = response.json()
 
             if not data.get('results') or len(data['results']) < 200:
@@ -877,10 +916,13 @@ POSITION {i}: {ticker}
 
             response = requests.get(
                 f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
-                params={'apiKey': POLYGON_API_KEY, 'limit': 50}
+                params={'apiKey': POLYGON_API_KEY, 'limit': 50},
+                timeout=10
             )
+            response.raise_for_status()
+            data = response.json()
 
-            if response.status_code != 200 or 'results' not in response.json():
+            if 'results' not in data:
                 return {
                     'entry_quality': 'UNKNOWN',
                     'wait_for_pullback': False,
@@ -1108,9 +1150,20 @@ POSITION {i}: {ticker}
             'confidence': position.get('confidence', ''),
             'thesis': position.get('thesis', ''),
             'stop_loss': position.get('stop_loss', 0),
+            'stop_pct': position.get('stop_pct', 0),  # v7.1.1 - Stop distance percentage
             'price_target': position.get('price_target', 0),
             'premarket_price': position.get('premarket_price', entry_price),
-            'gap_percent': position.get('gap_percent', 0)
+            'gap_percent': position.get('gap_percent', 0),
+            # v7.1 - Execution cost tracking fields
+            'entry_bid': position.get('entry_bid', 0),
+            'entry_ask': position.get('entry_ask', 0),
+            'entry_mid_price': position.get('entry_mid_price', 0),
+            'entry_spread_pct': position.get('entry_spread_pct', 0),
+            'slippage_bps': position.get('slippage_bps', 0),
+            # v7.1 - Exit policy tracking fields
+            'trailing_stop_active': position.get('trailing_stop_active', False),
+            'trailing_stop_price': position.get('trailing_stop_price', 0),
+            'peak_return_pct': position.get('peak_return_pct', 0)
         }
 
         return trade
@@ -1166,12 +1219,12 @@ POSITION {i}: {ticker}
             'market_breadth_regime': trade.get('market_breadth_regime', 'UNKNOWN'),
             'system_version': SYSTEM_VERSION,
             'ruleset_version': RULESET_VERSION,  # v7.1 - Track trading rules version
+            'universe_version': UNIVERSE_VERSION,  # v7.1.1 - Track S&P 1500 constituent list
             'relative_strength': trade.get('relative_strength', 0.0),
             'stock_return_3m': trade.get('stock_return_3m', 0.0),
             'sector_etf': trade.get('sector_etf', 'Unknown'),
             'conviction_level': trade.get('conviction_level', 'MEDIUM'),
             'supporting_factors': trade.get('supporting_factors', 0),
-            'rs_rating': trade.get('rs_rating', 0),  # Enhancement 2.1
             'technical_score': trade.get('technical_score', 0),  # Phase 5.6
             'technical_sma50': trade.get('technical_sma50', 0.0),
             'technical_ema5': trade.get('technical_ema5', 0.0),
@@ -1185,6 +1238,7 @@ POSITION {i}: {ticker}
             'news_article_count': trade.get('news_article_count', 0),  # Enhancement 2.5
             'sector': trade.get('sector', ''),
             'stop_loss': trade.get('stop_loss', 0),
+            'stop_pct': trade.get('stop_pct', 0),  # v7.1.1 - Stop distance percentage
             'price_target': trade.get('price_target', 0),
             'trailing_stop_activated': trade.get('trailing_stop_active', False),  # v7.1 - Exit policy tracking
             'trailing_stop_price': trade.get('trailing_stop_price', 0),
@@ -4002,7 +4056,8 @@ RECENT LESSONS LEARNED:
             with open(self.exclusions_file, 'r') as f:
                 data = json.load(f)
                 return data.get('excluded_catalysts', [])
-        except:
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to load exclusions from {self.exclusions_file}: {e}")
             return []
 
     def log_exclusion_override(self, ticker, catalyst, reasoning, exclusion_data):
@@ -4047,7 +4102,8 @@ RECENT LESSONS LEARNED:
         if json_match:
             try:
                 return json.loads(json_match.group(0))
-            except:
+            except Exception as e:
+                print(f"   ⚠️ Fallback JSON parsing error: {e}")
                 pass
         
         return None
@@ -4487,12 +4543,13 @@ RECENT LESSONS LEARNED:
                     'VIX_Regime', 'Market_Breadth_Regime',  # Phase 4 regime tracking
                     'System_Version',  # Enhancement 4.7 - Track code version per trade
                     'Ruleset_Version',  # v7.1 - Track trading rules version (policy drift prevention)
+                    'Universe_Version',  # v7.1.1 - Track S&P 1500 constituent list (breadth stability)
                     'Relative_Strength', 'Stock_Return_3M', 'Sector_ETF',
                     'Conviction_Level', 'Supporting_Factors',
                     'Technical_Score', 'Technical_SMA50', 'Technical_EMA5', 'Technical_EMA20', 'Technical_ADX', 'Technical_Volume_Ratio',
                     'Volume_Quality', 'Volume_Trending_Up',  # Enhancement 2.2
                     'Keywords_Matched', 'News_Sources', 'News_Article_Count',  # Enhancement 2.5: Catalyst learning
-                    'Sector', 'Stop_Loss', 'Price_Target',
+                    'Sector', 'Stop_Loss', 'Stop_Pct', 'Price_Target',  # v7.1.1 - Added Stop_Pct for distribution analysis
                     'Trailing_Stop_Activated', 'Trailing_Stop_Price', 'Peak_Return_Pct',  # v7.1 - Exit policy tracking
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
                     'Rotation_Into_Ticker', 'Rotation_Reason'
@@ -4546,6 +4603,7 @@ RECENT LESSONS LEARNED:
                 trade_data.get('market_breadth_regime', 'UNKNOWN'),  # Phase 4 market breadth
                 trade_data.get('system_version', SYSTEM_VERSION),  # Phase 4.7 - Track code version
                 trade_data.get('ruleset_version', RULESET_VERSION),  # v7.1 - Track trading rules version
+                trade_data.get('universe_version', UNIVERSE_VERSION),  # v7.1.1 - Track S&P 1500 constituent list
                 trade_data.get('relative_strength', 0.0),
                 trade_data.get('stock_return_3m', 0.0),
                 trade_data.get('sector_etf', 'Unknown'),
@@ -4564,6 +4622,7 @@ RECENT LESSONS LEARNED:
                 trade_data.get('news_article_count', 0),  # Enhancement 2.5
                 trade_data.get('sector', ''),
                 trade_data.get('stop_loss', 0),
+                trade_data.get('stop_pct', 0),  # v7.1.1 - Stop distance percentage
                 trade_data.get('price_target', 0),
                 trade_data.get('trailing_stop_activated', False),  # v7.1 - Exit policy tracking
                 trade_data.get('trailing_stop_price', 0),
@@ -5053,7 +5112,8 @@ RECENT LESSONS LEARNED:
             if log_file.exists():
                 try:
                     existing_logs = json.loads(log_file.read_text())
-                except:
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to load existing failure logs: {e}")
                     pass
 
             existing_logs.append(log_entry)
@@ -5871,11 +5931,13 @@ RECENT LESSONS LEARNED:
                     # Fetch 2-day history to get previous close
                     bars = requests.get(
                         f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")}/{datetime.now().strftime("%Y-%m-%d")}',
-                        params={'apiKey': POLYGON_API_KEY}
+                        params={'apiKey': POLYGON_API_KEY},
+                        timeout=10
                     ).json()
                     if bars.get('results') and len(bars['results']) >= 2:
                         previous_closes[ticker] = bars['results'][-2]['c']  # Previous day close
-                except:
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to fetch previous close for {ticker}: {e}")
                     previous_closes[ticker] = None
 
             for pos in buy_positions:
@@ -5964,10 +6026,12 @@ RECENT LESSONS LEARNED:
                         max_stop = entry_price * 0.93  # -7% cap for safety
                         pos['stop_loss'] = round(max(atr_stop, max_stop), 2)  # Use tighter of the two
                         stop_pct = ((pos['stop_loss'] - entry_price) / entry_price) * 100
+                        pos['stop_pct'] = round(stop_pct, 2)  # v7.1.1 - Track stop distance for distribution analysis
                         print(f"      Stop: ${pos['stop_loss']:.2f} ({stop_pct:.1f}%) - ATR-based (ATR=${atr:.2f}, 2.5x=${atr_stop_distance:.2f})")
                     else:
                         # Fallback to -7% if ATR unavailable
                         pos['stop_loss'] = round(entry_price * 0.93, 2)
+                        pos['stop_pct'] = -7.0  # v7.1.1 - Fixed stop percentage
                         print(f"      Stop: ${pos['stop_loss']:.2f} (-7.0%) - Fixed (ATR unavailable)")
 
                     pos['price_target'] = round(entry_price * (1 + dynamic_target_pct/100), 2)  # Dynamic target
@@ -6259,7 +6323,8 @@ RECENT LESSONS LEARNED:
             if log_file.exists():
                 try:
                     existing_logs = json.loads(log_file.read_text())
-                except:
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to load existing failure logs: {e}")
                     pass
 
             existing_logs.append(log_entry)

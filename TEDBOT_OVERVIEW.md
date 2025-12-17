@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v7.1 (Validation Improvements) - Live in production paper trading
+**Current Version**: v7.1.1 (Validation + Reporting) - Live in production paper trading
 
 ---
 
@@ -78,7 +78,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │  • Enters positions at market open prices                      │
 │                                                                  │
 │  ANALYZE (4:30 PM - after market close):                        │
-│  • Checks ATR-based stop losses (2.5x ATR, max -7% - v7.0)    │
+│  • Checks ATR-based stops (stop_pct = -min(2.5*ATR/price, 0.07)) │
 │  • Checks price targets (activates trailing stops)             │
 │  • Monitors time limits (3 weeks max hold)                     │
 │  • Checks news sentiment deterioration                         │
@@ -91,7 +91,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │              STAGE 4: LEARNING (Continuous Improvement)         │
 │                                                                  │
 │  TRADE COMPLETION (when position exits):                        │
-│  • Logs 52-column CSV with complete trade attribution:         │
+│  • Logs 63-column CSV with complete trade attribution:         │
 │    - Technical: SMA50, EMA5, EMA20, ADX, Volume Ratio, Score   │
 │    - Volume: Quality (EXCELLENT/STRONG/GOOD), Trending (T/F)   │
 │    - Keywords: Matched keywords from news                       │
@@ -147,7 +147,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 - Version tracking: System_Version column tracks which code generated each trade
 
 **Learning**: Closed-loop continuous improvement
-- Trade → CSV (52 columns) → Learning (daily/weekly/monthly) → Insights (exclusions, lessons, rules) → Claude Context → Decision → Trade
+- Trade → CSV (63 columns) → Learning (daily/weekly/monthly) → Insights (exclusions, lessons, rules) → Claude Context → Decision → Trade
 - Historical performance directly informs future decisions
 - Catalyst exclusions presented as warnings with accountability tracking
 - Deviations from learning recommendations require explanation and are logged
@@ -384,9 +384,11 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
    - **Effective Range**: 6% (MEDIUM in UNHEALTHY) to 13% (HIGH in HEALTHY)
    - **Example**: HIGH conviction (13%) + DEGRADED market → 13% × 0.8 = 10.4% actual
 
-5. **Stop Loss Calculation**
-   - **Standard**: -7% from entry
-   - **Gap entries**: Tighter stops (-5%) to account for volatility
+5. **Stop Loss Calculation** (v7.0 ATR-Based)
+   - Formula: `stop_pct = -min(2.5*ATR/entry_price, 0.07)`
+   - Volatile stocks: ATR suggests wider stop → capped at -7%
+   - Stable stocks: ATR suggests tighter stop → used as-is (e.g., -4%, -5%)
+   - Logged to CSV: Stop_Loss (price), Stop_Pct (percentage)
 
 6. **Price Target Calculation**
    - Based on catalyst type (see Dynamic Profit Targets above)
@@ -636,16 +638,17 @@ Analyzes past performance across multiple dimensions:
 7. **`learning_data/*.json`** - Performance attribution reports
 8. **`daily_picks.json`** - Dashboard display (accepted + rejected picks)
 
-### CSV Trade History Columns (50+ fields):
+### CSV Trade History Columns (63 fields):
 - Basic: Ticker, Entry/Exit Date, Entry/Exit Price, Return %, Hold Days
 - Position: Shares, Position Size $, Account Value Before/After
 - Catalyst: Type, Tier, News Score, Catalyst Details
-- Risk: Stop Loss, Price Target, Max Drawdown
+- Risk: Stop Loss, Stop_Pct (v7.1.1), Price Target, Max Drawdown
 - Technical: 50-day MA, 5/20 EMA, ADX, Volume Ratio, Volume Quality, RS Rating
 - Conviction: Level, Supporting Factors Count
 - Market: VIX at Entry, Market Regime, Macro Events, VIX_Regime, Market_Breadth_Regime (Phase 4.5)
-- System: System_Version (Phase 4.7 - tracks which code version generated trade)
-- Exit: Reason, What Worked, What Failed
+- System: System_Version (v4.7), Ruleset_Version (v7.1), Universe_Version (v7.1.1)
+- Execution: Entry_Bid, Entry_Ask, Entry_Mid_Price, Entry_Spread_Pct, Slippage_Bps (v7.1)
+- Exit: Reason, Trailing_Stop_Activated, Trailing_Stop_Price, Peak_Return_Pct (v7.1), What Worked, What Failed
 - Rotation: Rotation Into Ticker, Rotation Reason (if applicable)
 
 ---
@@ -814,11 +817,37 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: December 15, 2025
-**Version**: v7.1 (Validation Improvements)
+**Last Updated**: December 16, 2025
+**Version**: v7.1.1 (Validation + Reporting)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Updates (v7.1 - Validation Improvements - Dec 15)**:
+**Latest Updates (v7.1.1 - Reporting & Analysis Tools - Dec 16)**:
+- ✅ **Stop_Pct Column**: Added to CSV for stop distance distribution analysis
+  - Tracks actual stop percentage used per trade (e.g., -5.2%, -7.0%)
+  - Enables analysis: "What % of trades use ATR vs -7% cap?"
+  - Distribution metrics: median, P25, P75, P90 stop distances
+- ✅ **Universe_Version Tracking**: SHA256 hash of S&P 1500 constituent list
+  - Prevents breadth drift due to constituent changes (IPOs, delistings)
+  - Example: Dec 2025 (993 stocks) → v7.1.1-abc123de, Jan 2026 (1012 stocks) → v7.1.1-xyz789ab
+  - Enables analysis: "Did performance change due to universe shift?"
+- ✅ **Execution Cost Report**: Slippage distribution analysis by regime/spread
+  - Script: reports/execution_cost_report.py
+  - Analyzes median, P90, P99 slippage across: VIX regime, market breadth, entry spread, catalyst tier
+  - Benchmarks: Median <5 bps (good), P90 <20 bps (acceptable)
+- ✅ **Exit Quality Report**: Trailing stop effectiveness analysis
+  - Script: reports/exit_quality_report.py
+  - Analyzes: activation rate, peak returns, giveback distribution, capture rate
+  - Benchmarks: 80%+ capture rate, <3% median giveback, 40%+ activation rate
+- ✅ **Edge Attribution Report**: Expectancy analysis by multiple dimensions
+  - Script: reports/edge_attribution_report.py
+  - Expectancy = (Win% × Avg Win) - (Loss% × Avg Loss)
+  - Analyzes edge by: catalyst tier/type, RS rating, volume quality, conviction, VIX regime, market breadth
+  - Identifies which factors drive highest edge
+- ✅ **ATR Stop Terminology Fix**: Changed "floor" to "cap" with explicit formula
+  - Formula: stop_pct = -min(2.5*ATR/entry_price, 0.07)
+  - Clarifies: -7% is maximum loss cap, system uses tighter of ATR vs cap
+
+**Previous Updates (v7.1 - Validation Improvements - Dec 15)**:
 - ✅ **RULESET_VERSION Tracking**: SHA256 hash of trading rules (prevents policy drift)
   - Hash includes: GO prompt + strategy_rules.md + catalyst_exclusions.json
   - Logged to CSV: Ruleset_Version (e.g., v7.1-31cd61c9)
@@ -835,9 +864,9 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 **Previous Updates (v7.0 - Execution Realism & Deep Research - Dec 15)**:
 - ✅ **v7.0 Execution Improvements**: Addressing third-party analysis feedback on execution realism
-  - **ATR-Based Stops**: 2.5x ATR(14) with -7% maximum loss floor (system uses TIGHTER of the two)
-    - Volatile stocks: ATR may suggest -12%, system caps at -7% floor (limits max loss)
-    - Stable stocks: ATR may suggest -4%, system uses -4% (tighter than floor)
+  - **ATR-Based Stops**: 2.5x ATR(14) with -7% maximum loss cap (system uses TIGHTER of the two)
+    - Volatile stocks: ATR may suggest -12%, system caps at -7% (limits max loss)
+    - Stable stocks: ATR may suggest -4%, system uses -4% (tighter than cap)
     - Adapts to each stock's volatility while preventing excessive losses
   - **Spread/Slippage Checking**: Skip trades if bid-ask spread >0.5%
     - Prevents expensive execution on illiquid catalyst names

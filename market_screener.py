@@ -4,7 +4,7 @@ MARKET SCREENER - S&P 1500 Universe Scanner
 ============================================
 
 Scans the S&P 1500 daily to find stocks with:
-- Relative Strength ≥3% vs sector
+- Relative Strength calculation (used as scoring factor, not filter)
 - Recent catalysts (news, volume, technical)
 - Composite scoring and ranking
 
@@ -23,8 +23,10 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 import time
+from zoneinfo import ZoneInfo
 
 # Configuration
+ET = ZoneInfo('America/New_York')  # Eastern Time for trading operations
 PROJECT_DIR = Path(__file__).parent
 POLYGON_API_KEY = os.environ.get('POLYGON_API_KEY', '')
 FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', '')
@@ -206,7 +208,7 @@ class MarketScreener:
         self.api_key = POLYGON_API_KEY
         self.finnhub_key = FINNHUB_API_KEY
         self.fmp_key = FMP_API_KEY  # PHASE 2.2
-        self.today = datetime.now().strftime('%Y-%m-%d')
+        self.today = datetime.now(ET).strftime('%Y-%m-%d')
         self.scan_results = []
 
         # Cache for Finnhub data (reduce API calls)
@@ -530,7 +532,7 @@ class MarketScreener:
         Returns: Float (percentage, e.g., 15.5 = +15.5%)
         """
         try:
-            end_date = datetime.now()
+            end_date = datetime.now(ET)
             start_date = end_date - timedelta(days=90)
 
             start_str = start_date.strftime('%Y-%m-%d')
@@ -538,6 +540,7 @@ class MarketScreener:
 
             url = f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_str}/{end_str}?apiKey={self.api_key}'
             response = requests.get(url, timeout=15)
+            response.raise_for_status()
             data = response.json()
 
             # Accept both 'OK' and 'DELAYED' status
@@ -713,7 +716,7 @@ class MarketScreener:
         """
         try:
             # Get news from last 7 days
-            end_date = datetime.now()
+            end_date = datetime.now(ET)
             start_date = end_date - timedelta(days=7)
 
             params = {
@@ -726,6 +729,7 @@ class MarketScreener:
             }
 
             response = requests.get('https://api.polygon.io/v2/reference/news', params=params, timeout=10)
+            response.raise_for_status()
             articles = response.json().get('results', [])
 
             if not articles:
@@ -858,7 +862,7 @@ class MarketScreener:
                 try:
                     pub_date = datetime.fromisoformat(published.replace('Z', '+00:00'))
                     days_ago = (datetime.now(pub_date.tzinfo) - pub_date).days
-                except:
+                except Exception:
                     days_ago = 999  # Unknown date = reject
 
                 # NEGATIVE SENTIMENT FILTER
@@ -941,7 +945,7 @@ class MarketScreener:
                 try:
                     pub_date = datetime.fromisoformat(published.replace('Z', '+00:00'))
                     date_str = pub_date.strftime('%b %d')
-                except:
+                except Exception:
                     date_str = 'Recent'
 
                 top_articles.append({
@@ -976,7 +980,7 @@ class MarketScreener:
         Returns: Dict with volume metrics
         """
         try:
-            end_date = datetime.now()
+            end_date = datetime.now(ET)
             start_date = end_date - timedelta(days=30)
 
             start_str = start_date.strftime('%Y-%m-%d')
@@ -1072,8 +1076,8 @@ class MarketScreener:
             # Get earnings calendar for next 30 days
             url = f'https://finnhub.io/api/v1/calendar/earnings'
             params = {
-                'from': datetime.now().strftime('%Y-%m-%d'),
-                'to': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d'),
+                'from': datetime.now(ET).strftime('%Y-%m-%d'),
+                'to': (datetime.now(ET) + timedelta(days=30)).strftime('%Y-%m-%d'),
                 'token': self.finnhub_key
             }
 
@@ -1092,7 +1096,7 @@ class MarketScreener:
                     if ticker and date_str:
                         try:
                             earnings_date = datetime.strptime(date_str, '%Y-%m-%d')
-                            days_until = (earnings_date - datetime.now()).days
+                            days_until = (earnings_date - datetime.now(ET)).days
 
                             earnings_map[ticker] = {
                                 'date': date_str,
@@ -1100,7 +1104,7 @@ class MarketScreener:
                                 'eps_estimate': eps_estimate,
                                 'has_upcoming_earnings': True
                             }
-                        except:
+                        except Exception:
                             pass
 
             # Cache results
@@ -1172,7 +1176,7 @@ class MarketScreener:
                 try:
                     # Parse date
                     earning_date = datetime.strptime(period, '%Y-%m-%d')
-                    days_ago = (datetime.now() - earning_date).days
+                    days_ago = (datetime.now(ET) - earning_date).days
 
                     # Only look at earnings from last 30 days
                     if days_ago > 30 or days_ago < 0:
@@ -1195,7 +1199,7 @@ class MarketScreener:
                         }
                         break  # Take most recent
 
-                except:
+                except Exception:
                     continue
 
             # Build result with recency tiers
@@ -1301,8 +1305,8 @@ class MarketScreener:
             # Check if beat is recent (last 30 days)
             try:
                 actual_dt = datetime.strptime(actual_date, '%Y-%m-%d')
-                days_ago = (datetime.now() - actual_dt).days
-            except:
+                days_ago = (datetime.now(ET) - actual_dt).days
+            except Exception:
                 days_ago = 999  # Unknown date = too old
 
             # Only count as catalyst if recent AND beat
@@ -1357,8 +1361,8 @@ class MarketScreener:
             url = f'https://finnhub.io/api/v1/stock/insider-transactions'
             params = {
                 'symbol': ticker,
-                'from': (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d'),
-                'to': datetime.now().strftime('%Y-%m-%d'),
+                'from': (datetime.now(ET) - timedelta(days=90)).strftime('%Y-%m-%d'),
+                'to': datetime.now(ET).strftime('%Y-%m-%d'),
                 'token': self.finnhub_key
             }
 
@@ -1393,7 +1397,7 @@ class MarketScreener:
 
                 try:
                     filing_dt = datetime.strptime(filing_date, '%Y-%m-%d')
-                    days_ago = (datetime.now() - filing_dt).days
+                    days_ago = (datetime.now(ET) - filing_dt).days
 
                     # Only count buys from last 30 days
                     if days_ago <= 30 and days_ago >= 0:
@@ -1404,7 +1408,7 @@ class MarketScreener:
                             # PHASE 1.6: Calculate dollar value of purchase
                             if share_price > 0:
                                 total_dollar_value += change * share_price
-                except:
+                except Exception:
                     continue
 
             # Clustered buying = 3+ insiders buying in last 30 days
@@ -1803,7 +1807,7 @@ class MarketScreener:
                 if most_recent:
                     try:
                         filing_dt = datetime.strptime(most_recent, '%Y-%m-%d')
-                        days_ago = (datetime.now() - filing_dt).days
+                        days_ago = (datetime.now(ET) - filing_dt).days
 
                         if days_ago <= 2:  # Filed in last 2 days
                             has_recent_8k = True
@@ -1814,7 +1818,7 @@ class MarketScreener:
                                 catalyst_type_8k = 'contract_8k'
                             elif 'item 2.01' in content or 'acquisition' in content or 'merger' in content:
                                 catalyst_type_8k = 'M&A_8k'
-                    except:
+                    except Exception:
                         pass
 
             return {
@@ -1837,13 +1841,12 @@ class MarketScreener:
         """
         Complete analysis of a single stock
 
-        V4 FLOW: Fresh catalyst bypass
-        1. Calculate RS
+        DEEP RESEARCH FLOW (Dec 15, 2025):
+        1. Calculate RS (used as scoring factor 0-5 pts, NOT filter)
         2. Quick pre-check for FRESH M&A/FDA news (0-1 days old)
-        3. If fresh catalyst → Bypass RS filter
-        4. Otherwise → Apply RS ≥3% filter
-        5. Check for other Tier 1 & Tier 2 catalysts
-        6. Full technical analysis if passed
+        3. Check for Tier 1 & Tier 2 catalysts
+        4. Full technical analysis if passed
+        5. Composite scoring (RS contributes to overall score)
 
         Returns: Dict with all metrics, or None if rejected
         """
@@ -1868,7 +1871,7 @@ class MarketScreener:
         # DEEP RESEARCH ALIGNMENT: RS is scoring factor, not filter
         # No RS filtering here - all stocks proceed to catalyst evaluation
 
-        # STEP 2: Check for other Tier 1 & Tier 2 catalysts (now that RS check passed or was bypassed)
+        # STEP 2: Check for Tier 1 & Tier 2 catalysts
         analyst_result = self.get_analyst_ratings(ticker)
         insider_result = self.get_insider_transactions(ticker)
         earnings_surprise_result = self.get_earnings_surprises(ticker)
@@ -2288,8 +2291,9 @@ class MarketScreener:
         print("MARKET SCREENER - S&P 1500 Scan")
         print("=" * 60)
         print(f"Date: {self.today}")
-        print(f"Time: {datetime.now().strftime('%H:%M:%S')} ET")
-        print(f"Filters: RS ≥{MIN_RS_PCT}%, Price ≥${MIN_PRICE}, MCap ≥${MIN_MARKET_CAP:,}\n")
+        print(f"Time: {datetime.now(ET).strftime('%H:%M:%S')} ET")
+        print(f"Filters: Price ≥${MIN_PRICE}, MCap ≥${MIN_MARKET_CAP:,}")
+        print(f"         (RS used for scoring, not filtering)\n")
 
         # Load Finnhub earnings calendar (TIER 1 CATALYST DATA)
         if self.finnhub_key:
@@ -2304,24 +2308,29 @@ class MarketScreener:
         tickers = self.get_sp1500_tickers()
         universe_size = len(tickers)
 
+        # v7.1.1: Save universe for version tracking (breadth stability)
+        universe_file = Path(__file__).parent / 'universe_tickers.json'
+        with open(universe_file, 'w') as f:
+            json.dump({'tickers': sorted(tickers), 'fetched_at': self.today, 'count': len(tickers)}, f, indent=2)
+
         print(f"Scanning {universe_size} stocks...")
         print("(This will take 5-10 minutes due to API rate limits)\n")
 
         # Scan each stock
         candidates = []
-        rs_pass_count = 0
+        candidates_count = 0
 
         for i, ticker in enumerate(tickers, 1):
             if i % 50 == 0:
-                print(f"   Progress: {i}/{universe_size} scanned ({rs_pass_count} passed RS filter)")
+                print(f"   Progress: {i}/{universe_size} scanned ({candidates_count} candidates identified)")
 
             result = self.scan_stock(ticker)
 
             if result:
-                rs_pass_count += 1
+                candidates_count += 1
                 candidates.append(result)
 
-        print(f"\n   Scan complete: {rs_pass_count}/{universe_size} passed RS filter\n")
+        print(f"\n   Scan complete: {candidates_count}/{universe_size} candidates identified\n")
 
         # PHASE 3.1: Calculate IBD-style RS percentile rankings
         print("=" * 60)
@@ -2372,12 +2381,12 @@ class MarketScreener:
         total_stocks = len(top_candidates)
         above_50d_count = sum(1 for c in top_candidates if c.get('technical_setup', {}).get('above_50d_sma', False))
         breadth_pct = (above_50d_count / total_stocks * 100) if total_stocks > 0 else 0
-        breadth_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S ET')
+        breadth_timestamp = datetime.now(ET).strftime('%Y-%m-%d %H:%M:%S ET')
 
         # Build output
         scan_output = {
             'scan_date': self.today,
-            'scan_time': datetime.now().strftime('%H:%M:%S ET'),
+            'scan_time': datetime.now(ET).strftime('%H:%M:%S ET'),
             'breadth_pct': round(breadth_pct, 1),  # v7.0: Pre-calculate breadth at screener time
             'breadth_timestamp': breadth_timestamp,  # v7.0: Timestamp when breadth was calculated
             'breadth_above_50d': above_50d_count,  # v7.0: Count for transparency
