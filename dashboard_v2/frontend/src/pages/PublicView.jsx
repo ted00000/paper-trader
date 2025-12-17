@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Globe, TrendingUp, Award, Target } from 'lucide-react'
 import axios from 'axios'
 import EquityCurveChart from '../components/EquityCurveChart'
@@ -44,7 +44,7 @@ function PublicView() {
       <div className="text-center py-12">
         <div className="flex items-center justify-center gap-3 mb-4">
           <Globe className="text-tedbot-accent" size={48} />
-          <h1 className="text-5xl font-bold gradient-text">TEDBOT</h1>
+          <h1 className="text-5xl font-bold gradient-text">Tedbot</h1>
         </div>
         <p className="text-xl text-tedbot-gray-400 mb-2">Autonomous Trading System</p>
         <p className="text-tedbot-gray-500">
