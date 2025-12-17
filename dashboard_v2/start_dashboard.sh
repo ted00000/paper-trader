@@ -28,10 +28,10 @@ fi
 
 # Check if backend dependencies are installed
 echo "📦 Checking backend dependencies..."
-python3 -c "import flask" 2>/dev/null
+python3 -c "import flask; import numpy" 2>/dev/null
 if [ $? -ne 0 ]; then
-    echo "⚠️  Flask not found. Installing backend dependencies..."
-    pip3 install flask flask-cors
+    echo "⚠️  Backend dependencies missing. Installing..."
+    pip3 install flask flask-cors numpy
 fi
 
 # Check if frontend dependencies are installed
