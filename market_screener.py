@@ -4,7 +4,7 @@ MARKET SCREENER - S&P 1500 Universe Scanner
 ============================================
 
 Scans the S&P 1500 daily to find stocks with:
-- Relative Strength ≥3% vs sector
+- Relative Strength calculation (used as scoring factor, not filter)
 - Recent catalysts (news, volume, technical)
 - Composite scoring and ranking
 
@@ -1837,13 +1837,12 @@ class MarketScreener:
         """
         Complete analysis of a single stock
 
-        V4 FLOW: Fresh catalyst bypass
-        1. Calculate RS
+        DEEP RESEARCH FLOW (Dec 15, 2025):
+        1. Calculate RS (used as scoring factor 0-5 pts, NOT filter)
         2. Quick pre-check for FRESH M&A/FDA news (0-1 days old)
-        3. If fresh catalyst → Bypass RS filter
-        4. Otherwise → Apply RS ≥3% filter
-        5. Check for other Tier 1 & Tier 2 catalysts
-        6. Full technical analysis if passed
+        3. Check for Tier 1 & Tier 2 catalysts
+        4. Full technical analysis if passed
+        5. Composite scoring (RS contributes to overall score)
 
         Returns: Dict with all metrics, or None if rejected
         """
@@ -1868,7 +1867,7 @@ class MarketScreener:
         # DEEP RESEARCH ALIGNMENT: RS is scoring factor, not filter
         # No RS filtering here - all stocks proceed to catalyst evaluation
 
-        # STEP 2: Check for other Tier 1 & Tier 2 catalysts (now that RS check passed or was bypassed)
+        # STEP 2: Check for Tier 1 & Tier 2 catalysts
         analyst_result = self.get_analyst_ratings(ticker)
         insider_result = self.get_insider_transactions(ticker)
         earnings_surprise_result = self.get_earnings_surprises(ticker)
@@ -2314,19 +2313,19 @@ class MarketScreener:
 
         # Scan each stock
         candidates = []
-        rs_pass_count = 0
+        candidates_count = 0
 
         for i, ticker in enumerate(tickers, 1):
             if i % 50 == 0:
-                print(f"   Progress: {i}/{universe_size} scanned ({rs_pass_count} passed RS filter)")
+                print(f"   Progress: {i}/{universe_size} scanned ({candidates_count} candidates identified)")
 
             result = self.scan_stock(ticker)
 
             if result:
-                rs_pass_count += 1
+                candidates_count += 1
                 candidates.append(result)
 
-        print(f"\n   Scan complete: {rs_pass_count}/{universe_size} passed RS filter\n")
+        print(f"\n   Scan complete: {candidates_count}/{universe_size} candidates identified\n")
 
         # PHASE 3.1: Calculate IBD-style RS percentile rankings
         print("=" * 60)
