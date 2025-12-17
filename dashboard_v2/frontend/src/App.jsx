@@ -1,4 +1,3 @@
-import React, { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -14,14 +13,12 @@ import {
 import CommandCenter from './pages/CommandCenter'
 import Analytics from './pages/Analytics'
 import TradeExplorer from './pages/TradeExplorer'
-import Learning from './pages/Learning'
-import Risk from './pages/Risk'
+import LearningEngine from './pages/LearningEngine'
+import RiskCommand from './pages/RiskCommand'
 import LiveFeed from './pages/LiveFeed'
-import Public from './pages/Public'
+import PublicView from './pages/PublicView'
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('Command Center')
-
   const navigation = [
     { name: 'Command Center', href: '/', icon: LayoutDashboard },
     { name: 'Analytics', href: '/analytics', icon: TrendingUp },
@@ -70,7 +67,6 @@ function App() {
                 <NavLink
                   key={item.name}
                   to={item.href}
-                  onClick={() => setCurrentPage(item.name)}
                   className={({ isActive }) =>
                     `flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                       isActive
@@ -93,10 +89,10 @@ function App() {
             <Route path="/" element={<CommandCenter />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/trades" element={<TradeExplorer />} />
-            <Route path="/learning" element={<Learning />} />
-            <Route path="/risk" element={<Risk />} />
+            <Route path="/learning" element={<LearningEngine />} />
+            <Route path="/risk" element={<RiskCommand />} />
             <Route path="/live" element={<LiveFeed />} />
-            <Route path="/public" element={<Public />} />
+            <Route path="/public" element={<PublicView />} />
           </Routes>
         </main>
       </div>
