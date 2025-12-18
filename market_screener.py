@@ -2392,7 +2392,6 @@ class MarketScreener:
             'breadth_above_50d': above_50d_count,  # v7.0: Count for transparency
             'breadth_total': total_stocks,  # v7.0: Total for transparency
             'universe_size': universe_size,
-            'rs_pass_count': rs_pass_count,
             'candidates_found': len(top_candidates),
             'filters_applied': {
                 'min_rs_pct': MIN_RS_PCT,
