@@ -1,0 +1,186 @@
+Scores (1–10) vs best-in-class swing trading quant platform
+1) Prompt.txt — 6.5/10
+Strong, clear intent and decision framework (scorecard, ≥60 threshold, rotation logic, required technical filters, news validation).
+Prompt
+Prompt
+Main weakness: several “core mechanics” in the prompt do not match what the code/docs actually implement (position sizing method, tier gating, RS gating).
+Prompt
+Overview
+2) Overview.txt — 7.5/10
+This reads like a solid system design / ops blueprint: cron workflow, audit trail, regime logic, sector concentration control, learning loop, etc.
+Overview
+Overview
+Main weakness: it sometimes conflicts with Agent.txt history/behavior (RS handling and tier gating), and it describes sizing as conviction-factor based rather than score/100 (which conflicts with Prompt.txt).
+Overview
+Prompt
+3) Agent.txt — 7.0/10
+Implementation shows real “institutional hygiene”: validation pipeline, tier checks, news-score minimum, technical filters must pass, Stage 2 must pass, entry timing logic, sector concentration enforcement, and account/cash tracking.
+Agent
+Agent
+Agent
+Agent
+Main weakness: strategy drift inside the file itself (statements like “RS filter removed” vs other parts indicating RS rejection), and mismatch vs Prompt sizing logic.
+4) Screener.rtf — 7.0/10
+Good: RS is explicitly treated as “scoring factor, not filter,” which matches parts of Overview/Agent.
+Screener
+Good: strong catalyst + liquidity gating (hard filters) appears consistent with Overview’s “hard filters” claims.
+Screener
+Screener
+Main weakness: the screener’s internal scoring/weighting system is not the same object as the Prompt’s 100-point scorecard (it’s a different tier-weighted composite + catalyst score approach), so “scorecard alignment” is currently conceptual, not literal.
+Overall platform alignment score — 7.2/10
+You have many best-practice components (risk gates, technical confirmation, regime gating, logging/audit trail, learning feedback). The main thing preventing an 8–9 is policy drift: the “truth” differs between Prompt vs Overview vs code, especially around (a) sizing, (b) RS role, (c) catalyst tier acceptance rules.
+
+Concrete inconsistencies & discrepancies (what conflicts with what)
+A) Position sizing: “Score/100” (Prompt) vs “conviction buckets” (Overview/Agent)
+Prompt.txt says: base allocation 10% × (Entry Quality Score / 100), yielding ~5–12% typical sizes.
+Prompt
+Overview.txt says: conviction-factor buckets drive sizing (e.g., HIGH 13%, MEDIUM 10%) with breadth multipliers.
+Overview
+Agent.txt also describes those conviction buckets explicitly (HIGH 13%, MEDIUM-HIGH 11%, MEDIUM 10%).
+Agent
+Why it matters: this is a core capital allocation rule. Right now, “what the system intends” (score-proportional sizing) differs from “what it actually does” (bucket sizing).
+
+B) Catalyst tier acceptance: Prompt allows Tier 2; parts of the system gate harder under regimes
+Prompt.txt explicitly allows Tier 2 entries (example entry list includes Tier 2) and states Tier 1 or Tier 2 are acceptable if score ≥60.
+Prompt
+Prompt
+Agent.txt enforces: Tier 3 auto-reject (consistent with prompt), and under certain regimes (example shown: “HIGHEST_CONVICTION_ONLY”) it requires Tier 1 + News≥15.
+Agent
+Overview.txt states: VIX 25–30 becomes “Tier 1 only,” and VIX >30 is shutdown—this is consistent with Agent’s regime gating behavior.
+Overview
+Net: not a contradiction to allow Tier 2 in normal regime, but you should ensure the Prompt explicitly explains “Tier 2 allowed only when not in Tier1-only regimes,” otherwise it reads like Tier 2 is always equally eligible.
+
+C) Relative Strength (RS): contradictory statements about whether RS can reject trades
+You have three different “truths” across the artifacts:
+	1	Screener.rtf: RS “ALWAYS PASS – RS is scoring factor, not filter.” Screener
+	2	Agent.txt (current validation flow): explicitly says RS filter removed in v7.1 (RS used for scoring only). Agent
+	3	Agent.txt (version history / description section): says “Auto-rejects if RS <3% (sector laggards filtered out).” Agent
+Those cannot all be simultaneously true. The code path snippet you provided suggests (1) and (2) are the current reality; the “auto-reject RS<3%” looks like an older behavior that survived in documentation/comments/history.
+
+D) “Entry Quality Scorecard is PRIMARY framework” vs what the code literally computes
+Prompt.txt is very explicit: candidates are evaluated across five components totaling 100 points, and ≥60 is required.
+Prompt
+Prompt
+But Screener.rtf implements a different scoring structure: tier-aware weightings + catalyst_score with multipliers, and RS has its own “legacy composite score.”
+Screener
+Screener
+This is not “bad,” but it means the prompt’s scorecard is not currently a single canonical function used end-to-end. Best-in-class systems typically avoid having multiple competing scoring schemes unless they’re explicitly layered (e.g., “screener score” vs “final entry score”).
+
+E) Cash reserve policy: stated, but I don’t see enforcement logic in the code snippets
+Prompt.txt says maintain 10–30% cash reserve.
+Prompt
+Agent.txt does calculate cash_available, but calculation ≠ enforcement; nothing in what I saw forces a minimum cash reserve before allowing buys.
+Agent
+So right now this appears to be a principle in the prompt, but not an automated constraint (unless it exists elsewhere in Agent.txt outside the snippets we hit).
+
+What’s well-aligned (the good news)
+These are consistent across prompt/docs/code and are “best-in-class-ish”:
+	•	Technical gates are hard requirements (price > SMA50, EMA5>EMA20, ADX, volume), plus Stage 2 alignment and entry timing checks. PromptAgent
+	•	News validation minimum score (≥5) is enforced in code and specified in Prompt. AgentPrompt
+	•	Tier 3 is rejected (prompt says reject; agent enforces Tier3 auto-reject). PromptAgent
+	•	Liquidity hard filter ($50M avg daily dollar volume) is present in screener and described in Overview/Prompt. ScreenerPrompt
+	•	Sector concentration control exists in Agent and is described in Overview. AgentOverview
+
+The single biggest root cause: “strategy truth” is split across artifacts
+Right now, “the strategy” lives in:
+	•	Prompt.txt narrative rules Prompt
+	•	Overview.txt blueprint rules Overview
+	•	Agent.txt embedded prompt template + validation logic Agent
+	•	Screener.rtf scoring logic Screener
+That’s exactly how drift happens.
+If you want, I can propose a clean “single source of truth” structure (one canonical rules.yaml/strategy_rules.md + unit tests + auto-generated Prompt.txt), but the assessment above should already give you the concrete mismatches to fix first:
+	1	Sizing (score-proportional vs bucketed)
+	2	RS role (scoring-only vs rejection)
+	3	Tier policy language (Tier2 always vs regime-dependent Tier1-only)
+If you want me to be extremely surgical, I can also produce a “diff-style” checklist that maps each Prompt rule → where it exists (or doesn’t) in Agent/Screener.
+Sources
+
+yes
+
+Got it — here’s a diff-style mapping checklist: each Prompt rule → where it exists (Agent / Screener / Overview) → status (MATCH / PARTIAL / CONFLICT / MISSING), with the exact “why” and citations.
+
+Prompt-to-Implementation Alignment Checklist (diff-style)
+1) Portfolio construction and cadence
+	•	Prompt: Maintain 8–10 positions, actively optimized. Prompt
+	◦	Overview: Matches (8–10 positions, rotation/refresh workflow implied by cron + “rebalance”). Overview
+	◦	Agent: Not explicitly confirmed in the snippets we saw (portfolio exists; rotation logic present, but “8–10” not clearly enforced). Agent
+	◦	Screener: N/A (screener selects candidates).
+	◦	Status: PARTIAL (documented in Overview; enforcement unclear in Agent snippets).
+
+2) Entry threshold
+	•	Prompt: Entry Quality Score ≥ 60/100 required. Prompt
+	◦	Agent: Strong “validation gate” concept exists; however, the exact “≥60” threshold is not shown as enforced in the code snippets we reviewed. Agent
+	◦	Screener: Uses its own composite/tier-weighted scoring system, not the same literal “100-point scorecard.” Screener
+	◦	Overview: Supports “hard filters + scoring + decisioning,” but doesn’t prove the 60/100 gate is canonical. Overview
+	◦	Status: PARTIAL / POSSIBLE MISSING (prompt is explicit; implementation appears split across different scoring systems).
+
+3) Position sizing method
+	•	Prompt: Base allocation is 10% × (Score/100); typical 5–12% sizes. Prompt
+	◦	Overview: Uses conviction buckets (e.g., HIGH 13%, MEDIUM 10%) + regime multipliers. Overview
+	◦	Agent: Also states conviction bucket sizing (HIGH 13%, MEDIUM-HIGH 11%, MEDIUM 10%). Agent
+	◦	Status: CONFLICT (Prompt sizing ≠ Overview/Agent sizing).
+
+4) Cash reserve policy
+	•	Prompt: Maintain 10–30% cash reserve. Prompt
+	◦	Agent: Calculates cash available, but I do not see an explicit “must keep X% reserve” gate in the parts we reviewed. Agent
+	◦	Overview: Implies risk controls, but doesn’t explicitly show the reserve gate either in the snippets cited. Overview
+	◦	Status: LIKELY MISSING AS ENFORCEMENT (present as principle; unclear as automated constraint).
+
+5) Catalyst tier policy
+	•	Prompt: Tier 1 preferred; Tier 1 or Tier 2 acceptable if score ≥60; Tier 3 rejected. PromptPrompt
+	◦	Agent: Tier 3 auto-reject matches. Agent
+	◦	Agent (regime gating): Under “HIGHEST_CONVICTION_ONLY,” requires Tier 1 + higher news score. Agent
+	◦	Overview: States regime-based tightening: VIX 25–30 becomes Tier 1 only, >30 shutdown. Overview
+	◦	Status: MATCH WITH AN IMPORTANT CLARIFICATION (Prompt should explicitly say Tier 2 is allowed only when regime permits; Agent/Overview implement tightening).
+
+6) News validation
+	•	Prompt: News must be recent (48h-ish) and meet a minimum score; rejects if no real catalyst. Prompt
+	◦	Agent: Enforces NEWS_SCORE ≥ 5. Agent
+	◦	Screener: Catalyst score is central; includes explicit “catalyst_score” logic. Screener
+	◦	Status: MATCH (clean alignment on “news/catalyst is mandatory”).
+
+7) Technical filter requirements (hard gates)
+	•	Prompt: Requires technical confirmations (price>SMA50, EMA5>EMA20, ADX threshold, volume). Prompt
+	◦	Agent: “Must pass technical filters” is enforced in the validation flow. Agent
+	◦	Screener: Includes liquidity/technical context, but it’s more screening than final validation. Screener
+	◦	Status: MATCH (best-aligned part of the system).
+
+8) Liquidity / tradability filters
+	•	Prompt: Requires $50M avg daily dollar volume (or equivalent liquidity gate). Prompt
+	◦	Screener: Explicit: minimum $50M avg dollar volume. Screener
+	◦	Status: MATCH.
+
+9) Relative Strength (RS) role
+	•	Prompt: RS is part of scoring (15 points), implies it contributes to quality. Prompt
+	◦	Screener: Explicit: RS “ALWAYS PASS — scoring factor, not filter.” Screener
+	◦	Agent (current behavior): States RS filter removed (RS used for scoring). Agent
+	◦	Agent (older/history text): Says “auto-reject if RS <3%.” Agent
+	◦	Status: INTERNAL CONFLICT (Screener + Agent “current” align; Agent history text contradicts them).
+
+10) Sector concentration control
+	•	Prompt: Mentions “avoid crowding,” diversify exposure (implied).
+	◦	Overview: Explicit: concentration controls and risk structure. Overview
+	◦	Agent: Enforces max sector concentration (rejects if exceeded). Agent
+	◦	Status: MATCH.
+
+11) Regime logic (VIX / market conditions)
+	•	Prompt: Implies risk controls, but doesn’t fully specify the VIX-tier gates in the excerpt we reviewed.
+	◦	Overview: Very explicit: VIX 25–30 Tier 1 only; VIX >30 stop trading. Overview
+	◦	Agent: Implements regime tightening (HIGHEST_CONVICTION_ONLY) with stricter Tier/News gating. Agent
+	◦	Status: MATCH (but Prompt may be under-specified).
+
+The “Top 3” discrepancies to fix first (most impact)
+	1	Sizing rule conflict
+	◦	Prompt: score-proportional Prompt
+	◦	Agent/Overview: conviction buckets AgentOverview
+	2	RS policy drift inside Agent.txt
+	◦	“RS filter removed” Agent
+	◦	vs “auto-reject RS<3%” Agent
+	3	Scorecard canonicality (single scoring truth)
+	◦	Prompt asserts a single 100-pt system Prompt
+	◦	Screener uses a different composite object Screener
+	◦	Agent enforces gates but doesn’t clearly show “≥60/100” as the universal threshold in what we reviewed Agent
+
+If you want, next I can produce a single “canonical rules spec” (one-page Strategy Truth doc) that resolves these conflicts, written in a way you can:
+	•	turn into a rules.yaml later, and
+	•	auto-generate the Prompt from it so prompt/code can’t drift again.
