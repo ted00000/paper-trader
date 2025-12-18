@@ -659,6 +659,104 @@ class MarketScreener:
         print(f"   RS 80-89 (top 20%): {percentile_80to89} stocks")
         print(f"   RS 70-79 (top 30%): {percentile_70to79} stocks")
 
+    def detect_gap_up(self, ticker):
+        """
+        PHASE 2.5: Detect significant gap-ups with volume confirmation
+
+        Gap-ups signal overnight institutional accumulation or news-driven buying pressure
+
+        Catalyst Criteria:
+        - Today's open >3% above yesterday's close
+        - Today's volume >120% of 20-day average (confirms interest)
+        - Price maintains above yesterday's close (gap not filled)
+
+        Tier Classification: Tier 4 (technical catalyst, 1-3 day duration)
+
+        Scoring:
+        - Gap 3-5%: 8 points
+        - Gap >5%: 12 points
+        - Volume 150%+: +2 bonus points
+        - Volume 200%+: +3 bonus points
+
+        Returns: Dict with gap-up data and catalyst classification
+        """
+        try:
+            end_date = datetime.now(ET)
+            start_date = end_date - timedelta(days=30)  # 30 days for volume calc
+
+            start_str = start_date.strftime('%Y-%m-%d')
+            end_str = end_date.strftime('%Y-%m-%d')
+
+            url = f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_str}/{end_str}?apiKey={self.api_key}'
+            response = requests.get(url, timeout=15)
+            data = response.json()
+
+            if data.get('status') not in ['OK', 'DELAYED'] or 'results' not in data or len(data['results']) < 21:
+                return {'has_gap_up': False, 'score': 0, 'catalyst_type': None}
+
+            results = data['results']
+
+            # Calculate 20-day average volume
+            recent_volumes = [r['v'] for r in results[-20:]]
+            avg_volume_20d = sum(recent_volumes) / len(recent_volumes)
+
+            # Check today's gap
+            if len(results) < 2:
+                return {'has_gap_up': False, 'score': 0, 'catalyst_type': None}
+
+            yesterday = results[-2]
+            today = results[-1]
+
+            yesterday_close = yesterday['c']
+            today_open = today['o']
+            today_close = today['c']
+            today_volume = today['v']
+
+            # Calculate gap percentage
+            gap_pct = ((today_open - yesterday_close) / yesterday_close) * 100
+
+            # Check if gap-up (>3%) and maintained (close still above yesterday's close)
+            if gap_pct < 3.0 or today_close < yesterday_close:
+                return {'has_gap_up': False, 'score': 0, 'catalyst_type': None}
+
+            # Check volume confirmation (>120% of average)
+            volume_ratio = today_volume / avg_volume_20d
+            if volume_ratio < 1.2:
+                return {'has_gap_up': False, 'score': 0, 'catalyst_type': None}
+
+            # Score based on gap magnitude
+            score = 0
+            catalyst_type = None
+
+            if gap_pct >= 5.0:
+                score = 12
+                catalyst_type = 'gap_up_major'  # Tier 4 catalyst
+            elif gap_pct >= 3.0:
+                score = 8
+                catalyst_type = 'gap_up'  # Tier 4 catalyst
+
+            # Bonus for strong volume
+            if volume_ratio >= 2.0:
+                score += 3
+            elif volume_ratio >= 1.5:
+                score += 2
+
+            result = {
+                'has_gap_up': True,
+                'score': score,
+                'catalyst_type': catalyst_type,
+                'gap_pct': round(gap_pct, 2),
+                'volume_ratio': round(volume_ratio, 2),
+                'yesterday_close': round(yesterday_close, 2),
+                'today_open': round(today_open, 2),
+                'today_close': round(today_close, 2)
+            }
+
+            return result
+
+        except Exception as e:
+            return {'has_gap_up': False, 'score': 0, 'catalyst_type': None}
+
     def check_sector_rotation_catalyst(self, ticker, sector):
         """
         PHASE 1.3: Check if stock is in a leading sector (sector rotation catalyst)
@@ -2170,6 +2268,7 @@ class MarketScreener:
         earnings_surprise_result = self.get_earnings_surprises(ticker)
         revenue_surprise_result = self.get_revenue_surprise_fmp(ticker)  # PHASE 2.2
         breakout_52w_result = self.detect_52week_high_breakout(ticker)  # PHASE 1.2: 52-week high breakouts
+        gap_up_result = self.detect_gap_up(ticker)  # PHASE 2.5: Gap-up detection
         sector_rotation_result = self.check_sector_rotation_catalyst(ticker, sector)  # PHASE 1.3: Sector rotation
         options_flow_result = self.get_options_flow(ticker)  # PARKING LOT #1: Options flow
         dark_pool_result = self.get_dark_pool_activity(ticker)  # PARKING LOT #3: Dark pool activity
@@ -2198,7 +2297,8 @@ class MarketScreener:
         )
 
         has_tier4_catalyst = (
-            breakout_52w_result.get('catalyst_type') in ['52week_high_breakout_fresh', '52week_high_breakout_recent']  # PHASE 1.2
+            breakout_52w_result.get('catalyst_type') in ['52week_high_breakout_fresh', '52week_high_breakout_recent'] or  # PHASE 1.2
+            gap_up_result.get('catalyst_type') in ['gap_up_major', 'gap_up']  # PHASE 2.5
         )
 
         # DEEP RESEARCH CATALYST FILTER:
@@ -2255,8 +2355,9 @@ class MarketScreener:
             catalyst_tier = 'Tier 3'
             has_tier3_catalyst = True
 
-        # Tier 4: Technical Catalysts (52-week high breakouts, etc.)  # PHASE 1.2
-        elif breakout_52w_result.get('catalyst_type') in ['52week_high_breakout_fresh', '52week_high_breakout_recent']:
+        # Tier 4: Technical Catalysts (52-week high breakouts, gap-ups, etc.)  # PHASE 1.2, PHASE 2.5
+        elif (breakout_52w_result.get('catalyst_type') in ['52week_high_breakout_fresh', '52week_high_breakout_recent'] or
+              gap_up_result.get('catalyst_type') in ['gap_up_major', 'gap_up']):
             catalyst_tier = 'Tier 4'
             has_tier4_catalyst = True
 
@@ -2409,11 +2510,16 @@ class MarketScreener:
                 technical_result['score'] < 50):
                 catalyst_score -= 10  # Lots of insiders but bad setup = suspicious
 
-        # TIER 4 CATALYSTS (TECHNICAL CATALYSTS)  # PHASE 1.2
+        # TIER 4 CATALYSTS (TECHNICAL CATALYSTS)  # PHASE 1.2, PHASE 2.5
         # 52-week high breakout with volume = 10-13 points (72% win rate in research)
         if breakout_52w_result.get('has_breakout'):
             breakout_score = breakout_52w_result.get('score', 0)
             catalyst_score += breakout_score * catalyst_weight_multiplier
+
+        # Gap-up with volume = 8-15 points (overnight institutional interest)
+        if gap_up_result.get('has_gap_up'):
+            gap_score = gap_up_result.get('score', 0)
+            catalyst_score += gap_score * catalyst_weight_multiplier
 
         # ============================================================================
         # PHASE 2.4: MAGNITUDE-BASED SCORING ADJUSTMENTS
@@ -2605,8 +2711,12 @@ class MarketScreener:
                 buy_count = insider_result.get('buy_count', 0)
                 catalyst_tier_display = f'Tier 3 - Insider Buying ({buy_count}x)'
         elif catalyst_tier == 'Tier 4':
-            # PHASE 1.2: Technical catalysts
-            if breakout_52w_result.get('catalyst_type') in ['52week_high_breakout_fresh', '52week_high_breakout_recent']:
+            # PHASE 1.2, PHASE 2.5: Technical catalysts
+            if gap_up_result.get('catalyst_type') in ['gap_up_major', 'gap_up']:
+                gap_pct = gap_up_result.get('gap_pct', 0)
+                volume_ratio = gap_up_result.get('volume_ratio', 0)
+                catalyst_tier_display = f'Tier 4 - Gap Up (+{gap_pct:.1f}%, {volume_ratio:.1f}x vol)'
+            elif breakout_52w_result.get('catalyst_type') in ['52week_high_breakout_fresh', '52week_high_breakout_recent']:
                 days_ago = breakout_52w_result.get('days_ago', 0)
                 volume_ratio = breakout_52w_result.get('volume_ratio', 0)
                 catalyst_tier_display = f'Tier 4 - 52W High Breakout ({days_ago}d ago, {volume_ratio:.1f}x vol)'
@@ -2629,6 +2739,7 @@ class MarketScreener:
             'earnings_surprises': earnings_surprise_result,
             'earnings_data': earnings_result,
             'breakout_52w': breakout_52w_result,  # PHASE 1.2: 52-week high breakouts
+            'gap_up': gap_up_result,  # PHASE 2.5: Gap-up detection
             'sector_rotation': sector_rotation_result,  # PHASE 1.3: Sector rotation catalyst
             'options_flow': options_flow_result,  # PARKING LOT #1: Options flow data
             'dark_pool': dark_pool_result,  # PARKING LOT #3: Dark pool activity
