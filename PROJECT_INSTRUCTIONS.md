@@ -15,22 +15,49 @@
 ### Core Concept:
 Maintain an **actively optimized portfolio** targeting **8-10 high-quality positions** based on the Entry Quality Scorecard (0-100 points). Prioritize win rate over forced fills - only enter positions scoring ≥60 points. When portfolio is full (10 positions) and exceptional new opportunities (80+ points) emerge, rotate out the weakest performer to continuously optimize the portfolio.
 
-### Position Sizing (Conviction-Based):
-- **Base allocation:** 10% per position
-- **Conviction multiplier:** Entry Quality Score / 100
-- **Examples:**
-  - 60-point setup: 10% × 0.60 = 6% position
-  - 75-point setup: 10% × 0.75 = 7.5% position
-  - 90-point setup: 10% × 0.90 = 9% position
-- **Adjustments:** Volatility (ATR), beta, market regime (VIX)
-- **Result:** Positions range from 5-12% based on setup quality and risk
+### Position Sizing (Cluster-Based Conviction):
+The system uses **conviction levels** derived from cluster-based factor scoring (Phase 4.1):
+
+**Base Conviction Sizing:**
+- **HIGH conviction** (7+ supporting factors): 13% base
+- **MEDIUM-HIGH conviction** (5-6 factors): 11% base
+- **MEDIUM conviction** (3-4 factors): 10% base
+- **SKIP** (<3 factors): Do not enter
+
+**Supporting Factors** (max 11 via clustering):
+- **Momentum Cluster** (cap +3): RS percentile, sector strength, RS vs sector
+- **Institutional Cluster** (cap +2): Options flow, dark pool activity
+- **Catalyst Cluster** (no cap): Tier 1, multi-catalyst, revenue beat, news score >15
+- **Market Conditions Cluster** (cap +2): VIX <20
+
+**Market Breadth Adjustment:**
+- **HEALTHY** (breadth ≥50%): 1.0x multiplier (no adjustment)
+- **DEGRADED** (breadth 40-49%): 0.8x multiplier (reduce 20%)
+- **UNHEALTHY** (breadth <40%): 0.6x multiplier (reduce 40%)
+
+**Final Position Size** = Base Conviction × Market Breadth Adjustment
+
+**Examples:**
+- HIGH (13%) in HEALTHY market: 13% × 1.0 = 13% position
+- HIGH (13%) in DEGRADED market: 13% × 0.8 = 10.4% position
+- MEDIUM (10%) in UNHEALTHY market: 10% × 0.6 = 6% position
+
+**Effective Range:** 6% (MEDIUM in UNHEALTHY) to 13% (HIGH in HEALTHY)
 
 ### Portfolio Targets:
-- **Minimum:** 5 positions (during weak markets or high VIX)
-- **Target:** 8-10 positions (normal market conditions)
-- **Maximum:** 10 positions (hard limit for diversification)
-- **Quality Threshold:** Only accept Entry Quality Scores ≥60 points
-- **Cash Reserve:** Maintain 10-30% cash for best opportunities
+- **Target:** 8-10 positions (goal, not enforced minimum)
+- **Maximum:** 10 positions (**HARD LIMIT enforced** - rotation logic triggers at 10/10)
+- **Actual Range:** 0-10 positions depending on quality setups available
+  - Weak markets or high VIX: May hold 3-5 positions
+  - Normal markets: Typically 6-10 positions
+  - Strong opportunity flow: 10/10 positions (rotation mode active)
+- **Quality Threshold:** Minimum 3 supporting factors required (MEDIUM conviction)
+- **Cash Management:** Natural cash reserve results from quality-over-quantity approach
+  - System does NOT enforce minimum cash reserve
+  - Cash levels fluctuate based on available quality setups (3+ factors)
+  - Typical cash: 0-30% depending on market opportunity set
+
+**Note:** The Entry Quality Scorecard (0-100 points) is a DECISION FRAMEWORK for Claude to evaluate opportunities, not an automated threshold. The system enforces hard gates (technical filters, Stage 2, news score ≥5, Tier validation) and requires minimum 3 supporting factors for entry.
 
 ---
 
@@ -257,8 +284,13 @@ Every candidate is evaluated systematically across five components. This is the 
 ## 📐 RISK MANAGEMENT RULES
 
 ### Entry Requirements:
-- **Entry Quality Score:** ≥60 points (REQUIRED)
-- **Catalyst Tier:** Tier 1 or Tier 2 only
+- **Entry Quality Score:** Minimum 3 supporting factors (REQUIRED for entry)
+- **Catalyst Tier (Regime-Dependent):**
+  - **Normal Markets (VIX <25):** Tier 1 or Tier 2 acceptable
+  - **Elevated Risk (VIX 25-30):** Tier 1 ONLY, no Tier 2
+  - **High Risk (VIX 30-35):** Tier 1 ONLY + News ≥15/20
+  - **Shutdown (VIX ≥35):** NO NEW POSITIONS (existing positions held at stops)
+  - **Always Rejected:** Tier 3 (insider buying only - leading indicator, not immediate catalyst)
 - **Catalyst Age:** <5 days for earnings, <2 days for upgrades
 - **Technical Filters:** ALL must pass:
   1. Price > 50-day SMA (trend filter)

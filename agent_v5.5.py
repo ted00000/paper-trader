@@ -81,12 +81,12 @@ v5.5.0 - PHASE 5: LEARNING ENHANCEMENTS (2025-10-31):
   - **Catalyst Tier Performance**: Tier1 vs Tier2 vs Tier3 results
   - **VIX Regime Performance**: Win rate by VIX buckets (<15, 15-20, 20-25, 25-30, >30)
   - **News Score Effectiveness**: Returns by news score (0-5, 5-10, 10-15, 15-20)
-  - **Relative Strength Impact**: RS ≥3% vs RS <3% comparison
+  - **Relative Strength Impact**: Higher RS (≥3%) vs Lower RS (<3%) performance comparison
   - **Macro Event Impact**: Performance with/without nearby macro events
 - Automated recommendations system:
   - Detects if HIGH conviction underperforming MEDIUM
   - Flags trades entered at VIX >30 (SHUTDOWN violations)
-  - Identifies sector laggards outperforming leaders (RS validation)
+  - Analyzes RS percentile impact on win rates (scoring factor analysis)
   - Warns if weak news scores getting through (filter bypass)
 - Learning data persistence:
   - Saves to learning_data/monthly_analysis_YYYY-MM-DD.json
@@ -112,8 +112,8 @@ v5.4.0 - PHASE 4: CONVICTION SIZING + RELATIVE STRENGTH (2025-10-31):
   - 3+ factors + News≥5 + VIX<30 → MEDIUM conviction
 - GO command Phase 4 integration:
   - Calculates relative strength for each BUY recommendation
-  - Auto-rejects if RS <3% (sector laggards filtered out)
-  - Calculates conviction level based on all factors
+  - RS used for scoring only (0-5 points based on RS percentile, NOT a filter)
+  - Calculates conviction level based on all factors (cluster-based, max 11)
   - Position size determined by conviction (overrides Phase 2 tier sizing)
   - Prints detailed validation: RS%, conviction, supporting factors
 - Enhanced CSV tracking with 5 new columns:
