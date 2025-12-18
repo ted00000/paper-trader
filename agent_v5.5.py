@@ -3700,7 +3700,8 @@ POSITION {i}: {ticker}
 
         output = f"PRE-SCREENED CANDIDATES (Top {len(candidates)} from S&P 1500 scan):\n\n"
         output += f"Scanned: {screener_data['universe_size']} stocks\n"
-        output += f"Passed RS ≥3% filter: {screener_data['rs_pass_count']} stocks\n"
+        output += f"Candidates found: {screener_data['candidates_found']} stocks with catalysts\n"
+        output += f"Market breadth: {screener_data.get('breadth_pct', 'N/A')}% (stocks above 50-day MA)\n"
         output += f"Top candidates: {len(candidates)}\n\n"
 
         output += "TOP CANDIDATES (sorted by composite score):\n"
