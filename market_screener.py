@@ -263,12 +263,26 @@ class MarketScreener:
 
             # Paginate through results (need ~2 calls for 1500+ stocks)
             for page in range(3):  # Max 3 pages = 3000 stocks
-                if next_url == url:
-                    response = requests.get(url, params=params, timeout=30)
-                else:
-                    response = requests.get(next_url, timeout=30)
+                # Retry logic for SSL errors (common with Polygon API)
+                max_retries = 3
+                retry_delay = 2
 
-                data = response.json()
+                for retry in range(max_retries):
+                    try:
+                        if next_url == url:
+                            response = requests.get(url, params=params, timeout=30)
+                        else:
+                            response = requests.get(next_url, timeout=30)
+
+                        data = response.json()
+                        break  # Success, exit retry loop
+                    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as e:
+                        if retry < max_retries - 1:
+                            print(f"   ⚠️ SSL/Connection error on attempt {retry + 1}/{max_retries}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                        else:
+                            raise  # Final retry failed, re-raise exception
 
                 if data.get('status') in ['OK', 'DELAYED'] and 'results' in data:
                     for ticker_data in data['results']:
