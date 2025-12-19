@@ -1331,7 +1331,9 @@ class MarketScreener:
 
     def get_earnings_calendar(self):
         """
-        Fetch upcoming earnings calendar from Finnhub (cached for session)
+        Fetch recent + upcoming earnings from Finnhub calendar (cached for session)
+
+        TIER 1 FOCUS: Past 5 days to catch fresh earnings beats with guidance raises
 
         Returns: Dict mapping ticker -> earnings data
         """
@@ -1343,10 +1345,11 @@ class MarketScreener:
             return self.earnings_calendar_cache
 
         try:
-            # Get earnings calendar for next 30 days
+            # Get earnings from PAST 5 days + NEXT 30 days
+            # This catches fresh earnings beats that are Tier 1 catalysts
             url = f'https://finnhub.io/api/v1/calendar/earnings'
             params = {
-                'from': datetime.now(ET).strftime('%Y-%m-%d'),
+                'from': (datetime.now(ET) - timedelta(days=5)).strftime('%Y-%m-%d'),
                 'to': (datetime.now(ET) + timedelta(days=30)).strftime('%Y-%m-%d'),
                 'token': self.finnhub_key
             }
@@ -1361,30 +1364,131 @@ class MarketScreener:
                 for event in data['earningsCalendar']:
                     ticker = event.get('symbol', '')
                     date_str = event.get('date', '')
+                    eps_actual = event.get('epsActual', None)
                     eps_estimate = event.get('epsEstimate', None)
+                    revenue_actual = event.get('revenueActual', None)
+                    revenue_estimate = event.get('revenueEstimate', None)
 
                     if ticker and date_str:
                         try:
-                            earnings_date = datetime.strptime(date_str, '%Y-%m-%d')
-                            days_until = (earnings_date - datetime.now(ET)).days
+                            earnings_date = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=ET)
+                            now = datetime.now(ET)
+                            days_diff = (earnings_date.date() - now.date()).days
+
+                            # Calculate EPS beat percentage
+                            eps_beat_pct = 0
+                            if eps_actual is not None and eps_estimate is not None and eps_estimate != 0:
+                                eps_beat_pct = ((eps_actual - eps_estimate) / abs(eps_estimate)) * 100
+
+                            # Calculate revenue beat percentage
+                            revenue_beat_pct = 0
+                            if revenue_actual is not None and revenue_estimate is not None and revenue_estimate > 0:
+                                revenue_beat_pct = ((revenue_actual - revenue_estimate) / revenue_estimate) * 100
+
+                            # For reported earnings: set days_ago (0 if today, 1 if yesterday, etc.)
+                            # For upcoming earnings: set days_until
+                            if eps_actual is not None:  # Has reported
+                                days_ago = abs(days_diff)  # 0 if today, 1 if yesterday, etc.
+                                days_until = None
+                            else:  # Not yet reported
+                                days_ago = None
+                                days_until = days_diff if days_diff >= 0 else None
 
                             earnings_map[ticker] = {
                                 'date': date_str,
                                 'days_until': days_until,
+                                'days_ago': days_ago,
+                                'eps_actual': eps_actual,
                                 'eps_estimate': eps_estimate,
-                                'has_upcoming_earnings': True
+                                'eps_beat_pct': round(eps_beat_pct, 1) if eps_beat_pct != 0 else None,
+                                'revenue_actual': revenue_actual,
+                                'revenue_estimate': revenue_estimate,
+                                'revenue_beat_pct': round(revenue_beat_pct, 1) if revenue_beat_pct != 0 else None,
+                                'has_upcoming_earnings': days_diff >= 0 and eps_actual is None,
+                                'has_reported': eps_actual is not None
                             }
                         except Exception:
                             pass
 
             # Cache results
             self.earnings_calendar_cache = earnings_map
+            print(f"   📅 Loaded earnings calendar: {len(earnings_map)} stocks with earnings data")
             return earnings_map
 
         except Exception as e:
             print(f"   ⚠️ Error fetching earnings calendar: {e}")
             self.earnings_calendar_cache = {}
             return {}
+
+    def detect_tier1_earnings_beat(self, ticker):
+        """
+        TIER 1 CATALYST: Detect earnings beats >10% from past 5 days
+
+        TIER 1 CRITERIA:
+        - EPS beat >10% vs estimate
+        - Reported within last 5 days (fresh catalyst)
+        - Optional: Revenue beat >5% (bonus points)
+
+        This is the #1 most reliable Tier 1 catalyst for swing trading.
+
+        Returns: Dict with Tier 1 earnings beat data
+        """
+        # Get earnings calendar (already cached)
+        earnings_calendar = self.get_earnings_calendar()
+
+        if ticker not in earnings_calendar:
+            return {'has_tier1_beat': False, 'score': 0, 'catalyst_type': None}
+
+        earnings = earnings_calendar[ticker]
+
+        # Must have reported (not upcoming)
+        if not earnings.get('has_reported', False):
+            return {'has_tier1_beat': False, 'score': 0, 'catalyst_type': None}
+
+        # Must be from past 5 days (fresh catalyst)
+        days_ago = earnings.get('days_ago', None)
+        if days_ago is None or days_ago > 5:
+            return {'has_tier1_beat': False, 'score': 0, 'catalyst_type': None}
+
+        # Get beat percentages
+        eps_beat_pct = earnings.get('eps_beat_pct', 0) or 0
+        revenue_beat_pct = earnings.get('revenue_beat_pct', 0) or 0
+
+        # TIER 1 THRESHOLD: EPS beat >10%
+        if eps_beat_pct < 10:
+            return {'has_tier1_beat': False, 'score': 0, 'catalyst_type': None}
+
+        # Calculate score (EPS beat is primary driver)
+        # Base score: 60-100 points based on EPS beat magnitude
+        base_score = min(50 + (eps_beat_pct * 3), 100)
+
+        # Bonus: +20 points if revenue also beat >5%
+        if revenue_beat_pct > 5:
+            base_score = min(base_score + 20, 100)
+
+        # Recency boost: fresher = better
+        if days_ago == 0:
+            recency_tier = 'TODAY'
+            recency_boost = 1.2
+        elif days_ago <= 2:
+            recency_tier = 'FRESH'
+            recency_boost = 1.1
+        else:
+            recency_tier = 'RECENT'
+            recency_boost = 1.0
+
+        final_score = min(base_score * recency_boost, 100)
+
+        return {
+            'has_tier1_beat': True,
+            'eps_beat_pct': eps_beat_pct,
+            'revenue_beat_pct': revenue_beat_pct if revenue_beat_pct > 0 else None,
+            'days_ago': days_ago,
+            'earnings_date': earnings.get('date'),
+            'recency_tier': recency_tier,
+            'score': round(final_score, 1),
+            'catalyst_type': 'tier1_earnings_beat'
+        }
 
     def get_analyst_ratings(self, ticker):
         """
@@ -2262,6 +2366,11 @@ class MarketScreener:
         # No RS filtering here - all stocks proceed to catalyst evaluation
 
         # STEP 2: Check for Tier 1 & Tier 2 catalysts
+
+        # TIER 1 CATALYSTS (highest priority)
+        tier1_earnings_result = self.detect_tier1_earnings_beat(ticker)  # NEW: Tier 1 earnings beats >10%
+
+        # TIER 2/3 CATALYSTS
         analyst_result = self.get_analyst_ratings(ticker)
         price_target_result = self.get_price_target_changes(ticker)  # PHASE 1.1: Price target increases
         insider_result = self.get_insider_transactions(ticker)
@@ -2334,8 +2443,9 @@ class MarketScreener:
         has_tier2_catalyst = False
         has_tier3_catalyst = False
 
-        # Tier 1: M&A, FDA, Earnings Beats, Major Contracts
-        if (news_result.get('catalyst_type_news') in ['M&A_news', 'FDA_news'] or
+        # Tier 1: PRIORITY = Earnings Beats >10%, M&A, FDA, Major Contracts
+        if (tier1_earnings_result.get('has_tier1_beat') or  # NEW: Tier 1 earnings >10% beat
+            news_result.get('catalyst_type_news') in ['M&A_news', 'FDA_news'] or
             sec_8k_result.get('catalyst_type_8k') in ['M&A_8k'] or
             earnings_surprise_result.get('catalyst_type') == 'earnings_beat'):
             catalyst_tier = 'Tier 1'
@@ -2626,7 +2736,19 @@ class MarketScreener:
             else:
                 catalyst_reasons.append(f"CONTRACT NEWS: Major win")
 
-        # SEC 8-K filings (HIGHEST PRIORITY - direct from SEC)
+        # TIER 1 EARNINGS BEATS >10% (HIGHEST PRIORITY CATALYST)
+        if tier1_earnings_result.get('has_tier1_beat'):
+            eps_beat = tier1_earnings_result.get('eps_beat_pct', 0)
+            revenue_beat = tier1_earnings_result.get('revenue_beat_pct')
+            days_ago = tier1_earnings_result.get('days_ago', 0)
+            recency = tier1_earnings_result.get('recency_tier', '')
+
+            if revenue_beat and revenue_beat > 5:
+                catalyst_reasons.append(f"TIER 1 EARNINGS: EPS +{eps_beat:.0f}%, Rev +{revenue_beat:.0f}% ({recency}, {days_ago}d ago)")
+            else:
+                catalyst_reasons.append(f"TIER 1 EARNINGS: +{eps_beat:.0f}% EPS beat ({recency}, {days_ago}d ago)")
+
+        # SEC 8-K filings (direct from SEC)
         catalyst_type_8k = sec_8k_result.get('catalyst_type_8k')
         filing_date = sec_8k_result.get('filing_date')
         if catalyst_type_8k == 'M&A_8k':
@@ -2671,7 +2793,17 @@ class MarketScreener:
 
         # Add specific catalyst description
         if catalyst_tier == 'Tier 1':
-            if catalyst_type_8k == 'M&A_8k':
+            # PRIORITY: Tier 1 earnings beats >10%
+            if tier1_earnings_result.get('has_tier1_beat'):
+                eps_beat = tier1_earnings_result.get('eps_beat_pct', 0)
+                revenue_beat = tier1_earnings_result.get('revenue_beat_pct')
+                recency = tier1_earnings_result.get('recency_tier', '')
+
+                if revenue_beat and revenue_beat > 5:
+                    catalyst_tier_display = f'Tier 1 - Earnings Beat (EPS +{eps_beat:.0f}%, Rev +{revenue_beat:.0f}%) - {recency}'
+                else:
+                    catalyst_tier_display = f'Tier 1 - Earnings Beat (+{eps_beat:.0f}%) - {recency}'
+            elif catalyst_type_8k == 'M&A_8k':
                 catalyst_tier_display = 'Tier 1 - SEC 8-K M&A'
             elif catalyst_type_news == 'M&A_news':
                 catalyst_tier_display = 'Tier 1 - M&A News'
@@ -2729,6 +2861,7 @@ class MarketScreener:
             'sector': sector,
             'price': technical_result['current_price'],
             'relative_strength': rs_result,
+            'tier1_earnings': tier1_earnings_result,  # NEW: Tier 1 earnings beats >10%
             'catalyst_signals': news_result,
             'sec_8k_filings': sec_8k_result,  # SEC 8-K filing data
             'volume_analysis': volume_result,
