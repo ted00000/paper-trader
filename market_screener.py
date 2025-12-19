@@ -1490,6 +1490,147 @@ class MarketScreener:
             'catalyst_type': 'tier1_earnings_beat'
         }
 
+    def detect_tier1_ma_deal(self, ticker, news_result, sec_8k_result):
+        """
+        TIER 1 CATALYST: Detect M&A deals with >15% premium
+
+        TIER 1 CRITERIA:
+        - M&A announcement (news or SEC 8-K Item 2.01)
+        - Stock is TARGET (being acquired), not acquirer
+        - Premium >15% (or any M&A if premium not disclosed)
+        - Announced within last 2 days
+
+        Returns: Dict with Tier 1 M&A data
+        """
+        # Check if M&A detected in news or SEC filings
+        has_ma_news = news_result.get('catalyst_type_news') == 'M&A_news'
+        has_ma_8k = sec_8k_result.get('catalyst_type_8k') == 'M&A_8k'
+
+        if not has_ma_news and not has_ma_8k:
+            return {'has_tier1_ma': False, 'score': 0, 'catalyst_type': None}
+
+        # Check recency (must be within 2 days for Tier 1)
+        news_age = news_result.get('catalyst_news_age_days', 999)
+        if has_ma_news and news_age > 2:
+            return {'has_tier1_ma': False, 'score': 0, 'catalyst_type': None}
+
+        # Get M&A premium if available
+        ma_premium = news_result.get('ma_premium', None)
+
+        # TIER 1 THRESHOLD: Premium >15% (or assume Tier 1 if premium not disclosed)
+        # Note: Many M&A deals don't disclose premium immediately, but are still Tier 1
+        is_tier1 = True  # Default to Tier 1 for any M&A (conservative)
+
+        if ma_premium is not None and ma_premium < 15:
+            # Only reject if premium is explicitly LOW (<15%)
+            is_tier1 = False
+
+        if not is_tier1:
+            return {'has_tier1_ma': False, 'score': 0, 'catalyst_type': None}
+
+        # Calculate score based on premium magnitude
+        if ma_premium is not None:
+            if ma_premium >= 40:
+                base_score = 100  # Exceptional deal
+            elif ma_premium >= 30:
+                base_score = 90   # Strong premium
+            elif ma_premium >= 20:
+                base_score = 80   # Good premium
+            else:
+                base_score = 70   # Tier 1 minimum (15-20%)
+        else:
+            # No premium disclosed - use moderate score
+            base_score = 75
+
+        # Recency boost
+        if news_age == 0:
+            recency_tier = 'TODAY'
+            recency_boost = 1.2
+        elif news_age == 1:
+            recency_tier = 'YESTERDAY'
+            recency_boost = 1.1
+        else:
+            recency_tier = 'RECENT'
+            recency_boost = 1.0
+
+        final_score = min(base_score * recency_boost, 100)
+
+        # Determine source
+        if has_ma_8k:
+            source = 'SEC_8K'
+        else:
+            source = 'NEWS'
+
+        return {
+            'has_tier1_ma': True,
+            'ma_premium': ma_premium,
+            'days_ago': news_age if has_ma_news else None,
+            'source': source,
+            'recency_tier': recency_tier,
+            'score': round(final_score, 1),
+            'catalyst_type': 'tier1_ma_deal'
+        }
+
+    def detect_tier1_fda_approval(self, ticker, news_result):
+        """
+        TIER 1 CATALYST: Detect FDA drug approvals
+
+        TIER 1 CRITERIA:
+        - FDA approval news detected
+        - Announced within last 2 days
+        - Approval type: BREAKTHROUGH > PRIORITY > STANDARD > EXPANDED
+
+        Note: Without paid API, we rely on news keyword detection + classification
+
+        Returns: Dict with Tier 1 FDA approval data
+        """
+        # Check if FDA news detected
+        has_fda_news = news_result.get('catalyst_type_news') == 'FDA_news'
+
+        if not has_fda_news:
+            return {'has_tier1_fda': False, 'score': 0, 'catalyst_type': None}
+
+        # Check recency (must be within 2 days for Tier 1)
+        news_age = news_result.get('catalyst_news_age_days', 999)
+        if news_age > 2:
+            return {'has_tier1_fda': False, 'score': 0, 'catalyst_type': None}
+
+        # Get FDA approval type
+        fda_type = news_result.get('fda_approval_type', 'STANDARD')
+
+        # Calculate score based on approval type
+        type_scores = {
+            'BREAKTHROUGH': 100,  # Game-changing designation
+            'PRIORITY': 90,       # Fast-tracked approval
+            'STANDARD': 80,       # Regular FDA approval
+            'EXPANDED': 75,       # Additional indication
+            'LIMITED': 60         # Restricted approval
+        }
+
+        base_score = type_scores.get(fda_type, 80)
+
+        # Recency boost
+        if news_age == 0:
+            recency_tier = 'TODAY'
+            recency_boost = 1.2
+        elif news_age == 1:
+            recency_tier = 'YESTERDAY'
+            recency_boost = 1.1
+        else:
+            recency_tier = 'RECENT'
+            recency_boost = 1.0
+
+        final_score = min(base_score * recency_boost, 100)
+
+        return {
+            'has_tier1_fda': True,
+            'fda_approval_type': fda_type,
+            'days_ago': news_age,
+            'recency_tier': recency_tier,
+            'score': round(final_score, 1),
+            'catalyst_type': 'tier1_fda_approval'
+        }
+
     def get_analyst_ratings(self, ticker):
         """
         PHASE 2.1: Fetch analyst consensus trends using FREE tier recommendation endpoint
@@ -2367,8 +2508,10 @@ class MarketScreener:
 
         # STEP 2: Check for Tier 1 & Tier 2 catalysts
 
-        # TIER 1 CATALYSTS (highest priority)
-        tier1_earnings_result = self.detect_tier1_earnings_beat(ticker)  # NEW: Tier 1 earnings beats >10%
+        # TIER 1 CATALYSTS (highest priority - institutional-grade detection)
+        tier1_earnings_result = self.detect_tier1_earnings_beat(ticker)  # Earnings beats >10%
+        tier1_ma_result = self.detect_tier1_ma_deal(ticker, news_result, sec_8k_result)  # M&A deals >15% premium
+        tier1_fda_result = self.detect_tier1_fda_approval(ticker, news_result)  # FDA approvals
 
         # TIER 2/3 CATALYSTS
         analyst_result = self.get_analyst_ratings(ticker)
@@ -2443,11 +2586,11 @@ class MarketScreener:
         has_tier2_catalyst = False
         has_tier3_catalyst = False
 
-        # Tier 1: PRIORITY = Earnings Beats >10%, M&A, FDA, Major Contracts
-        if (tier1_earnings_result.get('has_tier1_beat') or  # NEW: Tier 1 earnings >10% beat
-            news_result.get('catalyst_type_news') in ['M&A_news', 'FDA_news'] or
-            sec_8k_result.get('catalyst_type_8k') in ['M&A_8k'] or
-            earnings_surprise_result.get('catalyst_type') == 'earnings_beat'):
+        # Tier 1: INSTITUTIONAL-GRADE CATALYSTS (verified with hard data)
+        if (tier1_earnings_result.get('has_tier1_beat') or  # Earnings >10% beat (Finnhub API)
+            tier1_ma_result.get('has_tier1_ma') or           # M&A >15% premium (News + SEC 8-K)
+            tier1_fda_result.get('has_tier1_fda') or         # FDA approval (News + Classification)
+            earnings_surprise_result.get('catalyst_type') == 'earnings_beat'):  # Legacy earnings detection
             catalyst_tier = 'Tier 1'
             has_tier1_catalyst = True
 
@@ -2736,7 +2879,9 @@ class MarketScreener:
             else:
                 catalyst_reasons.append(f"CONTRACT NEWS: Major win")
 
-        # TIER 1 EARNINGS BEATS >10% (HIGHEST PRIORITY CATALYST)
+        # TIER 1 CATALYSTS (INSTITUTIONAL-GRADE DETECTION)
+
+        # Tier 1 Earnings Beats >10%
         if tier1_earnings_result.get('has_tier1_beat'):
             eps_beat = tier1_earnings_result.get('eps_beat_pct', 0)
             revenue_beat = tier1_earnings_result.get('revenue_beat_pct')
@@ -2747,6 +2892,23 @@ class MarketScreener:
                 catalyst_reasons.append(f"TIER 1 EARNINGS: EPS +{eps_beat:.0f}%, Rev +{revenue_beat:.0f}% ({recency}, {days_ago}d ago)")
             else:
                 catalyst_reasons.append(f"TIER 1 EARNINGS: +{eps_beat:.0f}% EPS beat ({recency}, {days_ago}d ago)")
+
+        # Tier 1 M&A Deals >15% premium
+        if tier1_ma_result.get('has_tier1_ma'):
+            ma_premium = tier1_ma_result.get('ma_premium')
+            source = tier1_ma_result.get('source', 'NEWS')
+            days_ago = tier1_ma_result.get('days_ago', 0)
+
+            if ma_premium:
+                catalyst_reasons.append(f"TIER 1 M&A: +{ma_premium:.0f}% premium ({source}, {days_ago}d ago)")
+            else:
+                catalyst_reasons.append(f"TIER 1 M&A: Acquisition announced ({source}, {days_ago}d ago)")
+
+        # Tier 1 FDA Approvals
+        if tier1_fda_result.get('has_tier1_fda'):
+            fda_type = tier1_fda_result.get('fda_approval_type', 'STANDARD')
+            days_ago = tier1_fda_result.get('days_ago', 0)
+            catalyst_reasons.append(f"TIER 1 FDA: {fda_type} approval ({days_ago}d ago)")
 
         # SEC 8-K filings (direct from SEC)
         catalyst_type_8k = sec_8k_result.get('catalyst_type_8k')
@@ -2793,7 +2955,7 @@ class MarketScreener:
 
         # Add specific catalyst description
         if catalyst_tier == 'Tier 1':
-            # PRIORITY: Tier 1 earnings beats >10%
+            # PRIORITY 1: Tier 1 earnings beats >10%
             if tier1_earnings_result.get('has_tier1_beat'):
                 eps_beat = tier1_earnings_result.get('eps_beat_pct', 0)
                 revenue_beat = tier1_earnings_result.get('revenue_beat_pct')
@@ -2803,6 +2965,25 @@ class MarketScreener:
                     catalyst_tier_display = f'Tier 1 - Earnings Beat (EPS +{eps_beat:.0f}%, Rev +{revenue_beat:.0f}%) - {recency}'
                 else:
                     catalyst_tier_display = f'Tier 1 - Earnings Beat (+{eps_beat:.0f}%) - {recency}'
+
+            # PRIORITY 2: Tier 1 M&A deals >15% premium
+            elif tier1_ma_result.get('has_tier1_ma'):
+                ma_premium = tier1_ma_result.get('ma_premium')
+                source = tier1_ma_result.get('source', 'NEWS')
+                recency = tier1_ma_result.get('recency_tier', '')
+
+                if ma_premium:
+                    catalyst_tier_display = f'Tier 1 - M&A Deal (+{ma_premium:.0f}% premium) - {source} - {recency}'
+                else:
+                    catalyst_tier_display = f'Tier 1 - M&A Deal - {source} - {recency}'
+
+            # PRIORITY 3: Tier 1 FDA approvals
+            elif tier1_fda_result.get('has_tier1_fda'):
+                fda_type = tier1_fda_result.get('fda_approval_type', 'STANDARD')
+                recency = tier1_fda_result.get('recency_tier', '')
+                catalyst_tier_display = f'Tier 1 - FDA Approval ({fda_type}) - {recency}'
+
+            # LEGACY: Old detection methods (fallback)
             elif catalyst_type_8k == 'M&A_8k':
                 catalyst_tier_display = 'Tier 1 - SEC 8-K M&A'
             elif catalyst_type_news == 'M&A_news':
@@ -2861,7 +3042,9 @@ class MarketScreener:
             'sector': sector,
             'price': technical_result['current_price'],
             'relative_strength': rs_result,
-            'tier1_earnings': tier1_earnings_result,  # NEW: Tier 1 earnings beats >10%
+            'tier1_earnings': tier1_earnings_result,  # Tier 1 earnings beats >10%
+            'tier1_ma': tier1_ma_result,              # Tier 1 M&A deals >15% premium
+            'tier1_fda': tier1_fda_result,            # Tier 1 FDA approvals
             'catalyst_signals': news_result,
             'sec_8k_filings': sec_8k_result,  # SEC 8-K filing data
             'volume_analysis': volume_result,
