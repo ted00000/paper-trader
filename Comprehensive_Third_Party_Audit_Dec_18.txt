@@ -1,0 +1,167 @@
+Overall Grade vs Best-in-Class Swing Trading Quant Platform
+8.2 / 10
+That score assumes comparison against top-tier discretionary-quant swing systems, not HFT or stat-arb funds.
+You are well above “retail quant”, clearly below institutional multi-PM pods — but closer to the latter than the former.
+
+Where You Are Truly Best-in-Class
+1. Strategy–Code–Prompt Alignment (Very Strong)
+This is the single biggest improvement after reviewing the Agent file.
+What’s excellent:
+	•	The Agent enforces rules independently of the LLM
+	•	Claude is used for judgment and synthesis, not authority
+	•	Hard constraints live in Python (filters, exits, concentration, timing)
+	•	Soft reasoning lives in the prompt (thesis, catalyst logic, rotation)
+This is exactly how professional discretionary-quant hybrids are built.
+Grade: 9.2 / 10
+
+2. Risk Governance & Drift Prevention (Elite)
+Very few independent systems do this correctly.
+You have:
+	•	SYSTEM_VERSION
+	•	RULESET_VERSION (hash of prompts + rules + exclusions)
+	•	UNIVERSE_VERSION (hash of tradable universe)
+	•	Per-trade logging of all three
+This allows post-hoc attribution:
+“Did performance change because the strategy changed, or because the market did?”
+That is institutional-grade hygiene.
+Grade: 9.5 / 10
+
+3. Swing-Appropriate Time Semantics (Excellent)
+You correctly handle:
+	•	15-minute delayed data reality
+	•	GO (8:45) → EXECUTE (9:45) → ANALYZE (4:30–4:50)
+	•	Premarket gap classification (exhaustion vs continuation)
+	•	Minimum hold enforcement
+	•	No daily churn
+This avoids the #1 failure mode of swing bots: implicit intraday trading by accident.
+Grade: 9.0 / 10
+
+4. Catalyst + Technical Fusion (Very Strong)
+Your layering is sound:
+	1	Universe → Screener
+	2	Catalyst validation (news + age + tier)
+	3	Market regime (VIX + macro blackout)
+	4	Technical filters (hard gates)
+	5	Conviction scoring (soft sizing)
+	6	Portfolio constraints (sector / industry)
+	7	Entry timing refinement
+This is how human swing traders actually think, translated correctly into code.
+Grade: 8.8 / 10
+
+Key Inconsistencies & Contradictions (Important)
+These are not fatal, but they do cap your ceiling.
+
+⚠️ 1. Tier-1-Only Language vs Actual Logic
+The contradiction
+Your GO prompt and ruleset repeatedly state:
+“Tier 1 ONLY — non-negotiable”
+However, the Agent still contains full logic paths for Tier 2 and Tier 3:
+	•	get_dynamic_profit_target() supports Tier 2 / 3
+	•	detect_post_earnings_drift() allows long-duration holds
+	•	Conviction logic historically referenced Tier 2 inclusion
+	•	CSV schema tracks Tier 2/3 fields
+Why this matters
+This creates cognitive dissonance:
+	•	The system claims exclusivity
+	•	The code supports flexibility
+This is not a bug — but it weakens experimental clarity.
+Recommendation
+Pick one:
+	•	Hard Mode: Truly Tier-1 only → remove Tier 2/3 pathways
+	•	Research Mode: Rephrase prompt to:“Tier 1 preferred; Tier 2 permitted only under explicit conditions”
+Right now you’re straddling both.
+
+⚠️ 2. ATR Stops Exist — But Are Not Primary
+You implemented:
+	•	calculate_atr()
+	•	ATR-aware commentary
+	•	Stop-percentage tracking
+Yet:
+	•	Core exits still default to fixed −7%
+	•	ATR is not consistently binding stop placement
+Why this matters
+Best-in-class swing systems:
+	•	Normalize risk by volatility
+	•	Avoid systematically stopping out high-ATR leaders
+Recommendation
+Promote ATR to:
+	•	Primary stop selector OR
+	•	Tier-based modifier (e.g., Tier-1 = wider ATR multiple)
+
+⚠️ 3. Stage-2 Logic Exists but Isn’t Enforced
+You implemented a proper Minervini Stage-2 check:
+	•	150/200 MA alignment
+	•	Trend slope
+	•	52-week high proximity
+But:
+	•	It is not a mandatory gate
+	•	Technical filters can pass while Stage-2 fails
+Recommendation
+Decide:
+	•	Either Stage-2 is informational → label it so
+	•	Or enforce it as a Tier-1 prerequisite
+Right now it sits in an ambiguous middle ground.
+
+⚠️ 4. Learning System Is Diagnostic, Not Adaptive (Yet)
+Your learn phase:
+	•	Analyzes outcomes
+	•	Produces recommendations
+	•	Flags inconsistencies
+But:
+	•	It does not auto-adjust thresholds
+	•	It does not re-weight scores
+	•	It does not gate future trades
+This is fine — but it means learning is human-in-the-loop, not closed-loop.
+Best-in-class would at least:
+	•	Auto-tighten filters when regimes degrade
+	•	Disable underperforming catalyst types temporarily
+
+Where You Are NOT Best-in-Class (Yet)
+These are stretch goals, not criticisms:
+Area
+Why
+Portfolio optimization
+No correlation-aware sizing or beta targeting
+Factor attribution
+No formal decomposition of returns
+Regime switching
+VIX only, no breadth / trend regime
+Capital efficiency
+Single-bucket sizing, no Kelly-like logic
+True automation
+Human still approves conceptual shifts
+
+Final Score Breakdown
+Dimension
+Score
+Strategy design
+9.0
+Code robustness
+8.8
+Prompt alignment
+8.5
+Risk governance
+9.5
+Execution realism
+9.0
+Learning & adaptation
+7.5
+Institutional readiness
+7.8
+Overall: 8.2 / 10
+
+Bottom Line (Plain English)
+This is not a toy.It is a serious discretionary-quant swing platform with:
+	•	Excellent guardrails
+	•	Thoughtful timing realism
+	•	Proper separation of judgment vs enforcement
+	•	Rarely seen governance discipline
+Your biggest opportunity now is decisiveness:
+	•	Decide which rules are absolute
+	•	Decide which intelligence is advisory
+	•	Decide how much autonomy learning should have
+If you want, next steps could be:
+	•	A “v8 institutional hardening roadmap”
+	•	A comparison vs a known hedge-fund swing framework
+	•	Or a simulation audit checklist before going live with capital
+Just say the word.
