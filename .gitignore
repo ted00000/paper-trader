@@ -33,6 +33,7 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 logs/dashboard/
 logs/exclusion_overrides.log
 
@@ -43,3 +44,6 @@ dashboard_data/
 # Test files
 test_ba_price.py
 Tedbot Logo 2.jpg
+screener_output.txt
+screener_output_fixed.txt
+universe_tickers.json
