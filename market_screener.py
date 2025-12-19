@@ -262,25 +262,32 @@ class MarketScreener:
             next_url = url
 
             # Paginate through results (need ~2 calls for 1500+ stocks)
+            # Use session with keep-alive to prevent SSL EOF errors
+            session = requests.Session()
+            session.headers.update({'Connection': 'keep-alive'})
+
             for page in range(3):  # Max 3 pages = 3000 stocks
-                # Retry logic for SSL errors (common with Polygon API)
+                # Retry logic for intermittent SSL/connection errors
                 max_retries = 3
-                retry_delay = 2
+                retry_delay = 1
 
                 for retry in range(max_retries):
                     try:
                         if next_url == url:
-                            response = requests.get(url, params=params, timeout=30)
+                            response = session.get(url, params=params, timeout=30)
                         else:
-                            response = requests.get(next_url, timeout=30)
+                            response = session.get(next_url, timeout=30)
 
                         data = response.json()
                         break  # Success, exit retry loop
-                    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as e:
+                    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
                         if retry < max_retries - 1:
-                            print(f"   ⚠️ SSL/Connection error on attempt {retry + 1}/{max_retries}, retrying in {retry_delay}s...")
+                            print(f"   ⚠️ Connection error (attempt {retry + 1}/{max_retries}), retrying in {retry_delay}s...")
                             time.sleep(retry_delay)
-                            retry_delay *= 2  # Exponential backoff
+                            retry_delay *= 2  # Exponential backoff: 1s, 2s, 4s
+                            # Recreate session on retry
+                            session = requests.Session()
+                            session.headers.update({'Connection': 'keep-alive'})
                         else:
                             raise  # Final retry failed, re-raise exception
 
