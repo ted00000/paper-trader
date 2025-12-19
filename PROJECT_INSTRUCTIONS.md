@@ -1,4 +1,4 @@
-# PAPER TRADING LAB - PROJECT INSTRUCTIONS v2.0 (Deep Research Aligned)
+# PAPER TRADING LAB - PROJECT INSTRUCTIONS v2.1 (Phase 1 + Gap-Ups Complete)
 
 ## 🎯 PROJECT OVERVIEW
 
@@ -7,6 +7,36 @@
 **Start Date:** October 27, 2025
 **Starting Capital:** $1,000 (paper money)
 **Methodology:** Entry Quality Scorecard (100-point systematic evaluation)
+
+---
+
+## 🎭 STRATEGY PHILOSOPHY (IMPORTANT)
+
+**This is a MULTI-TIER, REGIME-AWARE system, NOT a "Tier 1 only" system.**
+
+### Tier Acceptance Policy:
+**The system accepts Tier 1, 2, 3, and 4 catalysts** - but with **regime-dependent restrictions**:
+
+- **Normal Markets (VIX <25):** All tiers acceptable (Tier 1, 2, 3, 4)
+  - **Preference hierarchy:** Tier 1 > Tier 2 > Tier 4 > Tier 3
+  - Tier 3/4 require stronger technical confirmation (RS ≥70 percentile, volume >150%)
+
+- **Elevated Risk (VIX 25-30):** **Tier 1 or Tier 2 ONLY** (no Tier 3/4 technical catalysts)
+  - System tightens to fundamental catalysts only
+
+- **High Risk (VIX 30-35):** **Tier 1 ONLY** + News score ≥15/20 required
+  - System restricts to highest-conviction fundamental catalysts
+
+- **Shutdown (VIX ≥35):** **NO NEW POSITIONS** (existing positions held at stops)
+
+### Why Multi-Tier Design:
+**Code supports all tiers** because market conditions change dynamically:
+- VIX regime determines acceptable catalyst tiers
+- Profit targets are catalyst-specific (Tier 1 = +15%, Tier 2 = +12%, Tier 3 = +10%, Tier 4 = +8%)
+- Post-earnings drift detection supports extended holds (Tier 1 earnings catalysts)
+- Learning system tracks performance by catalyst tier for continuous improvement
+
+**This is intentional flexibility, not design drift.** The system adapts catalyst acceptance based on risk regime.
 
 ---
 
