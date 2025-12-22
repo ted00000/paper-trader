@@ -3195,13 +3195,24 @@ class MarketScreener:
         """
         output_file = PROJECT_DIR / 'screener_candidates.json'
 
-        with open(output_file, 'w') as f:
-            json.dump(scan_output, f, indent=2)
+        try:
+            with open(output_file, 'w') as f:
+                json.dump(scan_output, f, indent=2)
 
-        print(f"✓ Saved {scan_output['candidates_found']} candidates to screener_candidates.json")
+            # Verify file was actually written
+            if output_file.exists():
+                file_size = output_file.stat().st_size
+                print(f"✓ Saved {scan_output['candidates_found']} candidates to screener_candidates.json ({file_size:,} bytes)")
+            else:
+                print(f"✗ ERROR: File not found after write: {output_file}")
+        except Exception as e:
+            print(f"✗ ERROR saving candidates file: {e}")
+            import traceback
+            traceback.print_exc()
 
-        # Count Tier 1 catalysts
-        tier1_count = sum(1 for c in scan_output['candidates'] if c.get('catalyst_tier'))
+        # Count Tier 1 catalysts (FIXED: was counting ALL tiers, now only Tier 1)
+        tier1_count = sum(1 for c in scan_output['candidates']
+                         if c.get('catalyst_tier', '').startswith('Tier 1'))
 
         # Print top 10 summary
         print("\n" + "=" * 80)
