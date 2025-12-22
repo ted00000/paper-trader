@@ -1,5 +1,47 @@
+/*
+  HIDDEN FOR MVP: Live Feed Page - Operations Status Moved to Command Center
+
+  NOTE: This page is hidden from navigation but preserved for future development.
+
+  The System Operations Status section (SCREENER, GO, EXECUTE, ANALYZE monitoring)
+  has been extracted into a reusable component (OperationsStatus.jsx) and moved to
+  the top of the Command Center page for better visibility and accessibility.
+
+  FUTURE ENHANCEMENT: Real-Time Activity Stream
+
+  This page was originally intended to provide a live feed of system events and
+  decision-making processes. Future implementation would include:
+
+  1. WebSocket Integration:
+     - Real-time event streaming from trading system
+     - Instant position updates and P&L changes
+     - Live market scan progress and discoveries
+     - Trade execution notifications with reasoning
+     - Stop loss adjustments and risk management events
+     - Learning loop completions and insights
+
+  2. Activity Stream Features:
+     - Chronological event timeline
+     - Filterable by event type (scans, trades, learning, risk)
+     - Expandable event details
+     - Historical playback capability
+
+  3. Implementation Requirements:
+     - WebSocket server endpoint in Flask backend
+     - Socket.io or native WebSocket connection in React
+     - Event emission from screener, go, execute, analyze, learn processes
+     - Persistent event storage for historical viewing
+     - Reconnection logic and error handling
+
+  To re-enable this page:
+  1. Uncomment navigation entry in App.jsx
+  2. Implement WebSocket infrastructure
+  3. Remove placeholder activity items below
+  4. Connect to real event stream
+*/
+
 import { useState, useEffect } from 'react'
-import { Activity, Radio, Zap, CheckCircle2, XCircle, AlertCircle, Eye, RefreshCw } from 'lucide-react'
+import { Activity, Zap, CheckCircle2, XCircle, AlertCircle, Eye, RefreshCw } from 'lucide-react'
 import axios from 'axios'
 
 function LiveFeed() {
@@ -94,12 +136,22 @@ function LiveFeed() {
     }
   }
 
+  // Define operation order
+  const operationOrder = ['SCREENER', 'GO', 'EXECUTE', 'ANALYZE']
+
+  // Sort operations by defined order
+  const sortedOperations = operationsData ?
+    operationOrder
+      .filter(op => operationsData.operations[op])
+      .map(op => [op, operationsData.operations[op]])
+    : []
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">System Operations</h1>
-          <p className="text-tedbot-gray-500">Real-time monitoring of all trading system processes</p>
+          <h1 className="text-3xl font-bold mb-2">Live Trading Feed</h1>
+          <p className="text-tedbot-gray-500">Real-time system activity and decision stream</p>
         </div>
         <div className="flex items-center gap-4">
           {operationsData && (
@@ -132,116 +184,164 @@ function LiveFeed() {
         </div>
       </div>
 
-      {/* Operations Grid */}
-      {loading && !operationsData ? (
-        <div className="glass rounded-lg p-8 text-center">
-          <div className="animate-pulse">
-            <Activity className="mx-auto mb-4 text-tedbot-accent" size={48} />
-            <p className="text-tedbot-gray-500">Loading operations status...</p>
+      {/* Operations Status Grid */}
+      <div className="glass rounded-lg p-6">
+        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <Activity size={20} />
+          System Operations Status
+        </h3>
+
+        {loading && !operationsData ? (
+          <div className="text-center py-8">
+            <div className="animate-pulse">
+              <Activity className="mx-auto mb-4 text-tedbot-accent" size={48} />
+              <p className="text-tedbot-gray-500">Loading operations status...</p>
+            </div>
+          </div>
+        ) : operationsData ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {sortedOperations.map(([name, op]) => (
+              <div
+                key={name}
+                onClick={() => viewLog(name)}
+                className={`bg-tedbot-darker rounded-lg p-4 border-l-4 ${getHealthColor(op.health)} transition-all cursor-pointer hover:shadow-lg hover:border-tedbot-accent`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    {getHealthIcon(op.health)}
+                    <div>
+                      <h4 className="font-bold text-sm">{name}</h4>
+                      <p className="text-xs text-tedbot-gray-500">{op.status}</p>
+                    </div>
+                  </div>
+                  <Eye size={16} className="text-tedbot-gray-500" />
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-tedbot-gray-500">Last Run:</span>
+                    <span className="font-semibold">{formatTimestamp(op.last_run)}</span>
+                  </div>
+
+                  {op.stats && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-tedbot-gray-500">Candidates:</span>
+                        <span className="font-semibold text-profit">{op.stats.candidates_found}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {op.error && (
+                    <div className="mt-2 p-2 bg-loss bg-opacity-10 border border-loss rounded text-xs text-loss">
+                      {op.error}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <XCircle className="mx-auto mb-4 text-loss" size={48} />
+            <p className="text-tedbot-gray-500">Failed to load operations status</p>
+          </div>
+        )}
+      </div>
+
+      {/* Activity Feed Preview */}
+      <div className="glass rounded-lg p-6">
+        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <Activity size={20} />
+          Recent Activity Stream
+        </h3>
+        <div className="space-y-3">
+          {/* Sample Activity Items */}
+          <div className="flex items-start gap-3 p-3 bg-tedbot-darker rounded-lg border-l-4 border-profit">
+            <Zap className="text-profit mt-1" size={18} />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Position Opened</p>
+              <p className="text-xs text-tedbot-gray-500">AAPL - Entry at $182.45 - Earnings Catalyst (Tier 1)</p>
+              <p className="text-xs text-tedbot-gray-600 mt-1">2 minutes ago</p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-3 bg-tedbot-darker rounded-lg border-l-4 border-tedbot-accent">
+            <Activity className="text-tedbot-accent mt-1" size={18} />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Market Scan Complete</p>
+              <p className="text-xs text-tedbot-gray-500">12 candidates identified from S&P 1500 universe</p>
+              <p className="text-xs text-tedbot-gray-600 mt-1">15 minutes ago</p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-3 bg-tedbot-darker rounded-lg border-l-4 border-yellow-500">
+            <Zap className="text-yellow-500 mt-1" size={18} />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Stop Loss Adjusted</p>
+              <p className="text-xs text-tedbot-gray-500">NVDA - Trailing stop moved to $875.20 (+8.2%)</p>
+              <p className="text-xs text-tedbot-gray-600 mt-1">32 minutes ago</p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-3 bg-tedbot-darker rounded-lg border-l-4 border-loss">
+            <Zap className="text-loss mt-1" size={18} />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Position Closed</p>
+              <p className="text-xs text-tedbot-gray-500">TSLA - Exit at $248.90 (+5.7%) - 3 day hold</p>
+              <p className="text-xs text-tedbot-gray-600 mt-1">1 hour ago</p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-3 bg-tedbot-darker rounded-lg border-l-4 border-tedbot-accent">
+            <Activity className="text-tedbot-accent mt-1" size={18} />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Daily Learning Loop</p>
+              <p className="text-xs text-tedbot-gray-500">Pattern analysis complete - 7 trades processed</p>
+              <p className="text-xs text-tedbot-gray-600 mt-1">2 hours ago</p>
+            </div>
           </div>
         </div>
-      ) : operationsData ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Object.entries(operationsData.operations).map(([name, op]) => (
-            <div
-              key={name}
-              className={`glass rounded-lg p-6 border-l-4 ${getHealthColor(op.health)} hover:shadow-lg transition-all`}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  {getHealthIcon(op.health)}
-                  <div>
-                    <h3 className="font-bold text-lg">{name}</h3>
-                    <p className="text-xs text-tedbot-gray-500">{op.status}</p>
-                  </div>
-                </div>
-              </div>
+      </div>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-tedbot-gray-500">Last Run:</span>
-                  <span className="font-semibold">{formatTimestamp(op.last_run)}</span>
-                </div>
+      {/*
+        FUTURE ENHANCEMENT: Real-Time WebSocket Feed
 
-                {op.stats && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-tedbot-gray-500">Candidates:</span>
-                      <span className="font-semibold text-profit">{op.stats.candidates_found}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-tedbot-gray-500">Scan Date:</span>
-                      <span className="font-semibold">{op.stats.scan_date}</span>
-                    </div>
-                  </>
-                )}
+        NOTE: This section is commented out but preserved for future development.
 
-                {op.error && (
-                  <div className="mt-3 p-2 bg-loss bg-opacity-10 border border-loss rounded text-xs text-loss">
-                    {op.error}
-                  </div>
-                )}
+        WebSocket implementation would provide instant real-time updates instead of
+        30-second polling, enabling:
+        - Instant position updates and P&L changes
+        - Real-time market scan progress
+        - Live trade execution notifications with reasoning
+        - Immediate stop loss adjustments and risk events
+        - Learning loop completion alerts
+        - Continuous system health metrics
 
-                {op.summary && !op.error && (
-                  <div className="mt-3 text-xs text-tedbot-gray-600">
-                    {op.summary}
-                  </div>
-                )}
-              </div>
+        Implementation would require:
+        1. WebSocket server endpoint in Flask backend
+        2. Socket.io or native WebSocket connection in React
+        3. Event streaming architecture from trading system
+        4. Reconnection logic and error handling
 
-              {['GO', 'EXECUTE', 'ANALYZE'].includes(name) && op.status !== 'NEVER_RUN' && (
-                <button
-                  onClick={() => viewLog(name)}
-                  className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-tedbot-darker border border-tedbot-accent rounded-lg hover:bg-tedbot-accent hover:text-black transition-all"
-                >
-                  <Eye size={16} />
-                  <span className="text-sm font-semibold">View Output</span>
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="glass rounded-lg p-8 text-center">
-          <XCircle className="mx-auto mb-4 text-loss" size={48} />
-          <p className="text-tedbot-gray-500">Failed to load operations status</p>
-        </div>
-      )}
+        Uncomment the code below to restore the "Coming Soon" UI section:
 
-      {/* WebSocket Future Enhancement */}
       <div className="glass rounded-lg p-8 text-center">
         <Radio className="mx-auto mb-4 text-tedbot-accent" size={64} />
         <h3 className="text-2xl font-bold mb-2">Real-Time WebSocket Feed</h3>
         <p className="text-tedbot-gray-500 mb-6">
-          Live streaming of all system events and decision-making (Coming Soon)
+          Live streaming of all system events and decision-making
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-tedbot-gray-600 max-w-2xl mx-auto">
-          <div className="flex items-center gap-2">
-            <Zap size={16} className="text-tedbot-accent" />
-            <span>Real-time position updates and P&L changes</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Activity size={16} className="text-tedbot-accent" />
-            <span>Market scan progress and candidate discoveries</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Zap size={16} className="text-tedbot-accent" />
-            <span>Trade execution notifications with reasoning</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Activity size={16} className="text-tedbot-accent" />
-            <span>Stop loss adjustments and risk management events</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Zap size={16} className="text-tedbot-accent" />
-            <span>Learning loop completions and insights</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Activity size={16} className="text-tedbot-accent" />
-            <span>System health and performance metrics</span>
-          </div>
+        <div className="space-y-2 text-sm text-tedbot-gray-600">
+          <p>• Real-time position updates and P&L changes</p>
+          <p>• Market scan progress and candidate discoveries</p>
+          <p>• Trade execution notifications with reasoning</p>
+          <p>• Stop loss adjustments and risk management events</p>
+          <p>• Learning loop completions and insights</p>
+          <p>• System health and performance metrics</p>
         </div>
       </div>
+      */}
 
       {/* Log Modal */}
       {selectedLog && (

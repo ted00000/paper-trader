@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   Target,
   Award,
@@ -11,11 +9,13 @@ import {
 import axios from 'axios'
 
 // Components
+import OperationsStatus from '../components/OperationsStatus'
 import MetricCard from '../components/MetricCard'
 import EquityCurveChart from '../components/EquityCurveChart'
 import RecentTradesTable from '../components/RecentTradesTable'
 import ActivePositionsGrid from '../components/ActivePositionsGrid'
 import MarketRegimeIndicator from '../components/MarketRegimeIndicator'
+import PerformanceDonutChart from '../components/PerformanceDonutChart'
 
 function CommandCenter() {
   const [overview, setOverview] = useState(null)
@@ -81,6 +81,9 @@ function CommandCenter() {
         </button>
       </div>
 
+      {/* System Operations Status - Top Row */}
+      <OperationsStatus />
+
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
@@ -141,16 +144,30 @@ function CommandCenter() {
         </div>
       </div>
 
-      {/* Equity Curve */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="glass rounded-lg p-6"
-      >
-        <h3 className="text-xl font-bold mb-4">Equity Curve</h3>
-        <EquityCurveChart />
-      </motion.div>
+      {/* Performance Overview Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Performance Donut Chart */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass rounded-lg p-6"
+        >
+          <h3 className="text-xl font-bold mb-4">Performance</h3>
+          <PerformanceDonutChart performance={performance} />
+        </motion.div>
+
+        {/* Equity Curve */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass rounded-lg p-6"
+        >
+          <h3 className="text-xl font-bold mb-4">Equity Curve</h3>
+          <EquityCurveChart />
+        </motion.div>
+      </div>
 
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -184,6 +201,21 @@ function CommandCenter() {
         transition={{ delay: 0.3 }}
       >
         <MarketRegimeIndicator />
+      </motion.div>
+
+      {/* Disclaimer */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="glass rounded-lg p-6 border-l-4 border-yellow-500"
+      >
+        <p className="text-sm text-tedbot-gray-500">
+          <strong className="text-yellow-500">Disclaimer:</strong> This is an autonomous trading system
+          in validation phase. Past performance does not guarantee future results. All trading involves
+          risk of loss. This dashboard is for informational purposes only and does not constitute
+          investment advice.
+        </p>
       </motion.div>
     </div>
   )

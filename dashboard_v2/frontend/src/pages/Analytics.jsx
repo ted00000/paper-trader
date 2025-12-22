@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, BarChart3, Calendar, RefreshCw } from 'lucide-react'
+import { TrendingUp, BarChart3, Calendar, RefreshCw, Award, Target } from 'lucide-react'
 import axios from 'axios'
 import CatalystPerformanceChart from '../components/CatalystPerformanceChart'
 import MonthlyReturnsHeatmap from '../components/MonthlyReturnsHeatmap'
+import ConvictionDistribution from '../components/ConvictionDistribution'
+import CatalystBreakdown from '../components/CatalystBreakdown'
 
 function Analytics() {
   const [catalystData, setCatalystData] = useState(null)
   const [monthlyData, setMonthlyData] = useState(null)
+  const [convictionData, setConvictionData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(null)
 
@@ -19,6 +22,7 @@ function Analytics() {
       ])
 
       setCatalystData(catalystRes.data.by_catalyst || [])
+      setConvictionData(catalystRes.data.by_conviction || [])
       setMonthlyData(monthlyRes.data.monthly_returns || {})
       setLastUpdate(new Date())
     } catch (error) {
@@ -66,6 +70,31 @@ function Analytics() {
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             Refresh
           </button>
+        </div>
+      </div>
+
+      {/* Conviction Distribution & Catalyst Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <Award className="text-tedbot-accent" size={24} />
+            <div>
+              <h2 className="text-xl font-bold">Conviction Distribution</h2>
+              <p className="text-sm text-tedbot-gray-500">Trade counts by conviction level</p>
+            </div>
+          </div>
+          <ConvictionDistribution convictionData={convictionData} />
+        </div>
+
+        <div className="glass rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <Target className="text-tedbot-accent" size={24} />
+            <div>
+              <h2 className="text-xl font-bold">Catalyst Breakdown</h2>
+              <p className="text-sm text-tedbot-gray-500">Trade counts by catalyst type</p>
+            </div>
+          </div>
+          <CatalystBreakdown catalystData={catalystData} />
         </div>
       </div>
 

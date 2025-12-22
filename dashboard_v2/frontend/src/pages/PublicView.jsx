@@ -1,3 +1,52 @@
+/*
+  HIDDEN FOR MVP: Public View - Not Needed for Password-Protected Dashboard
+
+  NOTE: This page is hidden from navigation but preserved for future consideration.
+
+  CONTEXT:
+  The entire dashboard v2 will be password-protected for MVP launch. This makes a
+  separate "public view" unnecessary since all data requires authentication.
+
+  ORIGINAL PURPOSE:
+  This page was designed to show high-level performance metrics and strategy overview
+  to external viewers (investors, friends/family, potential users) without requiring
+  authentication or exposing sensitive operational details.
+
+  FUTURE CONSIDERATIONS:
+
+  1. **Investor/Stakeholder Sharing**:
+     - If you want to share performance with select people without giving dashboard access
+     - Could be useful during fundraising or partnership discussions
+     - Provides professional-looking public face for Tedbot
+
+  2. **Marketing/Portfolio Showcase**:
+     - Public demonstration of system performance
+     - Could be linked from tedbot.ai landing page
+     - Builds credibility and transparency
+
+  3. **Alternative Approaches**:
+     - Screenshot/PDF export of Command Center metrics
+     - Automated weekly performance email reports
+     - Public-facing landing page with static stats (updated manually)
+     - Video screen recordings of dashboard for sharing
+
+  4. **Security Considerations if Re-Enabled**:
+     - Remove or sanitize any sensitive operational data
+     - Consider rate limiting to prevent scraping
+     - May need different API endpoints with restricted data
+     - Add caching to reduce server load from public traffic
+
+  DECISION POINT:
+  Before re-enabling, ask: "Do I need to share performance publicly, or is private
+  dashboard access sufficient for all stakeholders?"
+
+  To re-enable this page:
+  1. Uncomment navigation entry in App.jsx
+  2. Review what data should be public vs private
+  3. Consider adding public-specific API endpoints with data filtering
+  4. Test caching and performance under public load
+*/
+
 import { useState, useEffect } from 'react'
 import { TrendingUp, Award, Target } from 'lucide-react'
 import axios from 'axios'
