@@ -423,6 +423,272 @@ def get_monthly_returns():
         'monthly_returns': result
     })
 
+@app.route('/api/v2/learning/insights', methods=['GET'])
+def get_learning_insights():
+    """Learning system insights (placeholder)"""
+    return jsonify({
+        'daily_loops': 0,
+        'weekly_loops': 0,
+        'monthly_loops': 0,
+        'total_patterns': 0,
+        'recent_insights': []
+    })
+
+@app.route('/api/v2/operations/status', methods=['GET'])
+def get_operations_status():
+    """
+    Get status of all system operations (SCREENER, GO, EXECUTE, ANALYZE, LEARN_*)
+
+    Returns:
+        - Operation name
+        - Last run timestamp
+        - Status (SUCCESS/FAILED/NEVER_RUN)
+        - Stats (for screener: candidates, breadth, etc.)
+    """
+    operations = {}
+
+    # Check daily_reviews for GO/EXECUTE/ANALYZE operations
+    daily_reviews_dir = PROJECT_DIR / 'daily_reviews'
+    if daily_reviews_dir.exists():
+        today = datetime.now().strftime('%Y%m%d')
+
+        for operation in ['go', 'execute', 'analyze']:
+            pattern = f"{operation}_{today}_*.json"
+            files = sorted(daily_reviews_dir.glob(pattern), reverse=True)
+
+            if files:
+                latest_file = files[0]
+                # Extract timestamp from filename (e.g., go_20251218_153944.json)
+                filename = latest_file.name
+                parts = filename.replace('.json', '').split('_')
+                if len(parts) >= 3:
+                    timestamp_str = parts[2]
+                    # Format: HHMMSS -> HH:MM:SS
+                    timestamp = f"{parts[1][:4]}-{parts[1][4:6]}-{parts[1][6:8]} {timestamp_str[:2]}:{timestamp_str[2:4]}:{timestamp_str[4:]}"
+
+                    try:
+                        with open(latest_file) as f:
+                            data = json.load(f)
+
+                        operations[operation.upper()] = {
+                            'status': 'SUCCESS',
+                            'last_run': timestamp,
+                            'health': 'HEALTHY',
+                            'log_file': str(latest_file),
+                            'summary': f"Latest {operation} command completed"
+                        }
+                    except Exception as e:
+                        operations[operation.upper()] = {
+                            'status': 'FAILED',
+                            'last_run': timestamp,
+                            'health': 'FAILED',
+                            'error': str(e)
+                        }
+            else:
+                operations[operation.upper()] = {
+                    'status': 'NEVER_RUN',
+                    'last_run': None,
+                    'health': 'UNKNOWN'
+                }
+
+    # Check screener_candidates.json for SCREENER operation
+    if SCREENER_JSON.exists():
+        try:
+            with open(SCREENER_JSON) as f:
+                screener_data = json.load(f)
+
+            # Get file modification time
+            import os
+            mod_time = datetime.fromtimestamp(os.path.getmtime(SCREENER_JSON))
+
+            operations['SCREENER'] = {
+                'status': 'SUCCESS',
+                'last_run': mod_time.isoformat(),
+                'health': 'HEALTHY',
+                'stats': {
+                    'candidates_found': len(screener_data.get('candidates', [])),
+                    'scan_date': screener_data.get('scan_date', 'Unknown')
+                }
+            }
+        except Exception as e:
+            operations['SCREENER'] = {
+                'status': 'FAILED',
+                'last_run': None,
+                'health': 'FAILED',
+                'error': str(e)
+            }
+    else:
+        operations['SCREENER'] = {
+            'status': 'NEVER_RUN',
+            'last_run': None,
+            'health': 'UNKNOWN'
+        }
+
+    # Determine overall health
+    overall_health = 'HEALTHY'
+    for op_status in operations.values():
+        if op_status.get('health') == 'FAILED':
+            overall_health = 'UNHEALTHY'
+            break
+        elif op_status.get('health') == 'UNKNOWN':
+            if overall_health == 'HEALTHY':
+                overall_health = 'WARNING'
+
+    return jsonify({
+        'operations': operations,
+        'health': overall_health,
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/v2/operations/logs/<operation>', methods=['GET'])
+def get_operation_log(operation):
+    """
+    Get log/output for a specific operation
+
+    Returns the most recent daily_reviews JSON content for GO/EXECUTE/ANALYZE
+    Returns screener_candidates.json for SCREENER
+    Matches old dashboard behavior: shows today's log or falls back to most recent
+    """
+    valid_operations = ['go', 'execute', 'analyze', 'screener']
+    operation = operation.lower()
+
+    if operation not in valid_operations:
+        return jsonify({'error': 'Invalid operation'}), 400
+
+    # Handle SCREENER operation - show screener_candidates.json
+    if operation == 'screener':
+        screener_file = PROJECT_DIR / 'screener_candidates.json'
+        if not screener_file.exists():
+            return jsonify({
+                'error': 'No screener output found',
+                'operation': 'SCREENER',
+                'content': 'Screener has not been run yet.'
+            }), 404
+
+        try:
+            with open(screener_file) as f:
+                data = json.load(f)
+
+            # Format the screener output nicely
+            output_lines = []
+            output_lines.append(f"Scan Date: {data.get('scan_date', 'Unknown')}")
+            output_lines.append(f"Scan Time: {data.get('scan_time', 'Unknown')}")
+            output_lines.append(f"Universe Size: {data.get('universe_size', 0):,}")
+            output_lines.append(f"Candidates Found: {data.get('candidates_found', 0)}")
+            output_lines.append("")
+            output_lines.append("=" * 80)
+            output_lines.append("")
+
+            candidates = data.get('candidates', [])
+            if candidates:
+                output_lines.append(f"CANDIDATES ({len(candidates)}):")
+                output_lines.append("")
+                for i, candidate in enumerate(candidates, 1):
+                    output_lines.append(f"{i}. {candidate.get('ticker', 'N/A')} - Score: {candidate.get('composite_score', 0):.2f}")
+                    output_lines.append(f"   Sector: {candidate.get('sector', 'Unknown')}")
+                    output_lines.append(f"   Price: ${candidate.get('price', 0):.2f}")
+
+                    # Catalyst info
+                    catalyst = candidate.get('catalyst_signals', {})
+                    if catalyst.get('count', 0) > 0:
+                        output_lines.append(f"   Catalysts: {catalyst.get('count')} - {', '.join(catalyst.get('keywords', []))}")
+
+                    output_lines.append("")
+            else:
+                output_lines.append("No candidates found matching criteria.")
+
+            # Add full JSON at the end for reference
+            output_lines.append("")
+            output_lines.append("=" * 80)
+            output_lines.append("FULL JSON OUTPUT:")
+            output_lines.append("=" * 80)
+            output_lines.append(json.dumps(data, indent=2))
+
+            content = "\n".join(output_lines)
+
+            # Get file modification time
+            import os
+            mod_time = datetime.fromtimestamp(os.path.getmtime(screener_file))
+
+            return jsonify({
+                'operation': 'SCREENER',
+                'log_file': str(screener_file),
+                'timestamp': mod_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'is_today': mod_time.date() == datetime.now().date(),
+                'content': content
+            })
+
+        except Exception as e:
+            return jsonify({
+                'error': f'Error reading screener output: {str(e)}',
+                'operation': 'SCREENER'
+            }), 500
+
+    # Handle GO/EXECUTE/ANALYZE operations
+    daily_reviews_dir = PROJECT_DIR / 'daily_reviews'
+    if not daily_reviews_dir.exists():
+        return jsonify({'error': 'No daily reviews directory found'}), 404
+
+    # First try today's logs
+    today = datetime.now().strftime('%Y%m%d')
+    pattern_today = f"{operation}_{today}_*.json"
+    files_today = sorted(daily_reviews_dir.glob(pattern_today), reverse=True)
+
+    # If no logs today, find the most recent log from any date
+    if not files_today:
+        pattern_all = f"{operation}_*.json"
+        files_all = sorted(daily_reviews_dir.glob(pattern_all), reverse=True)
+
+        if not files_all:
+            return jsonify({
+                'error': 'No logs found',
+                'operation': operation,
+                'content': f'No {operation.upper()} command has ever been run.'
+            }), 404
+
+        latest_file = files_all[0]
+        is_today = False
+    else:
+        latest_file = files_today[0]
+        is_today = True
+
+    try:
+        with open(latest_file) as f:
+            data = json.load(f)
+
+        # Extract text content from Claude response
+        content = data.get('content', [{}])[0].get('text', '')
+
+        # Extract date and timestamp from filename (e.g., go_20251218_153944.json)
+        filename = latest_file.name
+        parts = filename.replace('.json', '').split('_')
+        date_str = parts[1]  # 20251218
+        time_str = parts[2]  # 153944
+
+        # Format date: 2025-12-18
+        formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
+        # Format time: 15:39:44
+        formatted_time = f"{time_str[:2]}:{time_str[2:4]}:{time_str[4:]}"
+
+        # Add note if not from today
+        if not is_today:
+            note = f"(No logs found for today - showing most recent run from {formatted_date})\n\n"
+            content = note + content
+
+        return jsonify({
+            'operation': operation.upper(),
+            'log_file': str(latest_file),
+            'timestamp': f"{formatted_date} {formatted_time}",
+            'is_today': is_today,
+            'content': content
+        })
+
+    except Exception as e:
+        return jsonify({
+            'error': f'Error reading log: {str(e)}',
+            'operation': operation
+        }), 500
+
 @app.route('/api/v2/health', methods=['GET'])
 def health_check():
     """API health check"""

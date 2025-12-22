@@ -2,11 +2,11 @@ import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-do
 import {
   LayoutDashboard,
   TrendingUp,
-  Search,
-  Brain,
+  // Search, // Hidden for MVP - Trade Explorer not ready
+  // Brain, // Hidden for MVP - Learning Engine not ready
   Shield,
-  Activity,
-  Globe
+  // Activity, // Hidden for MVP - Live Feed moved to Command Center
+  // Globe // Hidden for MVP - Public View not needed (password-protected dashboard)
 } from 'lucide-react'
 
 // Pages
@@ -22,11 +22,44 @@ function App() {
   const navigation = [
     { name: 'Command Center', href: '/', icon: LayoutDashboard },
     { name: 'Analytics', href: '/analytics', icon: TrendingUp },
-    { name: 'Trade Explorer', href: '/trades', icon: Search },
-    { name: 'Learning Engine', href: '/learning', icon: Brain },
+
+    // HIDDEN FOR MVP: Trade Explorer - Not ready for public launch
+    // { name: 'Trade Explorer', href: '/trades', icon: Search },
+    // TODO: Re-enable when trade explorer is functional:
+    //   - Connect to /api/v2/trades endpoint
+    //   - Build interactive sortable table
+    //   - Implement search and filter functionality
+    //   - Add detailed trade card view
+    //   - Enable CSV export
+    //   Note: Command Center already shows recent trades (sufficient for MVP)
+
+    // HIDDEN FOR MVP: Learning Engine - Not ready for public launch
+    // { name: 'Learning Engine', href: '/learning', icon: Brain },
+    // TODO: Re-enable when learning system data is available:
+    //   - Connect to real learning metrics API
+    //   - Remove hardcoded placeholder values
+    //   - Build actual visualization charts
+    //   - Implement daily/weekly/monthly learning loops display
+
     { name: 'Risk Command', href: '/risk', icon: Shield },
-    { name: 'Live Feed', href: '/live', icon: Activity },
-    { name: 'Public View', href: '/public', icon: Globe },
+
+    // HIDDEN FOR MVP: Live Feed - Operations monitoring moved to Command Center
+    // { name: 'Live Feed', href: '/live', icon: Activity },
+    // TODO: Re-enable when real-time activity stream is implemented:
+    //   - Build WebSocket server endpoint for live event streaming
+    //   - Implement real-time activity event tracking from trading system
+    //   - Connect to position updates, scan progress, execution events
+    //   - Add reconnection logic and error handling
+    //   Note: System Operations Status now displayed at top of Command Center
+
+    // HIDDEN FOR MVP: Public View - Not needed since entire dashboard will be password protected
+    // { name: 'Public View', href: '/public', icon: Globe },
+    // TODO: Re-enable if public sharing becomes a requirement:
+    //   - Consider use case: sharing performance with investors/friends/family
+    //   - May need different data permissions (hide sensitive operations data)
+    //   - Could be useful for marketing/portfolio showcase
+    //   - Alternative: Screenshot/PDF export of key metrics instead
+    //   Note: Current plan is single password-protected dashboard for MVP
   ]
 
   return (

@@ -1,4 +1,4 @@
-# PAPER TRADING LAB - PROJECT INSTRUCTIONS v2.0 (Deep Research Aligned)
+# PAPER TRADING LAB - PROJECT INSTRUCTIONS v2.1 (Phase 1 + Gap-Ups Complete)
 
 ## 🎯 PROJECT OVERVIEW
 
@@ -7,6 +7,36 @@
 **Start Date:** October 27, 2025
 **Starting Capital:** $1,000 (paper money)
 **Methodology:** Entry Quality Scorecard (100-point systematic evaluation)
+
+---
+
+## 🎭 STRATEGY PHILOSOPHY (IMPORTANT)
+
+**This is a MULTI-TIER, REGIME-AWARE system, NOT a "Tier 1 only" system.**
+
+### Tier Acceptance Policy:
+**The system accepts Tier 1, 2, 3, and 4 catalysts** - but with **regime-dependent restrictions**:
+
+- **Normal Markets (VIX <25):** All tiers acceptable (Tier 1, 2, 3, 4)
+  - **Preference hierarchy:** Tier 1 > Tier 2 > Tier 4 > Tier 3
+  - Tier 3/4 require stronger technical confirmation (RS ≥70 percentile, volume >150%)
+
+- **Elevated Risk (VIX 25-30):** **Tier 1 or Tier 2 ONLY** (no Tier 3/4 technical catalysts)
+  - System tightens to fundamental catalysts only
+
+- **High Risk (VIX 30-35):** **Tier 1 ONLY** + News score ≥15/20 required
+  - System restricts to highest-conviction fundamental catalysts
+
+- **Shutdown (VIX ≥35):** **NO NEW POSITIONS** (existing positions held at stops)
+
+### Why Multi-Tier Design:
+**Code supports all tiers** because market conditions change dynamically:
+- VIX regime determines acceptable catalyst tiers
+- Profit targets are catalyst-specific (Tier 1 = +15%, Tier 2 = +12%, Tier 3 = +10%, Tier 4 = +8%)
+- Post-earnings drift detection supports extended holds (Tier 1 earnings catalysts)
+- Learning system tracks performance by catalyst tier for continuous improvement
+
+**This is intentional flexibility, not design drift.** The system adapts catalyst acceptance based on risk regime.
 
 ---
 
@@ -268,16 +298,29 @@ Every candidate is evaluated systematically across five components. This is the 
 **Evaluate, accept if scorecard ≥60:**
 - Analyst upgrades from major firms (Goldman, Morgan Stanley, JPM)
 - Analyst upgrade trends (multiple upgrades)
+- **Price target raises >20% (NEW - PHASE 1.1):** Analyst price targets raised significantly above current price
 - SEC 8-K contract filings (Item 1.01)
 - Contract news from reliable sources
 - Strong earnings beats without guidance (>15%)
 
-### Tier 3 Catalysts (Low Probability)
-**Reject - These are LEADING indicators, not immediate catalysts:**
-- Insider buying only (no other catalyst)
-- Product launches without revenue impact
-- Conference presentations
-- General sector momentum
+### Tier 3 Catalysts (Leading Indicators)
+**Accept with strong RS/technical confirmation (3+ supporting factors required):**
+- **Sector rotation (NEW - PHASE 1.3):** Stock in sector outperforming SPY by >5% (3-month basis)
+- Insider buying clusters (3+ transactions within 30 days)
+- Product launches without immediate revenue impact
+- Conference presentations with strong momentum
+
+**Reject - Insufficient catalyst:**
+- Insider buying only (single transaction, no other catalyst)
+- General sector momentum without strong outperformance
+
+### Tier 4 Catalysts (Technical Catalysts)
+**NEW - Accept with strong volume + RS confirmation:**
+- **52-week high breakouts (PHASE 1.2):** Fresh breakout (last 5 days) with volume >150% average, price maintained within 3% of high
+- **Gap-ups (PHASE 2.5):** Opening gap >3% above previous close with volume >120% average, gap maintained through close
+- Consolidation breakouts with volume (4+ weeks tight range, volume spike on breakout)
+
+**Note on Tier 4:** Technical catalysts require stronger RS and momentum confirmation than fundamental catalysts. System weights volume and RS heavily (35-40% weight) for Tier 4 positions.
 
 ---
 
@@ -286,11 +329,12 @@ Every candidate is evaluated systematically across five components. This is the 
 ### Entry Requirements:
 - **Entry Quality Score:** Minimum 3 supporting factors (REQUIRED for entry)
 - **Catalyst Tier (Regime-Dependent):**
-  - **Normal Markets (VIX <25):** Tier 1 or Tier 2 acceptable
-  - **Elevated Risk (VIX 25-30):** Tier 1 ONLY, no Tier 2
+  - **Normal Markets (VIX <25):** Tier 1, Tier 2, Tier 3, or Tier 4 acceptable (with 3+ supporting factors)
+  - **Elevated Risk (VIX 25-30):** Tier 1 or Tier 2 ONLY (no Tier 3/4)
   - **High Risk (VIX 30-35):** Tier 1 ONLY + News ≥15/20
   - **Shutdown (VIX ≥35):** NO NEW POSITIONS (existing positions held at stops)
-  - **Always Rejected:** Tier 3 (insider buying only - leading indicator, not immediate catalyst)
+  - **Tier 3/4 Requirement:** Must have strong RS (≥70 percentile) AND volume confirmation
+  - **Always Rejected:** Single insider transaction without other catalyst, weak sector momentum (<5% vs SPY)
 - **Catalyst Age:** <5 days for earnings, <2 days for upgrades
 - **Technical Filters:** ALL must pass:
   1. Price > 50-day SMA (trend filter)
@@ -561,7 +605,8 @@ This system implements the **Entry Quality Scorecard methodology** from Deep Res
 
 ---
 
-**Version:** 2.0 (Deep Research Aligned)
-**Last Updated:** December 17, 2025
+**Version:** 2.1 (Enhanced Catalyst Detection - Phase 1 + Gap-Ups)
+**Last Updated:** December 18, 2025
 **Methodology:** Entry Quality Scorecard (100-point systematic framework)
 **Strategy:** Continuous Portfolio Optimization with Win Rate Priority
+**New in v2.1:** Added Tier 2 (price targets), Tier 3 (sector rotation), Tier 4 (52W breakouts, gap-ups)

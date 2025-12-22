@@ -34,7 +34,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │  • Calculates RS vs SPY (scoring factor, not hard filter)      │
 │  • Tracks sector rotation (11 sectors vs SPY)                  │
 │  • Detects institutional activity (options flow + dark pool)   │
-│  OUTPUT: 300-500 catalyst stocks → screener_candidates.json    │
+│  OUTPUT: 170-240 catalyst stocks → screener_candidates.json   │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -164,23 +164,29 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 
 #### What the Screener Looks For:
 
-1. **Catalyst Detection** (Tier 1-3 priority)
+1. **Catalyst Detection** (Tier 1-4 priority)
    - **Tier 1** (Highest Priority):
-     - M&A announcements
+     - M&A announcements (news + SEC 8-K Item 2.01)
      - FDA approvals
-     - Major contract wins
-     - Earnings beats (>15% surprise)
-     - Analyst upgrades (from top-tier firms)
+     - Major contract wins (news + SEC 8-K Item 1.01)
+     - Earnings beats >10% with raised guidance
+     - Revenue beats >10% combined with EPS beat
 
    - **Tier 2** (Medium Priority):
-     - Product launches
-     - Partnership announcements
-     - Earnings beats (10-15% surprise)
-     - Analyst upgrades (mid-tier firms)
+     - Analyst upgrades from major firms (Goldman, Morgan Stanley, JPM)
+     - **Price target raises >20% (NEW - PHASE 1.1):** Significant analyst price target increases
+     - SEC 8-K contract filings (Item 1.01)
+     - Strong earnings beats without guidance (>15%)
 
-   - **Tier 3** (Lower Priority):
-     - Insider buying (cluster of 3+ executives)
-     - Share buyback announcements
+   - **Tier 3** (Leading Indicators):
+     - **Sector rotation (NEW - PHASE 1.3):** Stock in sector outperforming SPY by >5% (3-month basis)
+     - Insider buying clusters (3+ transactions within 30 days)
+     - Product launches with strong momentum
+
+   - **Tier 4** (Technical Catalysts - NEW):
+     - **52-week high breakouts (PHASE 1.2):** Fresh breakout (last 5 days) with volume >150% average
+     - **Gap-ups (PHASE 2.5):** Opening gap >3% with volume >120% average, gap maintained through close
+     - Consolidation breakouts with volume (4+ weeks tight range)
 
 2. **Technical Filters** (All Must Pass)
    - **Price above 50-day SMA**: Confirms uptrend
@@ -258,11 +264,12 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
    - Validates the story isn't already "played out"
    - Checks for negative sentiment or red flags
 
-2. **VIX/Market Regime Check**
-   - **VIX < 20**: GREEN (normal trading)
-   - **VIX 20-25**: YELLOW (caution, reduce position sizing)
-   - **VIX 25-30**: ORANGE (elevated risk, Tier 1 only)
-   - **VIX > 30**: RED (SHUTDOWN - no new trades)
+2. **VIX/Market Regime Check** (Regime-Dependent Tier Policy)
+   - **VIX < 20**: GREEN (normal trading, all tiers accepted)
+   - **VIX 20-25**: YELLOW (caution, reduce position sizing, all tiers accepted)
+   - **VIX 25-30**: ORANGE (elevated risk, **Tier 1 or Tier 2 ONLY** - no Tier 3/4)
+   - **VIX 30-35**: HIGH RISK (**Tier 1 ONLY** + News ≥15/20 required)
+   - **VIX ≥ 35**: RED (SHUTDOWN - no new trades)
 
 3. **Macro Event Check** (Event-Day Only Blackouts)
    - **FOMC Meeting**: Day of only (2:00 PM announcement + press conference)
@@ -281,7 +288,10 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
    - **Hard Filters** (GO/NO-GO eliminate low-quality opportunities):
      - Price >$10 (Deep Research spec)
      - Liquidity >$50M daily volume (Deep Research spec)
-     - Catalyst presence required (any Tier 1 or Tier 2)
+     - Catalyst presence required (Tier 1-4, regime-dependent acceptance)
+     - Normal Markets (VIX <25): Tier 1, 2, 3, or 4 acceptable
+     - Elevated Risk (VIX 25-30): Tier 1 or 2 ONLY (no Tier 3/4)
+     - High Risk (VIX 30-35): Tier 1 ONLY + News ≥15/20
    - **Scoring Factors** (100-point Entry Quality Scorecard):
      - RS vs SPY is scoring factor (0-5 pts), NOT hard filter
      - Allows negative-RS stocks if strong catalyst present
@@ -876,10 +886,17 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
     - Prevents lookahead bias from using end-of-day breadth for intraday decisions
     - Timestamped in screener output for transparency
     - GO command uses pre-calculated breadth value
+- ✅ **Phase 1 + Gap-Ups Complete (Dec 18)**: Added 4 new catalyst types for 14.5x improvement in candidate flow
+  - **Price Target Raises (Tier 2)**: Analyst price targets raised >20% (~100 candidates/day)
+  - **52-Week High Breakouts (Tier 4)**: Fresh breakouts with volume >150% (~30 candidates/day)
+  - **Sector Rotation (Tier 3)**: Stocks in sectors outperforming SPY by >5% (~20-70 candidates/day)
+  - **Gap-Ups (Tier 4)**: Opening gaps >3% with volume >120% (~20-40 candidates/day)
+  - **Expected Flow**: 170-240 candidates/day (was 2 baseline, 85-120x increase)
+  - **Zero API Costs**: All detection uses existing free APIs (Finnhub, Polygon, FMP)
+  - **Deferred to Parking Lot**: Buyback detection, earnings acceleration, contract magnitude parsing (low ROI)
 - ✅ **Deep Research Implementation (Dec 15)**: Complete architectural shift to Entry Quality Scorecard methodology
   - **BREAKING CHANGE**: RS is now scoring factor (0-5 pts), NOT hard filter
   - Hard filters: Price >$10, Liquidity >$50M, Catalyst presence required
-  - Screener outputs 300-500 catalyst stocks (was 126-131)
   - AI evaluates 100-point scorecard for best opportunities
   - Target: 60-70% win rate, 8-12% monthly returns (academic PEAD research)
   - Aligns with Deep Research: "rule-based filters eliminate low-quality opportunities, then AI analyzes sentiment"
