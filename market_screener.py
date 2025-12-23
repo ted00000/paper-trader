@@ -77,6 +77,60 @@ RECENCY_PRICE_TARGET = 7     # Price targets stale after 1 week (reduced from 30
 RECENCY_SECTOR_ROTATION_FRESH = 3   # Fresh sector momentum (0-3 days)
 RECENCY_SECTOR_ROTATION_RECENT = 7  # Recent sector momentum (4-7 days)
 
+# ============================================================================
+# P2-12: SOURCE CREDIBILITY WEIGHTING
+# ============================================================================
+# Not all news sources are equal. Bloomberg/WSJ more reliable than blogs.
+# Multiplier applied to news score based on source tier.
+
+SOURCE_CREDIBILITY_TIERS = {
+    # TIER 1: Premium financial news (1.5x multiplier)
+    'bloomberg': 1.5,
+    'reuters': 1.5,
+    'dow jones': 1.5,
+    'wsj': 1.5,
+    'wall street journal': 1.5,
+    'financial times': 1.5,
+
+    # TIER 2: Major business news (1.2x multiplier)
+    'cnbc': 1.2,
+    'barrons': 1.2,
+    'marketwatch': 1.2,
+    'benzinga': 1.2,
+    'yahoo finance': 1.2,
+
+    # TIER 3: Standard financial sites (1.0x - no boost)
+    'seeking alpha': 1.0,
+    'the motley fool': 1.0,
+    'investing.com': 1.0,
+    'zacks': 1.0,
+
+    # TIER 4: Low credibility (0.8x penalty)
+    'pr newswire': 0.8,  # Company press releases (biased)
+    'business wire': 0.8,
+    'globenewswire': 0.8,
+}
+
+def get_source_credibility_multiplier(source):
+    """
+    Get credibility multiplier for news source.
+
+    Returns:
+        float: Multiplier between 0.8 and 1.5
+    """
+    if not source:
+        return 1.0
+
+    source_lower = source.lower()
+
+    # Check for known sources
+    for known_source, multiplier in SOURCE_CREDIBILITY_TIERS.items():
+        if known_source in source_lower:
+            return multiplier
+
+    # Unknown source = neutral (1.0)
+    return 1.0
+
 
 # ============================================================================
 # PHASE 1.3-1.4: NEWS PARSING HELPERS (Contract values, Guidance, M&A premiums)
@@ -1038,6 +1092,11 @@ class MarketScreener:
                 description = article.get('description', '').lower()
                 text = f"{title} {description}"
 
+                # P2-12: Get source credibility multiplier
+                publisher = article.get('publisher', {})
+                source_name = publisher.get('name', '') if isinstance(publisher, dict) else str(publisher)
+                credibility_multiplier = get_source_credibility_multiplier(source_name)
+
                 # Get article age
                 published = article.get('published_utc', '')
                 try:
@@ -1075,7 +1134,7 @@ class MarketScreener:
                                 continue  # Skip - ticker not in headline (likely general M&A news)
 
                             if days_ago <= RECENCY_MA_TIER1:  # M&A must be fresh
-                                score += points
+                                score += points * credibility_multiplier  # P2-12: Apply source weighting
                                 found_keywords.add(keyword)
                                 if not catalyst_type_news:
                                     catalyst_type_news = 'M&A_news'
@@ -1089,7 +1148,7 @@ class MarketScreener:
                                 continue  # Skip - ticker not in headline (likely general FDA news)
 
                             if days_ago <= 1:  # Same day or yesterday only
-                                score += points
+                                score += points * credibility_multiplier  # P2-12: Apply source weighting
                                 found_keywords.add(keyword)
                                 if not catalyst_type_news:
                                     catalyst_type_news = 'FDA_news'
@@ -1099,7 +1158,7 @@ class MarketScreener:
                                     fda_approval_type = classify_fda_approval(text)
                         elif 'contract' in keyword:
                             if days_ago <= RECENCY_CONTRACT_WIN:  # Contracts need immediate reaction
-                                score += points
+                                score += points * credibility_multiplier  # P2-12: Apply source weighting
                                 found_keywords.add(keyword)
                                 if not catalyst_type_news:
                                     catalyst_type_news = 'contract_news'
@@ -1121,7 +1180,7 @@ class MarketScreener:
                 # Check Tier 2 keywords (no strict recency requirement)
                 for keyword, points in tier2_keywords.items():
                     if keyword in text:
-                        score += points
+                        score += points * credibility_multiplier  # P2-12: Apply source weighting
                         found_keywords.add(keyword)
 
             # Cap at 30 (increased from 20 to account for higher Tier 1 weights)
