@@ -906,11 +906,13 @@ class MarketScreener:
                 'contract win': 6,     # Major contract = Tier 1
                 'awarded contract': 6, # Major contract = Tier 1
                 'signs contract': 6,   # Major contract = Tier 1
-                'upgrade': 5,          # Analyst upgrade = Tier 1
+                # REMOVED 'upgrade': 5 - analyst upgrades are Tier 2, not Tier 1
             }
 
             # Tier 2 and momentum keywords
             tier2_keywords = {
+                'upgrade': 5,          # MOVED from Tier 1 - analyst upgrades are Tier 2
+                'analyst upgrade': 5,
                 'earnings beat': 4,
                 'beat estimates': 4,
                 'beat expectations': 4,
@@ -1043,9 +1045,14 @@ class MarketScreener:
                     if keyword in text:
                         # CRITICAL: Only accept M&A/FDA/contract news from SAME DAY (0-1 days old)
                         if 'acquisition' in keyword or 'merger' in keyword or 'acquire' in keyword:
-                            # V5: Only accept if stock is TARGET (being bought), not acquirer (buying)
-                            if is_acquirer and not is_target:
-                                continue  # Skip - stock is buying, not being bought
+                            # AUDIT FIX: REQUIRE stock is TARGET (being acquired)
+                            # Reject if: (1) stock is acquirer OR (2) no M&A context at all
+                            if not is_target:
+                                continue  # Skip - must be explicit target (being acquired)
+
+                            # Additional validation: ticker must be in title for M&A
+                            if ticker.upper() not in title.upper():
+                                continue  # Skip - ticker not in headline (likely general M&A news)
 
                             if days_ago <= 1:  # Same day or yesterday only
                                 score += points
@@ -1057,6 +1064,10 @@ class MarketScreener:
                                 if ma_premium is None:
                                     ma_premium = parse_ma_premium(text)
                         elif 'FDA' in keyword or 'drug' in keyword:
+                            # AUDIT FIX: Ticker must be in title for FDA approvals
+                            if ticker.upper() not in title.upper():
+                                continue  # Skip - ticker not in headline (likely general FDA news)
+
                             if days_ago <= 1:  # Same day or yesterday only
                                 score += points
                                 found_keywords.add(keyword)
