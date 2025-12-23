@@ -1528,16 +1528,35 @@ class MarketScreener:
         # Get M&A premium if available
         ma_premium = news_result.get('ma_premium', None)
 
-        # TIER 1 THRESHOLD: Premium >15% (or assume Tier 1 if premium not disclosed)
-        # Note: Many M&A deals don't disclose premium immediately, but are still Tier 1
-        is_tier1 = True  # Default to Tier 1 for any M&A (conservative)
+        # AUDIT FIX: REQUIRE either premium >15% OR definitive agreement language
+        # OLD: Defaulted to Tier 1 for ANY M&A (too permissive)
+        # NEW: Require evidence of substantial deal
 
-        if ma_premium is not None and ma_premium < 15:
-            # Only reject if premium is explicitly LOW (<15%)
-            is_tier1 = False
+        if ma_premium is not None:
+            # Premium explicitly stated - must be >15%
+            if ma_premium < 15:
+                return {'has_tier1_ma': False, 'score': 0, 'catalyst_type': None}
+            is_tier1 = True
+        else:
+            # No premium disclosed - check for definitive agreement language
+            # This catches deals announced without terms disclosed yet
+            top_articles = news_result.get('top_articles', [])
+            has_definitive_agreement = False
 
-        if not is_tier1:
-            return {'has_tier1_ma': False, 'score': 0, 'catalyst_type': None}
+            for article in top_articles[:3]:  # Check top 3 articles
+                text = f"{article.get('title', '')} {article.get('description', '')}".lower()
+                if any(term in text for term in [
+                    'definitive agreement', 'merger agreement', 'acquisition agreement',
+                    'signed agreement', 'binding offer', 'to be acquired by'
+                ]):
+                    has_definitive_agreement = True
+                    break
+
+            if not has_definitive_agreement:
+                # No premium AND no definitive agreement = likely rumor or speculation
+                return {'has_tier1_ma': False, 'score': 0, 'catalyst_type': None}
+
+            is_tier1 = True
 
         # Calculate score based on premium magnitude
         if ma_premium is not None:
@@ -2963,6 +2982,12 @@ class MarketScreener:
 
         # Update catalyst_tier_display to match new scoring logic (Enhancement 0.2)
         catalyst_tier_display = catalyst_tier  # Use the tier from scoring logic
+
+        # AUDIT FIX: Add minimum composite score requirement for Tier 1
+        # Prevents low-quality signals from being marked Tier 1
+        if catalyst_tier == 'Tier 1' and composite_score < 60:
+            catalyst_tier = 'Tier 2'
+            catalyst_tier_display = 'Tier 2 - Unconfirmed Catalyst (low score)'
 
         # Add specific catalyst description
         if catalyst_tier == 'Tier 1':
