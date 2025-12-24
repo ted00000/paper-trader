@@ -73,6 +73,18 @@ function Analytics() {
         </div>
       </div>
 
+      {/* Monthly Returns Heatmap */}
+      <div className="glass rounded-lg p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Calendar className="text-tedbot-accent" size={24} />
+          <div>
+            <h2 className="text-xl font-bold">Monthly Returns Calendar</h2>
+            <p className="text-sm text-tedbot-gray-500">Performance heatmap by month and year</p>
+          </div>
+        </div>
+        <MonthlyReturnsHeatmap data={monthlyData} />
+      </div>
+
       {/* Conviction Distribution & Catalyst Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="glass rounded-lg p-6">
@@ -108,18 +120,6 @@ function Analytics() {
           </div>
         </div>
         <CatalystPerformanceChart data={catalystData} />
-      </div>
-
-      {/* Monthly Returns Heatmap */}
-      <div className="glass rounded-lg p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Calendar className="text-tedbot-accent" size={24} />
-          <div>
-            <h2 className="text-xl font-bold">Monthly Returns Calendar</h2>
-            <p className="text-sm text-tedbot-gray-500">Performance heatmap by month and year</p>
-          </div>
-        </div>
-        <MonthlyReturnsHeatmap data={monthlyData} />
       </div>
 
       {/* Additional Analytics Placeholders */}
