@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import {
   LayoutDashboard,
+  Calendar,
   TrendingUp,
   // Search, // Hidden for MVP - Trade Explorer not ready
   // Brain, // Hidden for MVP - Learning Engine not ready
@@ -11,6 +13,7 @@ import {
 
 // Pages
 import CommandCenter from './pages/CommandCenter'
+import Today from './pages/Today'
 import Analytics from './pages/Analytics'
 import TradeExplorer from './pages/TradeExplorer'
 import LearningEngine from './pages/LearningEngine'
@@ -19,8 +22,31 @@ import LiveFeed from './pages/LiveFeed'
 import PublicView from './pages/PublicView'
 
 function App() {
+  const [headerData, setHeaderData] = useState({ value: 0, return: 0 })
+
+  useEffect(() => {
+    // Fetch header data
+    const fetchHeaderData = async () => {
+      try {
+        const response = await fetch('/api/v2/overview')
+        const data = await response.json()
+        setHeaderData({
+          value: data.account?.value || 0,
+          return: data.account?.total_return_pct || 0
+        })
+      } catch (error) {
+        console.error('Failed to fetch header data:', error)
+      }
+    }
+
+    fetchHeaderData()
+    const interval = setInterval(fetchHeaderData, 30000) // Update every 30s
+    return () => clearInterval(interval)
+  }, [])
+
   const navigation = [
     { name: 'Command Center', href: '/', icon: LayoutDashboard },
+    { name: 'Today', href: '/today', icon: Calendar },
     { name: 'Analytics', href: '/analytics', icon: TrendingUp },
 
     // HIDDEN FOR MVP: Trade Explorer - Not ready for public launch
@@ -84,11 +110,15 @@ function App() {
               <div className="flex items-center gap-6">
                 <div className="text-right">
                   <div className="text-sm text-tedbot-gray-500">Account Value</div>
-                  <div className="text-2xl font-bold text-tedbot-accent">$1,234.56</div>
+                  <div className="text-2xl font-bold text-tedbot-accent">
+                    ${headerData.value.toFixed(2)}
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-tedbot-gray-500">Total Return</div>
-                  <div className="text-2xl font-bold text-profit">+23.4%</div>
+                  <div className={`text-2xl font-bold ${headerData.return >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {headerData.return >= 0 ? '+' : ''}{headerData.return.toFixed(2)}%
+                  </div>
                 </div>
               </div>
             </div>
@@ -122,6 +152,7 @@ function App() {
         <main className="p-6">
           <Routes>
             <Route path="/" element={<CommandCenter />} />
+            <Route path="/today" element={<Today />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/trades" element={<TradeExplorer />} />
             <Route path="/learning" element={<LearningEngine />} />

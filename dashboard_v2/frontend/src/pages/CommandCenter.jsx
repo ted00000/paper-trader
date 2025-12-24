@@ -84,6 +84,47 @@ function CommandCenter() {
       {/* System Operations Status - Top Row */}
       <OperationsStatus />
 
+      {/* System Performance Metrics */}
+      <div>
+        <h2 className="text-xl font-bold mb-4">System Performance</h2>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="glass rounded-lg p-6">
+            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">YTD Return</h3>
+            <p className={`text-2xl font-bold ${performance?.ytd_return >= 0 ? 'text-profit' : 'text-loss'}`}>
+              {performance?.ytd_return >= 0 ? '+' : ''}{performance?.ytd_return?.toFixed(2) || '0.00'}%
+            </p>
+          </div>
+
+          <div className="glass rounded-lg p-6">
+            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">MTD Return</h3>
+            <p className={`text-2xl font-bold ${performance?.mtd_return >= 0 ? 'text-profit' : 'text-loss'}`}>
+              {performance?.mtd_return >= 0 ? '+' : ''}{performance?.mtd_return?.toFixed(2) || '0.00'}%
+            </p>
+          </div>
+
+          <div className="glass rounded-lg p-6">
+            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">Avg Gain</h3>
+            <p className="text-2xl font-bold text-profit">
+              +{performance?.avg_gain?.toFixed(2) || '0.00'}%
+            </p>
+          </div>
+
+          <div className="glass rounded-lg p-6">
+            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">Avg Loss</h3>
+            <p className="text-2xl font-bold text-loss">
+              {performance?.avg_loss?.toFixed(2) || '0.00'}%
+            </p>
+          </div>
+
+          <div className="glass rounded-lg p-6">
+            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">Total Trades</h3>
+            <p className="text-2xl font-bold text-tedbot-accent">
+              {performance?.total_trades || 0}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
