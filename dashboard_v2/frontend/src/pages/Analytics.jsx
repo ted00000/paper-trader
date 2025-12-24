@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
-import { BarChart3, Calendar, RefreshCw, Award, Target } from 'lucide-react'
+import { BarChart3, Calendar, RefreshCw, Award, Target, Layers } from 'lucide-react'
 import axios from 'axios'
 import CatalystPerformanceChart from '../components/CatalystPerformanceChart'
 import MonthlyReturnsHeatmap from '../components/MonthlyReturnsHeatmap'
 import ConvictionDistribution from '../components/ConvictionDistribution'
 import CatalystBreakdown from '../components/CatalystBreakdown'
+import TierPerformance from '../components/TierPerformance'
 
 function Analytics() {
   const [catalystData, setCatalystData] = useState(null)
   const [monthlyData, setMonthlyData] = useState(null)
   const [convictionData, setConvictionData] = useState(null)
+  const [tierData, setTierData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(null)
 
@@ -23,6 +25,7 @@ function Analytics() {
 
       setCatalystData(catalystRes.data.by_catalyst || [])
       setConvictionData(catalystRes.data.by_conviction || [])
+      setTierData(catalystRes.data.by_tier || [])
       setMonthlyData(monthlyRes.data.monthly_returns || {})
       setLastUpdate(new Date())
     } catch (error) {
@@ -85,8 +88,8 @@ function Analytics() {
         <MonthlyReturnsHeatmap data={monthlyData} />
       </div>
 
-      {/* Conviction Distribution & Catalyst Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Conviction, Catalyst & Tier Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="glass rounded-lg p-6">
           <div className="flex items-center gap-3 mb-6">
             <Award className="text-tedbot-accent" size={24} />
@@ -107,6 +110,17 @@ function Analytics() {
             </div>
           </div>
           <CatalystBreakdown catalystData={catalystData} />
+        </div>
+
+        <div className="glass rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <Layers className="text-tedbot-accent" size={24} />
+            <div>
+              <h2 className="text-xl font-bold">Tier Performance</h2>
+              <p className="text-sm text-tedbot-gray-500">Performance by catalyst tier</p>
+            </div>
+          </div>
+          <TierPerformance tierData={tierData} />
         </div>
       </div>
 
