@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, BarChart3, Calendar, RefreshCw, Award, Target } from 'lucide-react'
+import { BarChart3, Calendar, RefreshCw, Award, Target } from 'lucide-react'
 import axios from 'axios'
 import CatalystPerformanceChart from '../components/CatalystPerformanceChart'
 import MonthlyReturnsHeatmap from '../components/MonthlyReturnsHeatmap'
@@ -122,8 +122,14 @@ function Analytics() {
         <CatalystPerformanceChart data={catalystData} />
       </div>
 
-      {/* Additional Analytics Placeholders */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* HIDDEN FOR MVP: Additional Analytics - Future development */}
+      {/* TODO: Re-enable when these analytics are implemented:
+        - Hold Time Analysis: Histogram of returns by hold days, optimal exit timing, correlation
+        - Sector Allocation: Pie chart, win rate by sector, rotation patterns
+        - Conviction Analysis: Win rate by tier, avg returns, calibration accuracy
+        - Market Regime Performance: Bull/bear performance, volatility analysis
+      */}
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass rounded-lg p-8 text-center">
           <TrendingUp className="mx-auto mb-4 text-tedbot-accent" size={48} />
           <h3 className="text-xl font-bold mb-2">Hold Time Analysis</h3>
@@ -167,7 +173,7 @@ function Analytics() {
             <p>• Regime-specific win rates</p>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Disclaimer */}
       <div className="glass rounded-lg p-6 border-l-4 border-yellow-500">
