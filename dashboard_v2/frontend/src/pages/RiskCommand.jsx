@@ -266,6 +266,16 @@ function RiskCommand() {
           <p>• Risk-adjusted performance attribution</p>
         </div>
       </div> */}
+
+      {/* Disclaimer */}
+      <div className="glass rounded-lg p-6 border-l-4 border-yellow-500">
+        <p className="text-sm text-tedbot-gray-500">
+          <strong className="text-yellow-500">Disclaimer:</strong> This is an autonomous trading system
+          in validation phase. Past performance does not guarantee future results. All trading involves
+          risk of loss. This dashboard is for informational purposes only and does not constitute
+          investment advice.
+        </p>
+      </div>
     </div>
   )
 }
