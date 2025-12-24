@@ -146,6 +146,26 @@ def get_overview():
     returns = [float(t.get('Return_Percent', 0)) for t in trades]
     avg_return = sum(returns) / len(returns) if returns else 0
 
+    # Calculate avg gain and avg loss
+    winning_returns = [r for r in returns if r > 0]
+    losing_returns = [r for r in returns if r < 0]
+    avg_gain = sum(winning_returns) / len(winning_returns) if winning_returns else 0
+    avg_loss = sum(losing_returns) / len(losing_returns) if losing_returns else 0
+
+    # Calculate YTD and MTD returns
+    from datetime import datetime
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+
+    ytd_trades = [t for t in trades if t.get('Exit_Date', '').startswith(str(current_year))]
+    ytd_returns = [float(t.get('Return_Percent', 0)) for t in ytd_trades]
+    ytd_return = sum(ytd_returns) if ytd_returns else 0
+
+    current_month_str = f"{current_year}-{current_month:02d}"
+    mtd_trades = [t for t in trades if t.get('Exit_Date', '').startswith(current_month_str)]
+    mtd_returns = [float(t.get('Return_Percent', 0)) for t in mtd_trades]
+    mtd_return = sum(mtd_returns) if mtd_returns else 0
+
     # Calculate Sharpe ratio (simplified)
     import numpy as np
     if len(returns) > 1:
@@ -181,6 +201,10 @@ def get_overview():
             'total_trades': total_trades,
             'win_rate': round(win_rate, 1),
             'avg_return': round(avg_return, 2),
+            'avg_gain': round(avg_gain, 2),
+            'avg_loss': round(avg_loss, 2),
+            'ytd_return': round(ytd_return, 2),
+            'mtd_return': round(mtd_return, 2),
             'sharpe_ratio': round(sharpe, 2),
             'max_drawdown': round(max_dd, 2)
         },
