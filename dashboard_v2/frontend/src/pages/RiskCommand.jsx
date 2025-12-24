@@ -3,7 +3,6 @@ import { Shield, AlertTriangle, Target, Lock } from 'lucide-react'
 
 function RiskCommand() {
   const [overview, setOverview] = useState(null)
-  const [positions, setPositions] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -12,16 +11,9 @@ function RiskCommand() {
 
   const fetchRiskData = async () => {
     try {
-      const [overviewRes, positionsRes] = await Promise.all([
-        fetch('/api/v2/overview'),
-        fetch('/api/v2/risk/positions')
-      ])
-
-      const overviewData = await overviewRes.json()
-      const positionsData = await positionsRes.json()
-
-      setOverview(overviewData)
-      setPositions(positionsData.positions || [])
+      const response = await fetch('/api/v2/overview')
+      const data = await response.json()
+      setOverview(data)
     } catch (error) {
       console.error('Failed to fetch risk data:', error)
     } finally {
@@ -63,7 +55,7 @@ function RiskCommand() {
 
   // Max concurrent positions
   const maxConcurrentPositions = 10
-  const currentPositions = positions.length
+  const currentPositions = overview?.positions?.length || 0
 
   return (
     <div className="space-y-6">
@@ -249,61 +241,8 @@ function RiskCommand() {
         </div>
       </div>
 
-      {/* Current Positions Risk Table */}
-      <div className="glass rounded-lg p-6">
-        <h2 className="text-xl font-bold mb-4">Current Positions</h2>
-        {positions.length === 0 ? (
-          <div className="text-center py-12 text-tedbot-gray-500">
-            <Shield className="mx-auto mb-4 opacity-50" size={48} />
-            <p>No active positions</p>
-            <p className="text-sm mt-2">Protected capital mode</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-tedbot-gray-800">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-tedbot-gray-400">Ticker</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-tedbot-gray-400">Entry</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-tedbot-gray-400">Current</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-tedbot-gray-400">P&L</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-tedbot-gray-400">Stop Loss</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-tedbot-gray-400">Distance to Stop</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-tedbot-gray-400">Risk Level</th>
-                </tr>
-              </thead>
-              <tbody>
-                {positions.map((pos, idx) => (
-                  <tr key={idx} className="border-b border-tedbot-gray-800 hover:bg-tedbot-darker/50">
-                    <td className="py-3 px-4">
-                      <span className="font-bold">{pos.ticker}</span>
-                      <div className="text-xs text-tedbot-gray-500">{pos.days_held} days</div>
-                    </td>
-                    <td className="text-right py-3 px-4">${pos.entry_price?.toFixed(2)}</td>
-                    <td className="text-right py-3 px-4">${pos.current_price?.toFixed(2)}</td>
-                    <td className={`text-right py-3 px-4 font-bold ${pos.unrealized_pnl_pct >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {pos.unrealized_pnl_pct >= 0 ? '+' : ''}{pos.unrealized_pnl_pct?.toFixed(2)}%
-                    </td>
-                    <td className="text-right py-3 px-4">${pos.stop_loss?.toFixed(2)}</td>
-                    <td className={`text-right py-3 px-4 ${pos.stop_distance_pct < 3 ? 'text-loss' : pos.stop_distance_pct < 5 ? 'text-yellow-500' : 'text-profit'}`}>
-                      {pos.stop_distance_pct?.toFixed(1)}%
-                    </td>
-                    <td className="text-right py-3 px-4">
-                      <span className={`px-2 py-1 rounded text-xs font-bold ${
-                        pos.risk_level === 'HIGH' ? 'bg-loss/20 text-loss' :
-                        pos.risk_level === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-500' :
-                        'bg-profit/20 text-profit'
-                      }`}>
-                        {pos.risk_level}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* HIDDEN FOR MVP: Current Positions table - Already shown on Command Center */}
+      {/* Position details visible on Command Center page with full context */}
 
       {/* HIDDEN FOR MVP: Advanced Risk Analytics - Future development */}
       {/* TODO: Re-enable when advanced analytics are implemented:
