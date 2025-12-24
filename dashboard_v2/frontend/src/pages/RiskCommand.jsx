@@ -305,8 +305,15 @@ function RiskCommand() {
         )}
       </div>
 
-      {/* Coming Soon */}
-      <div className="glass rounded-lg p-8 text-center">
+      {/* HIDDEN FOR MVP: Advanced Risk Analytics - Future development */}
+      {/* TODO: Re-enable when advanced analytics are implemented:
+        - Live position heat maps by sector and conviction
+        - Historical drawdown analysis and recovery times
+        - Portfolio beta and market correlation tracking
+        - Worst-case scenario stress testing
+        - Risk-adjusted performance attribution
+      */}
+      {/* <div className="glass rounded-lg p-8 text-center">
         <Shield className="mx-auto mb-4 text-tedbot-accent" size={64} />
         <h3 className="text-2xl font-bold mb-2">Advanced Risk Analytics</h3>
         <p className="text-tedbot-gray-500 mb-6">
@@ -319,7 +326,7 @@ function RiskCommand() {
           <p>• Worst-case scenario stress testing</p>
           <p>• Risk-adjusted performance attribution</p>
         </div>
-      </div>
+      </div> */}
     </div>
   )
 }
