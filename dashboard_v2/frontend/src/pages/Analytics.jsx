@@ -53,7 +53,7 @@ function Analytics() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Analytics Deep Dive</h1>
+          <h1 className="text-3xl font-bold mb-2">System Analytics</h1>
           <p className="text-tedbot-gray-500">Advanced performance analytics and insights</p>
         </div>
         <div className="flex items-center gap-4">
