@@ -53,7 +53,7 @@ function LiveFeed() {
 
   const fetchOperations = async () => {
     try {
-      const response = await axios.get('http://localhost:5001/api/v2/operations/status')
+      const response = await axios.get('/api/v2/operations/status')
       setOperationsData(response.data)
       setLoading(false)
     } catch (error) {
@@ -68,7 +68,7 @@ function LiveFeed() {
     setLogContent(null)
 
     try {
-      const response = await axios.get(`http://localhost:5001/api/v2/operations/logs/${operation.toLowerCase()}`)
+      const response = await axios.get(`/api/v2/operations/logs/${operation.toLowerCase()}`)
       setLogContent(response.data)
       setLogLoading(false)
     } catch (error) {

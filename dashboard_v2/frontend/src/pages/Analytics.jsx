@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, BarChart3, Calendar, RefreshCw, Award, Target } from 'lucide-react'
+import { BarChart3, Calendar, RefreshCw, Award, Target, Layers } from 'lucide-react'
 import axios from 'axios'
 import CatalystPerformanceChart from '../components/CatalystPerformanceChart'
 import MonthlyReturnsHeatmap from '../components/MonthlyReturnsHeatmap'
 import ConvictionDistribution from '../components/ConvictionDistribution'
 import CatalystBreakdown from '../components/CatalystBreakdown'
+import TierPerformance from '../components/TierPerformance'
 
 function Analytics() {
   const [catalystData, setCatalystData] = useState(null)
   const [monthlyData, setMonthlyData] = useState(null)
   const [convictionData, setConvictionData] = useState(null)
+  const [tierData, setTierData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(null)
 
@@ -23,6 +25,7 @@ function Analytics() {
 
       setCatalystData(catalystRes.data.by_catalyst || [])
       setConvictionData(catalystRes.data.by_conviction || [])
+      setTierData(catalystRes.data.by_tier || [])
       setMonthlyData(monthlyRes.data.monthly_returns || {})
       setLastUpdate(new Date())
     } catch (error) {
@@ -53,7 +56,7 @@ function Analytics() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Analytics Deep Dive</h1>
+          <h1 className="text-3xl font-bold mb-2">System Analytics</h1>
           <p className="text-tedbot-gray-500">Advanced performance analytics and insights</p>
         </div>
         <div className="flex items-center gap-4">
@@ -73,8 +76,20 @@ function Analytics() {
         </div>
       </div>
 
-      {/* Conviction Distribution & Catalyst Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Monthly Returns Heatmap */}
+      <div className="glass rounded-lg p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Calendar className="text-tedbot-accent" size={24} />
+          <div>
+            <h2 className="text-xl font-bold">Monthly Returns Calendar</h2>
+            <p className="text-sm text-tedbot-gray-500">Performance heatmap by month and year</p>
+          </div>
+        </div>
+        <MonthlyReturnsHeatmap data={monthlyData} />
+      </div>
+
+      {/* Conviction, Catalyst & Tier Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="glass rounded-lg p-6">
           <div className="flex items-center gap-3 mb-6">
             <Award className="text-tedbot-accent" size={24} />
@@ -96,6 +111,17 @@ function Analytics() {
           </div>
           <CatalystBreakdown catalystData={catalystData} />
         </div>
+
+        <div className="glass rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <Layers className="text-tedbot-accent" size={24} />
+            <div>
+              <h2 className="text-xl font-bold">Tier Performance</h2>
+              <p className="text-sm text-tedbot-gray-500">Performance by catalyst tier</p>
+            </div>
+          </div>
+          <TierPerformance tierData={tierData} />
+        </div>
       </div>
 
       {/* Catalyst Performance Chart */}
@@ -110,20 +136,14 @@ function Analytics() {
         <CatalystPerformanceChart data={catalystData} />
       </div>
 
-      {/* Monthly Returns Heatmap */}
-      <div className="glass rounded-lg p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Calendar className="text-tedbot-accent" size={24} />
-          <div>
-            <h2 className="text-xl font-bold">Monthly Returns Calendar</h2>
-            <p className="text-sm text-tedbot-gray-500">Performance heatmap by month and year</p>
-          </div>
-        </div>
-        <MonthlyReturnsHeatmap data={monthlyData} />
-      </div>
-
-      {/* Additional Analytics Placeholders */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* HIDDEN FOR MVP: Additional Analytics - Future development */}
+      {/* TODO: Re-enable when these analytics are implemented:
+        - Hold Time Analysis: Histogram of returns by hold days, optimal exit timing, correlation
+        - Sector Allocation: Pie chart, win rate by sector, rotation patterns
+        - Conviction Analysis: Win rate by tier, avg returns, calibration accuracy
+        - Market Regime Performance: Bull/bear performance, volatility analysis
+      */}
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass rounded-lg p-8 text-center">
           <TrendingUp className="mx-auto mb-4 text-tedbot-accent" size={48} />
           <h3 className="text-xl font-bold mb-2">Hold Time Analysis</h3>
@@ -167,6 +187,16 @@ function Analytics() {
             <p>• Regime-specific win rates</p>
           </div>
         </div>
+      </div> */}
+
+      {/* Disclaimer */}
+      <div className="glass rounded-lg p-6 border-l-4 border-yellow-500">
+        <p className="text-sm text-tedbot-gray-500">
+          <strong className="text-yellow-500">Disclaimer:</strong> This is an autonomous trading system
+          in validation phase. Past performance does not guarantee future results. All trading involves
+          risk of loss. This dashboard is for informational purposes only and does not constitute
+          investment advice.
+        </p>
       </div>
     </div>
   )
