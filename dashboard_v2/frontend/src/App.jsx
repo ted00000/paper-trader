@@ -6,7 +6,7 @@ import {
   TrendingUp,
   // Search, // Hidden for MVP - Trade Explorer not ready
   // Brain, // Hidden for MVP - Learning Engine not ready
-  Shield,
+  // Shield, // Hidden for MVP - Risk Command contains proprietary strategy info
   // Activity, // Hidden for MVP - Live Feed moved to Command Center
   // Globe // Hidden for MVP - Public View not needed (password-protected dashboard)
 } from 'lucide-react'
@@ -77,8 +77,6 @@ function App() {
     //   - Remove hardcoded placeholder values
     //   - Build actual visualization charts
     //   - Implement daily/weekly/monthly learning loops display
-
-    { name: 'Risk Command', href: '/risk', icon: Shield },
 
     // HIDDEN FOR MVP: Live Feed - Operations monitoring moved to Command Center
     // { name: 'Live Feed', href: '/live', icon: Activity },
