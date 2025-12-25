@@ -1,9 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard,
   Calendar,
   TrendingUp,
+  LogOut,
   // Search, // Hidden for MVP - Trade Explorer not ready
   // Brain, // Hidden for MVP - Learning Engine not ready
   // Shield, // Hidden for MVP - Risk Command contains proprietary strategy info
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react'
 
 // Pages
+import Login from './pages/Login'
 import CommandCenter from './pages/CommandCenter'
 import Today from './pages/Today'
 import Analytics from './pages/Analytics'
@@ -22,10 +24,49 @@ import LiveFeed from './pages/LiveFeed'
 import PublicView from './pages/PublicView'
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [headerData, setHeaderData] = useState({ value: 0, return: 0 })
 
+  // Check for existing session on mount
   useEffect(() => {
-    // Fetch header data
+    const checkAuth = async () => {
+      const token = localStorage.getItem('tedbot_session')
+      if (token) {
+        try {
+          const response = await fetch('/api/v2/auth/verify', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          if (response.ok) {
+            setIsAuthenticated(true)
+          } else {
+            localStorage.removeItem('tedbot_session')
+          }
+        } catch (error) {
+          console.error('Auth check failed:', error)
+          localStorage.removeItem('tedbot_session')
+        }
+      }
+      setLoading(false)
+    }
+    checkAuth()
+  }, [])
+
+  const handleLogin = (token) => {
+    setIsAuthenticated(true)
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('tedbot_session')
+    setIsAuthenticated(false)
+  }
+
+  // Fetch header data when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return
+
     const fetchHeaderData = async () => {
       try {
         const response = await fetch('/api/v2/overview')
@@ -42,7 +83,22 @@ function App() {
     fetchHeaderData()
     const interval = setInterval(fetchHeaderData, 30000) // Update every 30s
     return () => clearInterval(interval)
-  }, [])
+  }, [isAuthenticated])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-tedbot-dark flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-tedbot-accent border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-tedbot-gray-500">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />
+  }
 
   const navigation = [
     { name: 'Command Center', href: '/', icon: LayoutDashboard },
@@ -129,6 +185,14 @@ function App() {
                     {headerData.return >= 0 ? '+' : ''}{headerData.return.toFixed(2)}%
                   </div>
                 </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 bg-tedbot-darker border border-tedbot-gray-800 rounded-lg hover:border-loss hover:text-loss transition-colors"
+                  title="Sign out"
+                >
+                  <LogOut size={18} />
+                  <span className="text-sm">Logout</span>
+                </button>
               </div>
             </div>
           </div>

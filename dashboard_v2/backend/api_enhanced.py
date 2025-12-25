@@ -12,14 +12,32 @@ from flask_cors import CORS
 from datetime import datetime, timedelta
 from pathlib import Path
 from collections import defaultdict
+from functools import wraps
 import json
 import csv
 import os
+import secrets
+import hashlib
 
 # Project setup
 PROJECT_DIR = Path(__file__).parent.parent.parent
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
+
+# Authentication credentials (in production, move to environment variables)
+VALID_USERNAME = os.getenv('DASHBOARD_USERNAME', 'tedbot')
+VALID_PASSWORD_HASH = hashlib.sha256(os.getenv('DASHBOARD_PASSWORD', 'tedbot2025').encode()).hexdigest()
+
+# Session storage (in-memory for MVP, use Redis for production)
+active_sessions = {}
+
+def generate_session_token():
+    """Generate a secure random session token"""
+    return secrets.token_urlsafe(32)
+
+def verify_session(token):
+    """Verify if session token is valid"""
+    return token in active_sessions
 
 # Data file paths (READ ONLY)
 TRADES_CSV = PROJECT_DIR / 'trade_history' / 'completed_trades.csv'
@@ -95,6 +113,69 @@ def load_screener_candidates():
 # ROOT & DOCUMENTATION
 # =====================================================================
 
+# =====================================================================
+# AUTHENTICATION ENDPOINTS
+# =====================================================================
+
+@app.route('/api/v2/auth/login', methods=['POST'])
+def login():
+    """Authenticate user and create session"""
+    data = request.get_json()
+    username = data.get('username', '')
+    password = data.get('password', '')
+
+    # Hash provided password and compare
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    if username == VALID_USERNAME and password_hash == VALID_PASSWORD_HASH:
+        # Generate session token
+        token = generate_session_token()
+        active_sessions[token] = {
+            'username': username,
+            'created_at': datetime.now().isoformat(),
+            'last_activity': datetime.now().isoformat()
+        }
+
+        return jsonify({
+            'success': True,
+            'token': token,
+            'username': username
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'Invalid username or password'
+        }), 401
+
+@app.route('/api/v2/auth/verify', methods=['GET'])
+def verify():
+    """Verify session token is valid"""
+    auth_header = request.headers.get('Authorization', '')
+
+    if not auth_header.startswith('Bearer '):
+        return jsonify({'valid': False}), 401
+
+    token = auth_header[7:]  # Remove 'Bearer ' prefix
+
+    if verify_session(token):
+        # Update last activity
+        active_sessions[token]['last_activity'] = datetime.now().isoformat()
+        return jsonify({'valid': True})
+    else:
+        return jsonify({'valid': False}), 401
+
+@app.route('/api/v2/auth/logout', methods=['POST'])
+def logout():
+    """End session"""
+    auth_header = request.headers.get('Authorization', '')
+
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:]
+        if token in active_sessions:
+            del active_sessions[token]
+
+    return jsonify({'success': True})
+
 @app.route('/', methods=['GET'])
 def root():
     """API Documentation - Root endpoint"""
@@ -104,6 +185,11 @@ def root():
         'description': 'Read-only API for TEDBOT trading dashboard',
         'frontend': 'http://localhost:3000',
         'endpoints': {
+            'auth': {
+                'login': '/api/v2/auth/login',
+                'verify': '/api/v2/auth/verify',
+                'logout': '/api/v2/auth/logout'
+            },
             'health': '/api/v2/health',
             'overview': '/api/v2/overview',
             'equity_curve': '/api/v2/equity-curve',

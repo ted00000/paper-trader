@@ -46,10 +46,6 @@ ssh "$SERVER" "cat > /etc/nginx/sites-available/tedbot-dashboard-v2 << 'NGINX_EO
 server {
     server_name tedbot.ai www.tedbot.ai 174.138.67.26;
 
-    # Password protection for entire site
-    auth_basic \"TedBot Dashboard\";
-    auth_basic_user_file /etc/nginx/.htpasswd;
-
     # API routes - proxy to enhanced API on port 5001
     location /api/v2 {
         proxy_pass http://127.0.0.1:5001;
