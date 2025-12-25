@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Activity, CheckCircle2, XCircle, AlertCircle, Eye, RefreshCw } from 'lucide-react'
 import axios from 'axios'
+import ReactMarkdown from 'react-markdown'
 
 function OperationsStatus() {
   const [operationsData, setOperationsData] = useState(null)
@@ -236,8 +237,8 @@ function OperationsStatus() {
                   <p className="text-loss">{logContent.error}</p>
                 </div>
               ) : logContent?.content ? (
-                <div className="bg-tedbot-darker rounded-lg p-4 font-mono text-sm text-tedbot-accent whitespace-pre-wrap overflow-x-auto">
-                  {logContent.content}
+                <div className="bg-tedbot-darker rounded-lg p-6 prose prose-invert prose-sm max-w-none overflow-x-auto">
+                  <ReactMarkdown>{logContent.content}</ReactMarkdown>
                 </div>
               ) : (
                 <div className="text-center py-12 text-tedbot-gray-500">
