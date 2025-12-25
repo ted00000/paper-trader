@@ -49,6 +49,17 @@ function App() {
     { name: 'Today', href: '/today', icon: Calendar },
     { name: 'Analytics', href: '/analytics', icon: TrendingUp },
 
+    // HIDDEN FOR MVP: Risk Command - Contains proprietary strategy information
+    // { name: 'Risk Command', href: '/risk', icon: Shield },
+    // TODO: Review for future use - contains sensitive data:
+    //   - Max position size (10% rule)
+    //   - Max portfolio heat (80% limit)
+    //   - Max concurrent positions (10 positions)
+    //   - Stop loss strategy details
+    //   - Diversification rules
+    // Consider: Keep metrics (Portfolio Health, Max Drawdown, Risk Utilization)
+    // Remove: Position Limits, Stop Loss Protection, Diversification sections
+
     // HIDDEN FOR MVP: Trade Explorer - Not ready for public launch
     // { name: 'Trade Explorer', href: '/trades', icon: Search },
     // TODO: Re-enable when trade explorer is functional:

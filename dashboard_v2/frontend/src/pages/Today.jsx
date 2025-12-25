@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Calendar, TrendingUp, TrendingDown, Activity, DollarSign } from 'lucide-react'
-import OperationsStatus from '../components/OperationsStatus'
+import ScreeningDecisions from '../components/ScreeningDecisions'
 
 function Today() {
   const [todayData, setTodayData] = useState(null)
@@ -58,9 +58,6 @@ function Today() {
         </div>
       </div>
 
-      {/* System Operations Status */}
-      <OperationsStatus />
-
       {/* Today's Performance Metrics */}
       <div>
         <h2 className="text-xl font-bold mb-4">Today's Performance</h2>
@@ -116,6 +113,9 @@ function Today() {
         </div>
       </div>
 
+      {/* Screening Decisions */}
+      <ScreeningDecisions />
+
       {/* Today's Trades Table */}
       <div className="glass rounded-lg p-6">
         <h2 className="text-xl font-bold mb-4">Today's Trades</h2>
@@ -145,45 +145,6 @@ function Today() {
             </table>
           </div>
         )}
-      </div>
-
-      {/* Today's System Activity Log */}
-      <div className="glass rounded-lg p-6">
-        <h2 className="text-xl font-bold mb-4">System Activity Log</h2>
-        <div className="space-y-3">
-          <div className="p-3 bg-tedbot-darker rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-profit rounded-full"></div>
-                <span className="text-sm">SCREENER completed</span>
-              </div>
-              <span className="text-xs text-tedbot-gray-500">9:42 AM</span>
-            </div>
-            <p className="text-xs text-tedbot-gray-600 mt-1 ml-5">
-              37 candidates identified, 0 Tier 1 catalysts
-            </p>
-          </div>
-
-          <div className="p-3 bg-tedbot-darker rounded-lg opacity-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-tedbot-gray-600 rounded-full"></div>
-                <span className="text-sm">GO analysis pending</span>
-              </div>
-              <span className="text-xs text-tedbot-gray-500">Waiting...</span>
-            </div>
-          </div>
-
-          <div className="p-3 bg-tedbot-darker rounded-lg opacity-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-tedbot-gray-600 rounded-full"></div>
-                <span className="text-sm">EXECUTE pending</span>
-              </div>
-              <span className="text-xs text-tedbot-gray-500">Waiting...</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Disclaimer */}

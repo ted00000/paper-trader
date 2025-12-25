@@ -4,17 +4,17 @@ import {
   DollarSign,
   Target,
   Award,
-  AlertTriangle
+  AlertTriangle,
+  TrendingUp,
+  Activity,
+  Briefcase
 } from 'lucide-react'
 import axios from 'axios'
 
 // Components
 import OperationsStatus from '../components/OperationsStatus'
-import MetricCard from '../components/MetricCard'
 import EquityCurveChart from '../components/EquityCurveChart'
-import RecentTradesTable from '../components/RecentTradesTable'
 import ActivePositionsGrid from '../components/ActivePositionsGrid'
-import MarketRegimeIndicator from '../components/MarketRegimeIndicator'
 import PerformanceDonutChart from '../components/PerformanceDonutChart'
 
 function CommandCenter() {
@@ -61,7 +61,7 @@ function CommandCenter() {
     )
   }
 
-  const { account, performance, recent_trades, positions } = overview
+  const { account, performance, positions } = overview
 
   return (
     <div className="space-y-6">
@@ -84,104 +84,81 @@ function CommandCenter() {
       {/* System Operations Status - Top Row */}
       <OperationsStatus />
 
-      {/* System Performance Metrics */}
-      <div>
-        <h2 className="text-xl font-bold mb-4">System Performance</h2>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="glass rounded-lg p-6">
+      {/* Account Overview Hero */}
+      <div className="glass rounded-lg p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Briefcase className="text-tedbot-accent" size={24} />
+          <h2 className="text-xl font-bold">Account Overview</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <h3 className="text-sm font-medium text-tedbot-gray-500 mb-2">Account Value</h3>
+            <p className="text-3xl font-bold">${account.value.toFixed(2)}</p>
+            <p className={`text-sm mt-1 ${account.total_return_pct >= 0 ? 'text-profit' : 'text-loss'}`}>
+              {account.total_return_pct >= 0 ? '+' : ''}{account.total_return_pct.toFixed(2)}% ({account.total_return_usd >= 0 ? '+' : ''}${account.total_return_usd.toFixed(2)})
+            </p>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-tedbot-gray-500 mb-2">Active Positions</h3>
+            <p className="text-3xl font-bold text-tedbot-accent">{positions.length}</p>
+            <p className="text-sm text-tedbot-gray-600 mt-1">
+              ${account.invested.toFixed(2)} deployed
+            </p>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-tedbot-gray-500 mb-2">Deployed Capital</h3>
+            <p className="text-3xl font-bold text-profit">
+              {((account.invested / account.value) * 100).toFixed(1)}%
+            </p>
+            <p className="text-sm text-tedbot-gray-600 mt-1">
+              ${account.cash.toFixed(2)} cash available
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Performance Metrics */}
+      <div className="glass rounded-lg p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <TrendingUp className="text-tedbot-accent" size={24} />
+          <h2 className="text-xl font-bold">Performance Metrics</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
             <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">YTD Return</h3>
             <p className={`text-2xl font-bold ${performance?.ytd_return >= 0 ? 'text-profit' : 'text-loss'}`}>
               {performance?.ytd_return >= 0 ? '+' : ''}{performance?.ytd_return?.toFixed(2) || '0.00'}%
             </p>
           </div>
 
-          <div className="glass rounded-lg p-6">
+          <div>
             <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">MTD Return</h3>
             <p className={`text-2xl font-bold ${performance?.mtd_return >= 0 ? 'text-profit' : 'text-loss'}`}>
               {performance?.mtd_return >= 0 ? '+' : ''}{performance?.mtd_return?.toFixed(2) || '0.00'}%
             </p>
           </div>
 
-          <div className="glass rounded-lg p-6">
-            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">Avg Gain</h3>
-            <p className="text-2xl font-bold text-profit">
-              +{performance?.avg_gain?.toFixed(2) || '0.00'}%
+          <div>
+            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">Win Rate</h3>
+            <p className={`text-2xl font-bold ${
+              performance.win_rate >= 60 ? 'text-profit' :
+              performance.win_rate >= 50 ? 'text-tedbot-accent' :
+              'text-loss'
+            }`}>
+              {performance.win_rate}%
             </p>
           </div>
 
-          <div className="glass rounded-lg p-6">
-            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">Avg Loss</h3>
-            <p className="text-2xl font-bold text-loss">
-              {performance?.avg_loss?.toFixed(2) || '0.00'}%
+          <div>
+            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">Max Drawdown</h3>
+            <p className={`text-2xl font-bold ${
+              performance.max_drawdown < 10 ? 'text-profit' :
+              performance.max_drawdown < 15 ? 'text-tedbot-accent' :
+              'text-loss'
+            }`}>
+              {performance.max_drawdown.toFixed(1)}%
             </p>
           </div>
-
-          <div className="glass rounded-lg p-6">
-            <h3 className="text-sm font-semibold text-tedbot-gray-400 mb-2">Total Trades</h3>
-            <p className="text-2xl font-bold text-tedbot-accent">
-              {performance?.total_trades || 0}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Account Value"
-          value={`$${account.value.toFixed(2)}`}
-          change={account.total_return_pct}
-          icon={DollarSign}
-          trend={account.total_return_pct > 0 ? 'up' : 'down'}
-        />
-        <MetricCard
-          title="Win Rate"
-          value={`${performance.win_rate}%`}
-          subtitle={`${performance.total_trades} trades`}
-          icon={Target}
-          trend={performance.win_rate >= 60 ? 'up' : performance.win_rate >= 50 ? 'neutral' : 'down'}
-        />
-        <MetricCard
-          title="Sharpe Ratio"
-          value={performance.sharpe_ratio.toFixed(2)}
-          subtitle="Risk-adjusted return"
-          icon={Award}
-          trend={performance.sharpe_ratio > 1.5 ? 'up' : performance.sharpe_ratio > 1.0 ? 'neutral' : 'down'}
-        />
-        <MetricCard
-          title="Max Drawdown"
-          value={`${performance.max_drawdown.toFixed(1)}%`}
-          subtitle="Peak to trough"
-          icon={AlertTriangle}
-          trend={performance.max_drawdown < 10 ? 'up' : performance.max_drawdown < 15 ? 'neutral' : 'down'}
-          invertTrend
-        />
-      </div>
-
-      {/* Cash & Positions Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="glass rounded-lg p-6">
-          <h3 className="text-sm font-medium text-tedbot-gray-500 mb-2">Cash Available</h3>
-          <p className="text-3xl font-bold text-profit">${account.cash.toFixed(2)}</p>
-          <p className="text-xs text-tedbot-gray-600 mt-1">
-            {((account.cash / account.value) * 100).toFixed(1)}% of account
-          </p>
-        </div>
-        <div className="glass rounded-lg p-6">
-          <h3 className="text-sm font-medium text-tedbot-gray-500 mb-2">Invested</h3>
-          <p className="text-3xl font-bold text-tedbot-accent">${account.invested.toFixed(2)}</p>
-          <p className="text-xs text-tedbot-gray-600 mt-1">
-            {positions.length} active positions
-          </p>
-        </div>
-        <div className="glass rounded-lg p-6">
-          <h3 className="text-sm font-medium text-tedbot-gray-500 mb-2">Total P&L</h3>
-          <p className={`text-3xl font-bold ${account.total_return_usd >= 0 ? 'text-profit' : 'text-loss'}`}>
-            {account.total_return_usd >= 0 ? '+' : ''}${account.total_return_usd.toFixed(2)}
-          </p>
-          <p className="text-xs text-tedbot-gray-600 mt-1">
-            {account.total_return_pct >= 0 ? '+' : ''}{account.total_return_pct.toFixed(2)}% all-time
-          </p>
         </div>
       </div>
 
@@ -194,55 +171,89 @@ function CommandCenter() {
           transition={{ delay: 0.1 }}
           className="glass rounded-lg p-6"
         >
-          <h3 className="text-xl font-bold mb-4">Performance</h3>
+          <div className="flex items-center gap-3 mb-4">
+            <Target className="text-tedbot-accent" size={24} />
+            <h3 className="text-xl font-bold">Performance Breakdown</h3>
+          </div>
           <PerformanceDonutChart performance={performance} />
         </motion.div>
 
-        {/* Equity Curve */}
+        {/* Key Statistics */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
           className="glass rounded-lg p-6"
         >
-          <h3 className="text-xl font-bold mb-4">Equity Curve</h3>
-          <EquityCurveChart />
+          <div className="flex items-center gap-3 mb-4">
+            <Award className="text-tedbot-accent" size={24} />
+            <h3 className="text-xl font-bold">Key Statistics</h3>
+          </div>
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-sm font-medium text-tedbot-gray-500 mb-2">Sharpe Ratio</h4>
+              <p className={`text-3xl font-bold ${
+                performance.sharpe_ratio > 1.5 ? 'text-profit' :
+                performance.sharpe_ratio > 1.0 ? 'text-tedbot-accent' :
+                'text-tedbot-gray-400'
+              }`}>
+                {performance.sharpe_ratio.toFixed(2)}
+              </p>
+              <p className="text-xs text-tedbot-gray-600 mt-1">Risk-adjusted return</p>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-tedbot-gray-500 mb-2">Total Trades</h4>
+              <p className="text-3xl font-bold text-tedbot-accent">
+                {performance?.total_trades || 0}
+              </p>
+              <p className="text-xs text-tedbot-gray-600 mt-1">
+                {performance.win_rate}% win rate
+              </p>
+            </div>
+          </div>
         </motion.div>
       </div>
 
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Trades */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="glass rounded-lg p-6"
-        >
-          <h3 className="text-xl font-bold mb-4">Recent Trades</h3>
-          <RecentTradesTable trades={recent_trades} />
-        </motion.div>
-
-        {/* Active Positions */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="glass rounded-lg p-6"
-        >
-          <h3 className="text-xl font-bold mb-4">Active Positions</h3>
-          <ActivePositionsGrid positions={positions} />
-        </motion.div>
-      </div>
-
-      {/* Market Regime Indicator */}
+      {/* Equity Curve - Full Width */}
       <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="glass rounded-lg p-6"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <Activity className="text-tedbot-accent" size={24} />
+          <h3 className="text-xl font-bold">Equity Curve</h3>
+        </div>
+        <EquityCurveChart />
+      </motion.div>
+
+      {/* Active Positions */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="glass rounded-lg p-6"
+      >
+        <h3 className="text-xl font-bold mb-4">Active Positions</h3>
+        <ActivePositionsGrid positions={positions} />
+      </motion.div>
+
+      {/* HIDDEN FOR MVP: Market Regime Indicator - Data not available */}
+      {/* TODO: Re-enable when market regime detection is implemented:
+        - Add VIX tracking
+        - Implement trend detection (bull/bear/neutral)
+        - Track SPY performance
+        - Calculate sector breadth
+        - Generate risk-on/risk-off signals
+      */}
+      {/* <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
         <MarketRegimeIndicator />
-      </motion.div>
+      </motion.div> */}
 
       {/* Disclaimer */}
       <motion.div

@@ -713,6 +713,138 @@ def get_operation_log(operation):
             'operation': operation
         }), 500
 
+@app.route('/api/v2/screening-decisions', methods=['GET'])
+def get_screening_decisions():
+    """
+    Parse today's GO report to extract screening decisions
+    Returns a summary of stocks screened with decision reasoning
+    """
+    daily_reviews_dir = PROJECT_DIR / 'daily_reviews'
+    if not daily_reviews_dir.exists():
+        return jsonify({'decisions': [], 'summary': 'No screening data available'}), 404
+
+    # Get today's GO report
+    today = datetime.now().strftime('%Y%m%d')
+    pattern_today = f"go_{today}_*.json"
+    files_today = sorted(daily_reviews_dir.glob(pattern_today), reverse=True)
+
+    # Fallback to most recent if no report today
+    if not files_today:
+        pattern_all = "go_*.json"
+        files_all = sorted(daily_reviews_dir.glob(pattern_all), reverse=True)
+        if not files_all:
+            return jsonify({'decisions': [], 'summary': 'No GO reports found'}), 404
+        go_file = files_all[0]
+        is_today = False
+    else:
+        go_file = files_today[0]
+        is_today = True
+
+    try:
+        with open(go_file) as f:
+            data = json.load(f)
+
+        # Extract the text content from Claude's response
+        text_content = ""
+        if 'content' in data and isinstance(data['content'], list):
+            for item in data['content']:
+                if item.get('type') == 'text':
+                    text_content = item.get('text', '')
+                    break
+
+        # Parse the text to extract decisions
+        decisions = []
+        summary = ""
+
+        # Look for recommendation section
+        if "RECOMMENDATION" in text_content:
+            # Extract summary (e.g., "BUILD ZERO POSITIONS", "BUILD 3 POSITIONS")
+            import re
+            summary_match = re.search(r'RECOMMENDATION:\s*BUILD\s+(\w+)\s+POSITION', text_content, re.IGNORECASE)
+            if summary_match:
+                count = summary_match.group(1)
+                if count.upper() == 'ZERO':
+                    summary = "No positions recommended today"
+                else:
+                    summary = f"{count} position(s) recommended"
+
+        # Parse individual stock decisions
+        lines = text_content.split('\n')
+        current_ticker = None
+        current_decision = None
+        current_reason = None
+
+        for line in lines:
+            line = line.strip()
+
+            # Look for stock ticker lines (e.g., "**CCJ (Score 37.5)**")
+            ticker_match = re.search(r'\*\*([A-Z]{1,5})\s+\(Score\s+([\d.]+)\)\*\*', line)
+            if ticker_match:
+                # Save previous stock if exists
+                if current_ticker:
+                    decisions.append({
+                        'ticker': current_ticker,
+                        'decision': current_decision or 'Passed',
+                        'reason': current_reason or 'No catalyst met criteria',
+                        'score': current_score
+                    })
+
+                current_ticker = ticker_match.group(1)
+                current_score = float(ticker_match.group(2))
+                current_decision = None
+                current_reason = None
+
+            # Look for verdict/decision lines
+            elif current_ticker and ('VERDICT:' in line or 'DECISION:' in line):
+                # Extract the verdict
+                verdict_match = re.search(r'(?:VERDICT|DECISION):\s*(.+?)(?:\.|$)', line)
+                if verdict_match:
+                    verdict = verdict_match.group(1).strip()
+                    if 'REJECT' in verdict.upper() or 'PASS' in verdict.upper():
+                        current_decision = 'Passed'
+                        current_reason = verdict
+                    elif 'HOLD' in verdict.upper() or 'WATCH' in verdict.upper():
+                        current_decision = 'On Hold'
+                        current_reason = verdict
+                    elif 'SELECT' in verdict.upper() or 'BUY' in verdict.upper():
+                        current_decision = 'Selected'
+                        current_reason = verdict
+
+        # Save last stock
+        if current_ticker:
+            decisions.append({
+                'ticker': current_ticker,
+                'decision': current_decision or 'Passed',
+                'reason': current_reason or 'No catalyst met criteria',
+                'score': current_score
+            })
+
+        # If no decisions parsed, provide a generic summary
+        if not decisions and not summary:
+            if "ZERO TIER 1 CATALYSTS" in text_content or "ZERO POSITIONS" in text_content:
+                summary = "No Tier 1 catalysts identified today"
+            else:
+                summary = "Screening in progress"
+
+        # Get file timestamp
+        import os
+        mod_time = datetime.fromtimestamp(os.path.getmtime(go_file))
+
+        return jsonify({
+            'decisions': decisions[:10],  # Limit to top 10
+            'summary': summary or "Screening decisions available",
+            'timestamp': mod_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'is_today': is_today,
+            'total_reviewed': len(decisions)
+        })
+
+    except Exception as e:
+        return jsonify({
+            'error': f'Error parsing GO report: {str(e)}',
+            'decisions': [],
+            'summary': 'Error loading screening data'
+        }), 500
+
 @app.route('/api/v2/health', methods=['GET'])
 def health_check():
     """API health check"""

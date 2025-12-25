@@ -99,6 +99,27 @@ function RiskCommand() {
         </div>
       </div>
 
+      {/* Trade Performance Metrics */}
+      <div className="glass rounded-lg p-6">
+        <h3 className="text-xl font-bold mb-4">Trade Performance Metrics</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="text-sm font-medium text-tedbot-gray-500 mb-2">Average Gain</h4>
+            <p className="text-3xl font-bold text-profit">
+              +{overview?.performance?.avg_gain?.toFixed(2) || '0.00'}%
+            </p>
+            <p className="text-xs text-tedbot-gray-600 mt-1">Per winning trade</p>
+          </div>
+          <div>
+            <h4 className="text-sm font-medium text-tedbot-gray-500 mb-2">Average Loss</h4>
+            <p className="text-3xl font-bold text-loss">
+              {overview?.performance?.avg_loss?.toFixed(2) || '0.00'}%
+            </p>
+            <p className="text-xs text-tedbot-gray-600 mt-1">Per losing trade</p>
+          </div>
+        </div>
+      </div>
+
       {/* Risk Controls */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass rounded-lg p-6">
