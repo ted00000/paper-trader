@@ -158,47 +158,47 @@ function App() {
       <div className="min-h-screen bg-tedbot-dark">
         {/* Header */}
         <header className="bg-tedbot-darker border-b-2 border-tedbot-accent">
-          <div className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+          <div className="px-4 sm:px-6 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <img
                   src="/tedbot-logo.png"
                   alt="Tedbot Logo"
-                  className="w-12 h-12 rounded-lg"
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg"
                 />
                 <div>
-                  <h1 className="text-3xl font-bold gradient-text">Tedbot</h1>
-                  <p className="text-sm text-tedbot-gray-500">Autonomous Trading Terminal</p>
+                  <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Tedbot</h1>
+                  <p className="text-xs sm:text-sm text-tedbot-gray-500">Autonomous Trading Terminal</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-6">
-                <div className="text-right">
-                  <div className="text-sm text-tedbot-gray-500">Account Value</div>
-                  <div className="text-2xl font-bold text-tedbot-accent">
+              <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6">
+                <div className="text-left sm:text-right">
+                  <div className="text-xs sm:text-sm text-tedbot-gray-500">Account Value</div>
+                  <div className="text-lg sm:text-2xl font-bold text-tedbot-accent">
                     ${headerData.value.toFixed(2)}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm text-tedbot-gray-500">Total Return</div>
-                  <div className={`text-2xl font-bold ${headerData.return >= 0 ? 'text-profit' : 'text-loss'}`}>
+                <div className="text-left sm:text-right">
+                  <div className="text-xs sm:text-sm text-tedbot-gray-500">Total Return</div>
+                  <div className={`text-lg sm:text-2xl font-bold ${headerData.return >= 0 ? 'text-profit' : 'text-loss'}`}>
                     {headerData.return >= 0 ? '+' : ''}{headerData.return.toFixed(2)}%
                   </div>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 bg-tedbot-darker border border-tedbot-gray-800 rounded-lg hover:border-loss hover:text-loss transition-colors"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-tedbot-darker border border-tedbot-gray-800 rounded-lg hover:border-loss hover:text-loss transition-colors whitespace-nowrap"
                   title="Sign out"
                 >
-                  <LogOut size={18} />
-                  <span className="text-sm">Logout</span>
+                  <LogOut size={16} className="sm:w-[18px] sm:h-[18px]" />
+                  <span className="text-xs sm:text-sm">Logout</span>
                 </button>
               </div>
             </div>
           </div>
 
           {/* Navigation Tabs */}
-          <nav className="flex gap-1 px-6 overflow-x-auto">
+          <nav className="flex gap-1 px-4 sm:px-6 overflow-x-auto scrollbar-hide">
             {navigation.map((item) => {
               const Icon = item.icon
               return (
@@ -206,14 +206,14 @@ function App() {
                   key={item.name}
                   to={item.href}
                   className={({ isActive }) =>
-                    `flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    `flex items-center gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                       isActive
                         ? 'border-tedbot-accent text-tedbot-accent'
                         : 'border-transparent text-tedbot-gray-500 hover:text-white hover:border-tedbot-gray-700'
                     }`
                   }
                 >
-                  <Icon size={16} />
+                  <Icon size={14} className="sm:w-4 sm:h-4" />
                   {item.name}
                 </NavLink>
               )
