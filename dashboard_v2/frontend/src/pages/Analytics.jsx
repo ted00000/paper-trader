@@ -54,10 +54,10 @@ function Analytics() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold mb-2">System Analytics</h1>
-          <p className="text-tedbot-gray-500">Advanced performance analytics and insights</p>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2">System Analytics</h1>
+          <p className="text-tedbot-gray-500 text-sm">Advanced performance analytics and insights</p>
         </div>
         <div className="flex items-center gap-4">
           {lastUpdate && (
@@ -68,7 +68,7 @@ function Analytics() {
           <button
             onClick={fetchAnalytics}
             disabled={loading}
-            className="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-tedbot-gray-900 transition-colors disabled:opacity-50"
+            className="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-tedbot-gray-900 transition-colors disabled:opacity-50 whitespace-nowrap"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             Refresh

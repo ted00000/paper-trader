@@ -7,7 +7,8 @@ import {
   AlertTriangle,
   TrendingUp,
   Activity,
-  Briefcase
+  Briefcase,
+  RefreshCw
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -66,18 +67,19 @@ function CommandCenter() {
   return (
     <div className="space-y-6">
       {/* Page Title */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold">Command Center</h2>
-          <p className="text-tedbot-gray-500 mt-1">
+          <h2 className="text-2xl sm:text-3xl font-bold">Command Center</h2>
+          <p className="text-tedbot-gray-500 text-sm mt-1">
             Real-time overview · Updated {lastUpdate.toLocaleTimeString()}
           </p>
         </div>
         <button
           onClick={fetchOverview}
-          className="px-4 py-2 bg-tedbot-gray-800 hover:bg-tedbot-gray-700 rounded-lg transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-tedbot-darker rounded-lg border border-tedbot-gray-800 hover:border-tedbot-accent transition-colors whitespace-nowrap"
         >
-          Refresh Data
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          <span className="text-sm">Refresh Page</span>
         </button>
       </div>
 

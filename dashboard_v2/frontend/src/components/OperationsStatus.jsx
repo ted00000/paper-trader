@@ -107,14 +107,14 @@ function OperationsStatus() {
   return (
     <>
       <div className="glass rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
             <Activity size={20} />
             System Operations Status
           </h3>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {operationsData && (
-              <div className={`flex items-center gap-2 glass px-4 py-2 rounded-lg border ${
+              <div className={`flex items-center gap-2 glass px-3 sm:px-4 py-2 rounded-lg border ${
                 operationsData.health === 'HEALTHY' ? 'border-profit' :
                 operationsData.health === 'WARNING' ? 'border-yellow-500' :
                 'border-loss'
@@ -124,7 +124,7 @@ function OperationsStatus() {
                   operationsData.health === 'WARNING' ? 'bg-yellow-500' :
                   'bg-loss'
                 }`}></div>
-                <span className={`text-sm font-semibold ${
+                <span className={`text-xs sm:text-sm font-semibold ${
                   operationsData.health === 'HEALTHY' ? 'text-profit' :
                   operationsData.health === 'WARNING' ? 'text-yellow-500' :
                   'text-loss'
@@ -135,7 +135,7 @@ function OperationsStatus() {
             )}
             <button
               onClick={fetchOperations}
-              className="flex items-center gap-2 px-4 py-2 bg-tedbot-darker rounded-lg border border-tedbot-gray-800 hover:border-tedbot-accent transition-colors"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-tedbot-darker rounded-lg border border-tedbot-gray-800 hover:border-tedbot-accent transition-colors whitespace-nowrap"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               <span className="text-sm">Refresh</span>
