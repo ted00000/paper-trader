@@ -1,81 +1,13 @@
 {
-  "scan_date": "2025-11-25",
-  "scan_time": "22:57:19 ET",
-  "universe_size": 289,
-  "rs_pass_count": 1,
-  "candidates_found": 1,
+  "scan_date": null,
+  "scan_time": null,
+  "universe_size": 0,
+  "rs_pass_count": 0,
+  "candidates_found": 0,
   "filters_applied": {
     "min_rs_pct": 3.0,
     "min_price": 5.0,
     "min_market_cap": 1000000000
   },
-  "candidates": [
-    {
-      "ticker": "PCG",
-      "composite_score": 29.58,
-      "sector": "Technology",
-      "price": 0,
-      "relative_strength": {
-        "rs_pct": 0.0,
-        "stock_return_3m": 0.0,
-        "sector_return_3m": 0.0,
-        "sector_etf": "XLK",
-        "passed_filter": false,
-        "score": 0
-      },
-      "catalyst_signals": {
-        "score": 0,
-        "count": 0,
-        "keywords": [],
-        "scaled_score": 0,
-        "top_articles": []
-      },
-      "sec_8k_filings": {
-        "has_recent_8k": true,
-        "catalyst_type_8k": "contract_8k",
-        "filing_date": "2025-11-25",
-        "score": 100
-      },
-      "volume_analysis": {
-        "volume_ratio": 1.0,
-        "avg_volume_20d": 0,
-        "yesterday_volume": 0,
-        "score": 33.3
-      },
-      "technical_setup": {
-        "distance_from_52w_high_pct": 100,
-        "is_near_high": false,
-        "high_52w": 0,
-        "current_price": 0,
-        "score": 0
-      },
-      "analyst_ratings": {
-        "has_upgrade": false,
-        "upgrade_count": 0,
-        "downgrade_count": 0,
-        "net_upgrades": 0,
-        "recent_upgrades": [],
-        "score": 0,
-        "catalyst_type": null
-      },
-      "insider_transactions": {
-        "has_cluster": true,
-        "buy_count": 3,
-        "total_shares": 13572,
-        "score": 75,
-        "catalyst_type": "insider_buying"
-      },
-      "earnings_surprises": {
-        "has_beat": false,
-        "surprise_pct": 0,
-        "score": 0,
-        "catalyst_type": null,
-        "recency_tier": null
-      },
-      "earnings_data": {},
-      "catalyst_tier": "Tier 2 - SEC 8-K Contract",
-      "why_selected": "INSIDER BUY: 3 transactions, SEC 8-K CONTRACT: Filed 2025-11-25",
-      "rank": 1
-    }
-  ]
+  "candidates": []
 }
