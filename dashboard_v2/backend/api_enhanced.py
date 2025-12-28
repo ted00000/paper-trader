@@ -681,27 +681,29 @@ def get_operation_log(operation):
 
             # Format the screener output nicely
             output_lines = []
-            output_lines.append(f"Scan Date: {data.get('scan_date', 'Unknown')}")
-            output_lines.append(f"Scan Time: {data.get('scan_time', 'Unknown')}")
-            output_lines.append(f"Universe Size: {data.get('universe_size', 0):,}")
-            output_lines.append(f"Candidates Found: {data.get('candidates_found', 0)}")
+            output_lines.append("# SCREENER RESULTS")
             output_lines.append("")
-            output_lines.append("=" * 80)
+            output_lines.append(f"**Scan Date:** {data.get('scan_date', 'Unknown')}")
+            output_lines.append(f"**Scan Time:** {data.get('scan_time', 'Unknown')}")
+            output_lines.append(f"**Universe Size:** {data.get('universe_size', 0):,}")
+            output_lines.append(f"**Candidates Found:** {data.get('candidates_found', 0)}")
+            output_lines.append("")
+            output_lines.append("---")
             output_lines.append("")
 
             candidates = data.get('candidates', [])
             if candidates:
-                output_lines.append(f"CANDIDATES ({len(candidates)}):")
+                output_lines.append(f"## CANDIDATES ({len(candidates)})")
                 output_lines.append("")
                 for i, candidate in enumerate(candidates, 1):
-                    output_lines.append(f"{i}. {candidate.get('ticker', 'N/A')} - Score: {candidate.get('composite_score', 0):.2f}")
-                    output_lines.append(f"   Sector: {candidate.get('sector', 'Unknown')}")
-                    output_lines.append(f"   Price: ${candidate.get('price', 0):.2f}")
+                    output_lines.append(f"**{i}. {candidate.get('ticker', 'N/A')}** - Score: {candidate.get('composite_score', 0):.2f}")
+                    output_lines.append(f"- **Sector:** {candidate.get('sector', 'Unknown')}")
+                    output_lines.append(f"- **Price:** ${candidate.get('price', 0):.2f}")
 
                     # Catalyst info
                     catalyst = candidate.get('catalyst_signals', {})
                     if catalyst.get('count', 0) > 0:
-                        output_lines.append(f"   Catalysts: {catalyst.get('count')} - {', '.join(catalyst.get('keywords', []))}")
+                        output_lines.append(f"- **Catalysts:** {catalyst.get('count')} - {', '.join(catalyst.get('keywords', []))}")
 
                     output_lines.append("")
             else:
