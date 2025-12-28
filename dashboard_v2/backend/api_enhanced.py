@@ -28,6 +28,10 @@ CORS(app)  # Enable CORS for React frontend
 VALID_USERNAME = os.getenv('DASHBOARD_USERNAME', 'tedbot')
 VALID_PASSWORD_HASH = hashlib.sha256(os.getenv('DASHBOARD_PASSWORD', 'tedbot2025').encode()).hexdigest()
 
+# Super user credentials (can view operation logs)
+SUPER_USER_USERNAME = os.getenv('SUPER_USER_USERNAME', 'ted')
+SUPER_USER_PASSWORD_HASH = hashlib.sha256(os.getenv('SUPER_USER_PASSWORD', 'SuperTed2025').encode()).hexdigest()
+
 # Session storage (in-memory for MVP, use Redis for production)
 active_sessions = {}
 
@@ -127,11 +131,16 @@ def login():
     # Hash provided password and compare
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-    if username == VALID_USERNAME and password_hash == VALID_PASSWORD_HASH:
+    # Check if super user
+    is_super_user = (username == SUPER_USER_USERNAME and password_hash == SUPER_USER_PASSWORD_HASH)
+
+    # Check if regular user or super user
+    if (username == VALID_USERNAME and password_hash == VALID_PASSWORD_HASH) or is_super_user:
         # Generate session token
         token = generate_session_token()
         active_sessions[token] = {
             'username': username,
+            'is_super_user': is_super_user,
             'created_at': datetime.now().isoformat(),
             'last_activity': datetime.now().isoformat()
         }
@@ -139,7 +148,8 @@ def login():
         return jsonify({
             'success': True,
             'token': token,
-            'username': username
+            'username': username,
+            'is_super_user': is_super_user
         })
     else:
         return jsonify({
@@ -160,7 +170,10 @@ def verify():
     if verify_session(token):
         # Update last activity
         active_sessions[token]['last_activity'] = datetime.now().isoformat()
-        return jsonify({'valid': True})
+        return jsonify({
+            'valid': True,
+            'is_super_user': active_sessions[token].get('is_super_user', False)
+        })
     else:
         return jsonify({'valid': False}), 401
 
