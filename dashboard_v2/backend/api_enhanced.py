@@ -782,19 +782,72 @@ def get_operation_log(operation):
         # Remove JSON code blocks (```json ... ```)
         content = re.sub(r'```json\s*\n.*?\n```', '', content, flags=re.DOTALL)
 
-        # Style the override section with green color
+        # Extract Portfolio Status and Reasoning before removing
+        portfolio_status = None
+        reasoning_text = None
+        status_match = re.search(r'\*\*Portfolio Status:\*\* ([^\n]+)', content)
+        reasoning_match = re.search(r'\*\*Reasoning:\*\* ([^\n]+)', content)
+
+        if status_match:
+            portfolio_status = status_match.group(1)
+        if reasoning_match:
+            reasoning_text = reasoning_match.group(1)
+
+        # Remove orphaned Portfolio Status/Reasoning lines (that appeared after JSON)
+        content = re.sub(r'\n*\*\*Portfolio Status:\*\*[^\n]*\n\*\*Reasoning:\*\*[^\n]*', '', content)
+
+        # Style main title with green
+        content = re.sub(
+            r'^# ([^\n]+)$',
+            r'# <span style="color: #00ff41">\1</span>',
+            content,
+            flags=re.MULTILINE,
+            count=1
+        )
+
+        # Style critical sections
+        content = re.sub(
+            r'(ZERO TIER 1 CATALYSTS IDENTIFIED)',
+            r'<span style="color: #ff0033; font-weight: bold;">\1</span>',
+            content
+        )
+
+        # Style the override section
         content = re.sub(
             r'## 🚨 IF YOU WANT TO OVERRIDE',
             r'## 🚨 <span style="color: #00ff41">IF YOU WANT TO OVERRIDE</span>',
             content
         )
 
-        # Style "Override Tier 1 requirement..." text
+        # Style "Override Tier 1 requirement..." text with emphasis
         content = re.sub(
             r'"(Override Tier 1 requirement[^"]*)"',
-            r'<span style="color: #00ff41">"**\1**"</span>',
+            r'<span style="color: #00ff41; font-weight: bold;">"\1"</span>',
             content
         )
+
+        # Style FINAL DECISION section
+        content = re.sub(
+            r'## ✅ FINAL DECISION',
+            r'## <span style="color: #00ff41">✅ FINAL DECISION</span>',
+            content
+        )
+
+        # Style recommendation text
+        content = re.sub(
+            r'(I recommend ZERO positions today\.)',
+            r'<span style="color: #00ff41; font-weight: bold;">\1</span>',
+            content
+        )
+
+        # Add formatted summary box at the end if we have the data
+        if portfolio_status and reasoning_text:
+            summary_box = '\n\n---\n\n'
+            summary_box += '## 📋 <span style="color: #00ff41">SUMMARY</span>\n\n'
+            summary_box += f'**Portfolio Status:** <span style="color: #00ff41">{portfolio_status}</span>\n\n'
+            summary_box += f'**Reasoning:** {reasoning_text}\n'
+
+            content = content + summary_box
 
         # Add note if not from today
         if not is_today:
