@@ -776,6 +776,26 @@ def get_operation_log(operation):
         # Format time: 15:39:44
         formatted_time = f"{time_str[:2]}:{time_str[2:4]}:{time_str[4:]}"
 
+        # Clean up the content for better display
+        import re
+
+        # Remove JSON code blocks (```json ... ```)
+        content = re.sub(r'```json\s*\n.*?\n```', '', content, flags=re.DOTALL)
+
+        # Style the override section with green color
+        content = re.sub(
+            r'## 🚨 IF YOU WANT TO OVERRIDE',
+            r'## 🚨 <span style="color: #00ff41">IF YOU WANT TO OVERRIDE</span>',
+            content
+        )
+
+        # Style "Override Tier 1 requirement..." text
+        content = re.sub(
+            r'"(Override Tier 1 requirement[^"]*)"',
+            r'<span style="color: #00ff41">"**\1**"</span>',
+            content
+        )
+
         # Add note if not from today
         if not is_today:
             note = f"(No logs found for today - showing most recent run from {formatted_date})\n\n"
