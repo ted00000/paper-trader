@@ -560,10 +560,8 @@ def get_operations_status():
     # Check daily_reviews for GO/EXECUTE/ANALYZE operations
     daily_reviews_dir = PROJECT_DIR / 'daily_reviews'
     if daily_reviews_dir.exists():
-        today = datetime.now().strftime('%Y%m%d')
-
         for operation in ['go', 'execute', 'analyze']:
-            pattern = f"{operation}_{today}_*.json"
+            pattern = f"{operation}_*.json"
             files = sorted(daily_reviews_dir.glob(pattern), reverse=True)
 
             if files:
