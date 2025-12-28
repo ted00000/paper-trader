@@ -707,13 +707,6 @@ def get_operation_log(operation):
             else:
                 output_lines.append("No candidates found matching criteria.")
 
-            # Add full JSON at the end for reference
-            output_lines.append("")
-            output_lines.append("=" * 80)
-            output_lines.append("FULL JSON OUTPUT:")
-            output_lines.append("=" * 80)
-            output_lines.append(json.dumps(data, indent=2))
-
             content = "\n".join(output_lines)
 
             # Get file modification time
