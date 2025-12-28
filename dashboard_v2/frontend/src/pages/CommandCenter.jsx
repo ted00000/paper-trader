@@ -18,7 +18,7 @@ import EquityCurveChart from '../components/EquityCurveChart'
 import ActivePositionsGrid from '../components/ActivePositionsGrid'
 import PerformanceDonutChart from '../components/PerformanceDonutChart'
 
-function CommandCenter() {
+function CommandCenter({ isSuperUser = false }) {
   const [overview, setOverview] = useState(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
@@ -84,7 +84,7 @@ function CommandCenter() {
       </div>
 
       {/* System Operations Status - Top Row */}
-      <OperationsStatus />
+      <OperationsStatus isSuperUser={isSuperUser} />
 
       {/* Account Overview Hero */}
       <div className="glass rounded-lg p-6">

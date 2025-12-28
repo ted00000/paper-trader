@@ -25,6 +25,7 @@ import PublicView from './pages/PublicView'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isSuperUser, setIsSuperUser] = useState(false)
   const [loading, setLoading] = useState(true)
   const [headerData, setHeaderData] = useState({ value: 0, return: 0 })
 
@@ -40,7 +41,9 @@ function App() {
             }
           })
           if (response.ok) {
+            const data = await response.json()
             setIsAuthenticated(true)
+            setIsSuperUser(data.is_super_user || false)
           } else {
             localStorage.removeItem('tedbot_session')
           }
@@ -54,8 +57,9 @@ function App() {
     checkAuth()
   }, [])
 
-  const handleLogin = (token) => {
+  const handleLogin = (token, is_super_user) => {
     setIsAuthenticated(true)
+    setIsSuperUser(is_super_user || false)
   }
 
   const handleLogout = () => {
@@ -224,7 +228,7 @@ function App() {
         {/* Main Content */}
         <main className="p-6">
           <Routes>
-            <Route path="/" element={<CommandCenter />} />
+            <Route path="/" element={<CommandCenter isSuperUser={isSuperUser} />} />
             <Route path="/today" element={<Today />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/trades" element={<TradeExplorer />} />

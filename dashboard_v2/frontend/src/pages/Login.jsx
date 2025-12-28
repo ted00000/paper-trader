@@ -28,7 +28,7 @@ function Login({ onLogin }) {
       if (response.ok) {
         // Store session token
         localStorage.setItem('tedbot_session', data.token)
-        onLogin(data.token)
+        onLogin(data.token, data.is_super_user)
       } else {
         setError(data.error || 'Invalid credentials')
       }

@@ -4,7 +4,7 @@ import axios from 'axios'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 
-function OperationsStatus() {
+function OperationsStatus({ isSuperUser = false }) {
   const [operationsData, setOperationsData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selectedLog, setSelectedLog] = useState(null)
@@ -157,8 +157,8 @@ function OperationsStatus() {
             {sortedOperations.map(([name, op]) => (
               <div
                 key={name}
-                onClick={() => viewLog(name)}
-                className={`bg-tedbot-darker rounded-lg p-4 border-l-4 ${getHealthColor(op.health)} transition-all cursor-pointer hover:shadow-lg hover:border-tedbot-accent`}
+                onClick={isSuperUser ? () => viewLog(name) : undefined}
+                className={`bg-tedbot-darker rounded-lg p-4 border-l-4 ${getHealthColor(op.health)} transition-all ${isSuperUser ? 'cursor-pointer hover:shadow-lg hover:border-tedbot-accent' : ''}`}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -168,7 +168,7 @@ function OperationsStatus() {
                       <p className="text-xs text-tedbot-gray-500">{op.status}</p>
                     </div>
                   </div>
-                  <Eye size={16} className="text-tedbot-gray-500" />
+                  {isSuperUser && <Eye size={16} className="text-tedbot-gray-500" />}
                 </div>
 
                 <div className="space-y-1 text-xs">
