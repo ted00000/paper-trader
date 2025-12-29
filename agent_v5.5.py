@@ -261,6 +261,14 @@ import traceback
 import pytz
 import hashlib
 
+# Alpaca Integration (v7.2 - Phase 1: Paper Trading)
+try:
+    from alpaca_broker import AlpacaBroker
+    ALPACA_AVAILABLE = True
+except ImportError:
+    print("⚠️  AlpacaBroker not available - using JSON file portfolio tracking")
+    ALPACA_AVAILABLE = False
+
 # Configuration
 ET = pytz.timezone('America/New_York')  # Eastern Time for trading operations
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
@@ -414,6 +422,20 @@ class TradingAgent:
         self.pending_file = self.project_dir / 'portfolio_data' / 'pending_positions.json'
         self.exclusions_file = self.project_dir / 'strategy_evolution' / 'catalyst_exclusions.json'
         self.daily_activity_file = self.project_dir / 'portfolio_data' / 'daily_activity.json'
+
+        # Initialize Alpaca broker (v7.2 - Phase 1: Paper Trading Integration)
+        self.broker = None
+        self.use_alpaca = False
+        if ALPACA_AVAILABLE:
+            try:
+                self.broker = AlpacaBroker()
+                self.use_alpaca = True
+                print("✓ Alpaca broker connected (paper trading mode)")
+            except Exception as e:
+                print(f"⚠️  Alpaca broker initialization failed: {e}")
+                print("   Falling back to JSON file portfolio tracking")
+                self.broker = None
+                self.use_alpaca = False
 
         # Ensure required data files exist
         self._ensure_data_files()
