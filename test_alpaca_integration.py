@@ -14,8 +14,22 @@ sys.path.insert(0, str(Path(__file__).parent))
 original_argv = sys.argv
 sys.argv = ['test_script']
 
-# Now import (main() won't trigger because len(sys.argv) == 1)
-from agent_v5_5 import TradingAgent
+# Now import - need to use exec since filename has dots
+with open('agent_v5.5.py', 'r') as f:
+    code = f.read()
+    # Remove the main execution block to prevent it from running
+    code_lines = code.split('\n')
+    filtered_lines = []
+    skip_main = False
+    for line in code_lines:
+        if 'if __name__ ==' in line:
+            skip_main = True
+        if not skip_main:
+            filtered_lines.append(line)
+    exec('\n'.join(filtered_lines))
+
+# Get TradingAgent from globals
+TradingAgent = globals()['TradingAgent']
 
 # Restore argv
 sys.argv = original_argv
