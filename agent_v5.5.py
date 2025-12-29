@@ -1196,6 +1196,86 @@ POSITION {i}: {ticker}
 
         return trade
 
+    def _execute_alpaca_sell(self, ticker, shares, reason):
+        """
+        Execute sell order via Alpaca (v7.2 - Stage 3)
+
+        Args:
+            ticker: Stock symbol
+            shares: Number of shares to sell
+            reason: Exit reason for logging
+
+        Returns:
+            Tuple of (success: bool, message: str, order_id: str or None)
+        """
+        if not self.use_alpaca or not self.broker:
+            return False, "Alpaca not available - using JSON tracking", None
+
+        try:
+            # Safety check: Verify we actually have this position in Alpaca
+            position = self.broker.get_position(ticker)
+            if not position:
+                return False, f"No Alpaca position found for {ticker}", None
+
+            # Calculate shares to sell (use all if shares > position qty)
+            shares_to_sell = min(int(shares), int(float(position.qty)))
+
+            if shares_to_sell <= 0:
+                return False, f"Invalid quantity: {shares_to_sell}", None
+
+            # Place market sell order
+            print(f"      📤 Placing Alpaca SELL order: {shares_to_sell} shares of {ticker}")
+            order = self.broker.place_market_order(ticker, shares_to_sell, side='sell')
+
+            print(f"      ✓ Alpaca order placed: {order.id} (status: {order.status})")
+            return True, f"Sold {shares_to_sell} shares via Alpaca", order.id
+
+        except Exception as e:
+            error_msg = f"Alpaca sell failed: {str(e)}"
+            print(f"      ⚠️ {error_msg}")
+            return False, error_msg, None
+
+    def _execute_alpaca_buy(self, ticker, position_size_dollars, entry_price):
+        """
+        Execute buy order via Alpaca (v7.2 - Stage 3)
+
+        Args:
+            ticker: Stock symbol
+            position_size_dollars: Dollar amount to invest
+            entry_price: Expected entry price (for share calculation)
+
+        Returns:
+            Tuple of (success: bool, message: str, order_id: str or None, actual_shares: int)
+        """
+        if not self.use_alpaca or not self.broker:
+            return False, "Alpaca not available - using JSON tracking", None, 0
+
+        try:
+            # Calculate shares from dollar amount
+            shares = int(position_size_dollars / entry_price)
+
+            if shares <= 0:
+                return False, f"Invalid quantity: {shares} (${position_size_dollars:.2f} / ${entry_price:.2f})", None, 0
+
+            # Safety check: Verify we have enough buying power
+            account = self.broker.get_account()
+            buying_power = float(account.buying_power)
+
+            if position_size_dollars > buying_power:
+                return False, f"Insufficient buying power: ${buying_power:.2f} < ${position_size_dollars:.2f}", None, 0
+
+            # Place market buy order
+            print(f"      📤 Placing Alpaca BUY order: {shares} shares of {ticker} (~${position_size_dollars:.2f})")
+            order = self.broker.place_market_order(ticker, shares, side='buy')
+
+            print(f"      ✓ Alpaca order placed: {order.id} (status: {order.status})")
+            return True, f"Bought {shares} shares via Alpaca", order.id, shares
+
+        except Exception as e:
+            error_msg = f"Alpaca buy failed: {str(e)}"
+            print(f"      ⚠️ {error_msg}")
+            return False, error_msg, None, 0
+
     def _log_trade_to_csv(self, trade):
         """
         Wrapper to log closed trade to CSV via log_completed_trade()
@@ -5928,6 +6008,19 @@ RECENT LESSONS LEARNED:
                         # Standardize the exit reason (converts Claude's freeform text to consistent format)
                         standardized_reason = self.standardize_exit_reason(position, exit_price, claude_reason)
 
+                        # v7.2 Stage 3: Execute sell order via Alpaca (if available)
+                        alpaca_success, alpaca_msg, order_id = self._execute_alpaca_sell(
+                            ticker,
+                            position.get('shares', 0),
+                            standardized_reason
+                        )
+                        if alpaca_success:
+                            print(f"      ✓ Alpaca: {alpaca_msg} (Order: {order_id})")
+                        elif "not available" not in alpaca_msg:
+                            # Log Alpaca failures (but don't block the exit if Alpaca fails)
+                            print(f"      ⚠️ Alpaca: {alpaca_msg}")
+                            print(f"      → Continuing with JSON portfolio tracking")
+
                         closed_trade = self._close_position(position, exit_price, standardized_reason)
                         closed_trades.append(closed_trade)
                         exited_tickers.add(ticker)  # Track this ticker was exited
@@ -6122,6 +6215,22 @@ RECENT LESSONS LEARNED:
 
                     # Update cash available for next position
                     cash_available -= position_size_dollars
+
+                    # v7.2 Stage 3: Execute buy order via Alpaca (if available)
+                    alpaca_success, alpaca_msg, order_id, actual_shares = self._execute_alpaca_buy(
+                        ticker,
+                        position_size_dollars,
+                        entry_price
+                    )
+                    if alpaca_success:
+                        print(f"      ✓ Alpaca: {alpaca_msg} (Order: {order_id})")
+                        # Update shares if Alpaca returned actual quantity
+                        if actual_shares > 0:
+                            pos['shares'] = actual_shares
+                    elif "not available" not in alpaca_msg:
+                        # Log Alpaca failures (but don't block the entry if Alpaca fails)
+                        print(f"      ⚠️ Alpaca: {alpaca_msg}")
+                        print(f"      → Continuing with JSON portfolio tracking")
 
                     updated_positions.append(pos)
                     print(f"   ✓ ENTERED {ticker}: ${entry_price:.2f}, {pos['shares']:.2f} shares (${position_size_dollars:.2f} = {position_size_pct}% of ${current_account_value:.2f})")
