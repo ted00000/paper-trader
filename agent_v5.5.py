@@ -279,7 +279,7 @@ CLAUDE_MODEL = 'claude-sonnet-4-5-20250929'
 PROJECT_DIR = Path(__file__).parent
 
 # System version tracking (Enhancement 4.7)
-SYSTEM_VERSION = 'v7.1'  # Validation Improvements (ruleset versioning, slippage tracking, exit policy clarity)
+SYSTEM_VERSION = 'v8.0'  # Alpaca Paper Trading Integration (real brokerage API execution)
 
 # v7.1: Ruleset versioning for policy drift prevention
 def get_ruleset_version():
@@ -6560,7 +6560,7 @@ def main():
     command = sys.argv[1].lower()
 
     print(f"\n{'='*60}")
-    print(f"Paper Trading Lab Agent v5.4.0")
+    print(f"Paper Trading Lab Agent v8.0 (Alpaca Integration)")
     et_tz = pytz.timezone('America/New_York')
     print(f"Time: {datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S ET')}")
     print(f"{'='*60}")
