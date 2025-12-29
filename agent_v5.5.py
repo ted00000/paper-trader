@@ -1283,9 +1283,68 @@ POSITION {i}: {ticker}
 
     def load_current_portfolio(self):
         """
-        Load current portfolio from JSON file
-        Returns empty portfolio structure if file doesn't exist
+        Load current portfolio from Alpaca or JSON file (v7.2 - Alpaca Integration)
+
+        Priority:
+        1. If Alpaca connected: Load from broker positions
+        2. Fallback: Load from JSON file
+        3. Default: Return empty portfolio structure
+
+        Returns empty portfolio structure if no positions found
         """
+        # Try Alpaca first (if connected)
+        if self.use_alpaca and self.broker:
+            try:
+                positions = self.broker.get_positions()
+
+                if not positions:
+                    # No positions in Alpaca - return empty portfolio
+                    return {
+                        'positions': [],
+                        'total_positions': 0,
+                        'portfolio_value': self.broker.get_account_value(),
+                        'last_updated': datetime.now().isoformat(),
+                        'portfolio_status': 'Empty - No active positions'
+                    }
+
+                # Convert Alpaca positions to Tedbot format
+                portfolio_positions = []
+                for pos in positions:
+                    portfolio_positions.append({
+                        'ticker': pos.symbol,
+                        'shares': float(pos.qty),
+                        'entry_price': float(pos.avg_entry_price),
+                        'current_price': float(pos.current_price),
+                        'position_size': float(pos.market_value),
+                        'days_held': 0,  # Will be calculated from entry_date if stored
+                        'unrealized_gain_pct': float(pos.unrealized_plpc) * 100,
+                        'unrealized_gain_dollars': float(pos.unrealized_pl),
+                        # Note: Alpaca doesn't store these - we'll need to track separately
+                        # or load from JSON as supplementary data
+                        'catalyst': 'Unknown (loaded from Alpaca)',
+                        'thesis': 'Position tracking from Alpaca',
+                        'stop_loss': float(pos.avg_entry_price) * 0.93,  # Default 7% stop
+                        'price_target': float(pos.avg_entry_price) * 1.10,  # Default 10% target
+                        'entry_date': datetime.now().isoformat(),  # Placeholder
+                    })
+
+                account = self.broker.get_account()
+
+                return {
+                    'positions': portfolio_positions,
+                    'total_positions': len(portfolio_positions),
+                    'portfolio_value': float(account.equity),
+                    'cash_balance': float(account.cash),
+                    'last_updated': datetime.now().isoformat(),
+                    'portfolio_status': f'{len(portfolio_positions)} active positions (loaded from Alpaca)'
+                }
+
+            except Exception as e:
+                print(f"⚠️  Failed to load portfolio from Alpaca: {e}")
+                print("   Falling back to JSON file...")
+                # Fall through to JSON loading
+
+        # Fallback to JSON file (original behavior)
         if self.portfolio_file.exists():
             with open(self.portfolio_file, 'r') as f:
                 return json.load(f)
