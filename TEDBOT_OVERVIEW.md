@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v7.1.1 (Validation + Reporting) - Live in production paper trading
+**Current Version**: v8.0 (Alpaca Integration) - Live paper trading with real brokerage API execution
 
 ---
 
@@ -68,6 +68,12 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │           STAGE 3: EXECUTION (EXECUTE + ANALYZE Commands)       │
+│                    🔗 ALPACA API INTEGRATION (v8.0)             │
+│                                                                  │
+│  PORTFOLIO LOADING:                                              │
+│  • Loads positions from Alpaca API (not JSON file - v8.0)      │
+│  • Syncs real-time position data (shares, entry price, P/L)    │
+│  • Graceful fallback to JSON if Alpaca unavailable             │
 │                                                                  │
 │  EXECUTE (9:45 AM - after market open):                         │
 │  • Validates gap-aware entry (<3%: enter, 3-8%: caution, >8%: skip) │
@@ -75,7 +81,12 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │  • Calculates position size (conviction × market breadth adj)  │
 │  • Sets ATR-based stop loss (2.5x ATR, capped at -7% - v7.0)  │
 │  • Sets price target (dynamic based on catalyst type)          │
-│  • Enters positions at market open prices                      │
+│  • PLACES REAL ORDERS via Alpaca API (v8.0):                   │
+│    - BUY: Market orders for new positions                      │
+│    - SELL: Market orders for Claude-recommended exits          │
+│    - Validates buying power before buys                        │
+│    - Verifies position exists before sells                     │
+│    - Logs all order IDs for tracking                           │
 │                                                                  │
 │  ANALYZE (4:30 PM - after market close):                        │
 │  • Checks ATR-based stops (stop_pct = -min(2.5*ATR/price, 0.07)) │
@@ -83,6 +94,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │  • Monitors time limits (3 weeks max hold)                     │
 │  • Checks news sentiment deterioration                         │
 │  • Trailing stop: Locks +8%, trails -2% from peak (v7.1)      │
+│  • PLACES SELL ORDERS via Alpaca API when triggered (v8.0)     │
 │  • Exits positions meeting criteria                             │
 │  OUTPUT: Updates current_portfolio.json, logs to CSV           │
 └─────────────────────────────────────────────────────────────────┘
@@ -902,6 +914,19 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
   - Aligns with Deep Research: "rule-based filters eliminate low-quality opportunities, then AI analyzes sentiment"
   - Prevents filtering out NVDA/LLY/ORCL with weak 3M RS but strong catalysts
 - ✅ **Blackout Policy Update (Dec 10)**: Changed to event-day only (FOMC, CPI, NFP, PCE) - aligned with institutional best practices, reduces December blackout days from 57% to 29%
+
+**Latest Update (v8.0 - Dec 28, 2025)**:
+- ✅ **Alpaca Paper Trading Integration**: Complete migration from JSON simulation to real brokerage API
+  - **Portfolio Loading**: Positions load from Alpaca API (real-time sync)
+  - **Order Execution**: All buys/sells execute via Alpaca market orders
+  - **EXECUTE Command**: Places BUY orders for new positions, SELL orders for Claude exits
+  - **ANALYZE Command**: Places SELL orders when stop loss/target/time stop triggered
+  - **Safety Features**: Position verification, buying power checks, graceful fallback to JSON
+  - **Environment**: $100,000 paper trading account (no real money)
+  - **Purpose**: 6-12 month validation to collect realistic execution data (slippage, fills, timing)
+  - **Deployment**: Fully autonomous via cron (no manual intervention required)
+  - **Testing**: All cron environment tests passing, ready for live market hours
+  - **Next Phase**: Validate order execution quality, compare to JSON simulation baseline
 
 **Previous Updates (Phase 4 - Risk Optimization & Institutional Enhancements)**:
 - ✅ Phase 4.1: Cluster-based conviction scoring (prevents double-counting correlated signals)
