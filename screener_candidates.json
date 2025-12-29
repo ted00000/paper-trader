@@ -1,94 +1,94 @@
 {
   "scan_date": "2025-12-29",
-  "scan_time": "10:20:40 ET",
+  "scan_time": "14:41:52 ET",
   "breadth_pct": 100.0,
-  "breadth_timestamp": "2025-12-29 10:20:40 ET",
-  "breadth_above_50d": 2,
-  "breadth_total": 2,
+  "breadth_timestamp": "2025-12-29 14:41:52 ET",
+  "breadth_above_50d": 1,
+  "breadth_total": 1,
   "universe_size": 993,
-  "candidates_found": 2,
+  "candidates_found": 1,
   "filters_applied": {
     "min_rs_pct": null,
     "min_price": 10.0,
     "min_market_cap": 1000000000
   },
   "sector_rotation": {
-    "spy_return": 3.18,
+    "spy_return": 3.17,
     "sector_performance": {
       "Technology": {
         "etf": "XLK",
-        "3m_return": 3.21,
-        "vs_spy": 0.03,
+        "3m_return": 3.36,
+        "vs_spy": 0.19,
         "is_leading": false,
         "is_lagging": false
       },
       "Healthcare": {
         "etf": "XLV",
-        "3m_return": 12.23,
-        "vs_spy": 9.05,
+        "3m_return": 12.04,
+        "vs_spy": 8.87,
         "is_leading": true,
         "is_lagging": false
       },
       "Financials": {
         "etf": "XLF",
-        "3m_return": 2.87,
-        "vs_spy": -0.31,
+        "3m_return": 2.72,
+        "vs_spy": -0.45,
         "is_leading": false,
         "is_lagging": false
       },
       "Consumer Discretionary": {
         "etf": "XLY",
-        "3m_return": 1.11,
-        "vs_spy": -2.07,
+        "3m_return": 0.82,
+        "vs_spy": -2.35,
         "is_leading": false,
         "is_lagging": true
       },
       "Industrials": {
         "etf": "XLI",
-        "3m_return": 1.69,
-        "vs_spy": -1.49,
+        "3m_return": 1.63,
+        "vs_spy": -1.54,
         "is_leading": false,
         "is_lagging": false
       },
       "Consumer Staples": {
         "etf": "XLP",
-        "3m_return": 0.03,
-        "vs_spy": -3.15,
+        "3m_return": -0.11,
+        "vs_spy": -3.28,
         "is_leading": false,
         "is_lagging": true
       },
       "Energy": {
         "etf": "XLE",
-        "3m_return": -0.53,
-        "vs_spy": -3.71,
+        "3m_return": -0.14,
+        "vs_spy": -3.31,
         "is_leading": false,
         "is_lagging": true
       },
       "Utilities": {
         "etf": "XLU",
-        "3m_return": -1.35,
-        "vs_spy": -4.53,
+        "3m_return": -1.28,
+        "vs_spy": -4.45,
         "is_leading": false,
         "is_lagging": true
       },
       "Real Estate": {
         "etf": "XLRE",
-        "3m_return": -3.43,
-        "vs_spy": -6.61,
+        "3m_return": -3.71,
+        "vs_spy": -6.88,
         "is_leading": false,
         "is_lagging": true
       },
       "Materials": {
         "etf": "XLB",
-        "3m_return": 1.9,
-        "vs_spy": -1.28,
+        "3m_return": 1.92,
+        "vs_spy": -1.25,
         "is_leading": false,
         "is_lagging": false
       },
       "Communication Services": {
         "etf": "XLC",
-        "3m_return": -0.45,
-        "vs_spy": -3.63,
+        "3m_return": -0.42,
+        "vs_spy": -3.59,
         "is_leading": false,
         "is_lagging": true
       }
@@ -99,8 +99,8 @@
     "lagging_sectors": [
       "Consumer Discretionary",
       "Consumer Staples",
-      "Communication Services",
       "Energy",
+      "Communication Services",
       "Utilities",
       "Real Estate"
     ],
@@ -109,8 +109,8 @@
         "Healthcare",
         {
           "etf": "XLV",
-          "3m_return": 12.23,
-          "vs_spy": 9.05,
+          "3m_return": 12.04,
+          "vs_spy": 8.87,
           "is_leading": true,
           "is_lagging": false
         }
@@ -119,8 +119,8 @@
         "Technology",
         {
           "etf": "XLK",
-          "3m_return": 3.21,
-          "vs_spy": 0.03,
+          "3m_return": 3.36,
+          "vs_spy": 0.19,
           "is_leading": false,
           "is_lagging": false
         }
@@ -129,8 +129,8 @@
         "Financials",
         {
           "etf": "XLF",
-          "3m_return": 2.87,
-          "vs_spy": -0.31,
+          "3m_return": 2.72,
+          "vs_spy": -0.45,
           "is_leading": false,
           "is_lagging": false
         }
@@ -139,8 +139,8 @@
         "Materials",
         {
           "etf": "XLB",
-          "3m_return": 1.9,
-          "vs_spy": -1.28,
+          "3m_return": 1.92,
+          "vs_spy": -1.25,
           "is_leading": false,
           "is_lagging": false
         }
@@ -149,8 +149,8 @@
         "Industrials",
         {
           "etf": "XLI",
-          "3m_return": 1.69,
-          "vs_spy": -1.49,
+          "3m_return": 1.63,
+          "vs_spy": -1.54,
           "is_leading": false,
           "is_lagging": false
         }
@@ -159,8 +159,8 @@
         "Consumer Discretionary",
         {
           "etf": "XLY",
-          "3m_return": 1.11,
-          "vs_spy": -2.07,
+          "3m_return": 0.82,
+          "vs_spy": -2.35,
           "is_leading": false,
           "is_lagging": true
         }
@@ -169,18 +169,8 @@
         "Consumer Staples",
         {
           "etf": "XLP",
-          "3m_return": 0.03,
-          "vs_spy": -3.15,
-          "is_leading": false,
-          "is_lagging": true
-        }
-      ],
-      [
-        "Communication Services",
-        {
-          "etf": "XLC",
-          "3m_return": -0.45,
-          "vs_spy": -3.63,
+          "3m_return": -0.11,
+          "vs_spy": -3.28,
           "is_leading": false,
           "is_lagging": true
         }
@@ -189,8 +179,18 @@
         "Energy",
         {
           "etf": "XLE",
-          "3m_return": -0.53,
-          "vs_spy": -3.71,
+          "3m_return": -0.14,
+          "vs_spy": -3.31,
+          "is_leading": false,
+          "is_lagging": true
+        }
+      ],
+      [
+        "Communication Services",
+        {
+          "etf": "XLC",
+          "3m_return": -0.42,
+          "vs_spy": -3.59,
           "is_leading": false,
           "is_lagging": true
         }
@@ -199,8 +199,8 @@
         "Utilities",
         {
           "etf": "XLU",
-          "3m_return": -1.35,
-          "vs_spy": -4.53,
+          "3m_return": -1.28,
+          "vs_spy": -4.45,
           "is_leading": false,
           "is_lagging": true
         }
@@ -209,8 +209,8 @@
         "Real Estate",
         {
           "etf": "XLRE",
-          "3m_return": -3.43,
-          "vs_spy": -6.61,
+          "3m_return": -3.71,
+          "vs_spy": -6.88,
           "is_leading": false,
           "is_lagging": true
         }
@@ -219,139 +219,15 @@
   },
   "candidates": [
     {
-      "ticker": "ATMC",
-      "composite_score": 67.69,
-      "sector": "Technology",
-      "price": 15.6,
-      "relative_strength": {
-        "rs_pct": 16.86,
-        "stock_return_3m": 20.09,
-        "sector_return_3m": 3.51,
-        "spy_return_3m": 3.23,
-        "sector_etf": "XLK",
-        "passed_filter": true,
-        "score": 100,
-        "rs_score_points": 5,
-        "rs_percentile": 86
-      },
-      "tier1_earnings": {
-        "has_tier1_beat": false,
-        "score": 0,
-        "catalyst_type": null
-      },
-      "tier1_ma": {
-        "has_tier1_ma": false,
-        "score": 0,
-        "catalyst_type": null
-      },
-      "tier1_fda": {
-        "has_tier1_fda": false,
-        "score": 0,
-        "catalyst_type": null
-      },
-      "catalyst_signals": {
-        "score": 0,
-        "count": 0,
-        "keywords": [],
-        "scaled_score": 0,
-        "top_articles": []
-      },
-      "sec_8k_filings": {
-        "has_recent_8k": false,
-        "catalyst_type_8k": null,
-        "filing_date": null,
-        "score": 0
-      },
-      "volume_analysis": {
-        "volume_ratio": 1.0,
-        "avg_volume_20d": 0,
-        "yesterday_volume": 0,
-        "score": 33.3
-      },
-      "technical_setup": {
-        "distance_from_52w_high_pct": 1.02,
-        "is_near_high": true,
-        "high_52w": 15.76,
-        "current_price": 15.6,
-        "above_50d_sma": true,
-        "score": 97.96954314720811
-      },
-      "analyst_ratings": {
-        "has_improving_trend": false,
-        "score": 0,
-        "catalyst_type": null
-      },
-      "price_targets": {
-        "has_target_increase": false,
-        "score": 0,
-        "catalyst_type": null
-      },
-      "insider_transactions": {
-        "has_cluster": false,
-        "buy_count": 0,
-        "score": 0,
-        "catalyst_type": null
-      },
-      "earnings_surprises": {
-        "has_beat": false,
-        "surprise_pct": 0,
-        "score": 0,
-        "catalyst_type": null,
-        "recency_tier": null
-      },
-      "earnings_data": {},
-      "breakout_52w": {
-        "has_breakout": true,
-        "score": 13,
-        "catalyst_type": "52week_high_breakout_fresh",
-        "breakout_price": 15.76,
-        "days_ago": 0,
-        "volume_ratio": 18.48,
-        "current_price": 15.6,
-        "distance_from_high_pct": 1.0
-      },
-      "gap_up": {
-        "has_gap_up": false,
-        "score": 0,
-        "catalyst_type": null
-      },
-      "sector_rotation": {
-        "has_rotation_catalyst": false,
-        "score": 0,
-        "catalyst_type": null,
-        "sector": "Technology",
-        "sector_etf": "XLK",
-        "sector_return_3m": 3.51,
-        "vs_spy": 0.28
-      },
-      "options_flow": {
-        "has_unusual_activity": false,
-        "call_put_ratio": 0,
-        "score": 0,
-        "signal_type": null
-      },
-      "dark_pool": {
-        "has_unusual_activity": true,
-        "volume_spike_ratio": 160.63,
-        "recent_volume": 722769,
-        "avg_volume": 4499,
-        "score": 25,
-        "signal_type": "heavy_accumulation"
-      },
-      "catalyst_tier": "Tier 4 - 52W High Breakout (0d ago, 18.5x vol)",
-      "why_selected": "Strong RS (+16.86%), Near 52w high",
-      "rank": 1
-    },
-    {
       "ticker": "BCAR",
-      "composite_score": 15.97,
+      "composite_score": 15.96,
       "sector": "Technology",
-      "price": 10.06,
+      "price": 10.05,
       "relative_strength": {
-        "rs_pct": -1.9,
-        "stock_return_3m": 1.31,
+        "rs_pct": -1.92,
+        "stock_return_3m": 1.21,
         "sector_return_3m": 3.28,
-        "spy_return_3m": 3.21,
+        "spy_return_3m": 3.13,
         "sector_etf": "XLK",
         "passed_filter": true,
         "score": 0,
@@ -393,12 +269,12 @@
         "score": 33.3
       },
       "technical_setup": {
-        "distance_from_52w_high_pct": 0.25,
+        "distance_from_52w_high_pct": 0.35,
         "is_near_high": true,
         "high_52w": 10.09,
-        "current_price": 10.06,
+        "current_price": 10.05,
         "above_50d_sma": true,
-        "score": 99.50421417947446
+        "score": 99.30589985126426
       },
       "analyst_ratings": {
         "has_improving_trend": false,
@@ -432,9 +308,9 @@
         "catalyst_type": "52week_high_breakout_recent",
         "breakout_price": 10.09,
         "days_ago": 4,
-        "volume_ratio": 2.32,
-        "current_price": 10.06,
-        "distance_from_high_pct": 0.2
+        "volume_ratio": 2.3,
+        "current_price": 10.05,
+        "distance_from_high_pct": 0.3
       },
       "gap_up": {
         "has_gap_up": false,
@@ -448,7 +324,7 @@
         "sector": "Technology",
         "sector_etf": "XLK",
         "sector_return_3m": 3.28,
-        "vs_spy": 0.07
+        "vs_spy": 0.15
       },
       "options_flow": {
         "has_unusual_activity": false,
@@ -458,15 +334,15 @@
       },
       "dark_pool": {
         "has_unusual_activity": false,
-        "volume_spike_ratio": 0.0,
-        "recent_volume": 195,
+        "volume_spike_ratio": 0.19,
+        "recent_volume": 12854,
         "avg_volume": 68840,
         "score": 0,
         "signal_type": null
       },
       "catalyst_tier": "Tier 4 - 52W High Breakout (4d ago, 2.3x vol)",
       "why_selected": "Near 52w high",
-      "rank": 2
+      "rank": 1
     }
   ]
 }

@@ -770,6 +770,18 @@ class MarketScreener:
 
             results = data['results']
 
+            # DATA FRESHNESS CHECK (CRITICAL FIX - Dec 29, 2025)
+            # ATMC bug: Last trade Dec 8, screener ran Dec 29 - 21 days stale!
+            # Reject stocks with no recent trading activity (halted/frozen/low liquidity)
+            most_recent_bar_timestamp = results[-1]['t']
+            most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
+            days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
+            
+            # HARD FILTER: Reject if most recent data is >5 trading days old
+            # (allows for 3-day weekends + 1 buffer day, but catches week+ stale data)
+            if days_since_last_trade > 5:
+                return {'has_breakout': False, 'score': 0, 'catalyst_type': None}
+
             # Calculate 20-day average volume
             recent_volumes = [r['v'] for r in results[-20:]]
             avg_volume_20d = sum(recent_volumes) / len(recent_volumes)
@@ -1345,6 +1357,18 @@ class MarketScreener:
                 return {'has_breakout': False, 'score': 0, 'catalyst_type': None}
 
             results = data['results']
+
+            # DATA FRESHNESS CHECK (CRITICAL FIX - Dec 29, 2025)
+            # ATMC bug: Last trade Dec 8, screener ran Dec 29 - 21 days stale!
+            # Reject stocks with no recent trading activity (halted/frozen/low liquidity)
+            most_recent_bar_timestamp = results[-1]['t']
+            most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
+            days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
+            
+            # HARD FILTER: Reject if most recent data is >5 trading days old
+            # (allows for 3-day weekends + 1 buffer day, but catches week+ stale data)
+            if days_since_last_trade > 5:
+                return {'has_breakout': False, 'score': 0, 'catalyst_type': None}
 
             # Calculate 20-day average volume
             recent_volumes = [r['v'] for r in results[-20:]]
