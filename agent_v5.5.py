@@ -4869,13 +4869,26 @@ RECENT LESSONS LEARNED:
             
             if should_close:
                 print(f"   🚪 CLOSING: {ticker} - {exit_reason} ({return_pct:+.2f}%)")
-                
+
+                # v7.2 Stage 3b: Execute sell order via Alpaca (if available)
+                alpaca_success, alpaca_msg, order_id = self._execute_alpaca_sell(
+                    ticker,
+                    position.get('shares', 0),
+                    exit_reason
+                )
+                if alpaca_success:
+                    print(f"      ✓ Alpaca: {alpaca_msg} (Order: {order_id})")
+                elif "not available" not in alpaca_msg:
+                    # Log Alpaca failures (but don't block the exit if Alpaca fails)
+                    print(f"      ⚠️ Alpaca: {alpaca_msg}")
+                    print(f"      → Continuing with JSON portfolio tracking")
+
                 # Create trade record
                 trade_data = self.close_position(position, current_price, exit_reason)
-                
+
                 # Log to CSV
                 self.log_completed_trade(trade_data)
-                
+
                 closed_trades.append(trade_data)
             else:
                 print(f"   ✓ {ticker}: ${current_price:.2f} ({unrealized_gain_pct:+.2f}%) - {exit_reason}")
