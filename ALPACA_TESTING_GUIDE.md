@@ -42,44 +42,61 @@ Ran `test_alpaca_integration.py` on production server:
 ✓ Order execution methods present
 ```
 
-## Testing the Full Trading Cycle
+## Autonomous Trading Cycle
 
-Since we can't simulate real market conditions, testing must happen during actual trading hours:
+**The system runs automatically via cron jobs - no manual intervention needed.**
 
-### Testing Approach
+### Automated Schedule (Monday-Friday)
 
-**Option 1: Full Live Test (Recommended)**
-Run the complete trading cycle during market hours:
-
-```bash
-# SSH into server
-ssh root@174.138.67.26
-cd /root/paper_trading_lab
-source venv/bin/activate
-source .env
-
-# 8:45 AM ET - Select stocks
-python3 agent_v5.5.py go
-
-# 9:30 AM ET - Execute entries (WILL PLACE REAL PAPER ORDERS)
-python3 agent_v5.5.py execute
-
-# 4:30 PM ET - Update and check exits (MAY PLACE REAL PAPER SELLS)
-python3 agent_v5.5.py analyze
+```
+7:00 AM ET  - Market screener runs
+9:00 AM ET  - GO command (Claude selects 10 stocks)
+9:45 AM ET  - EXECUTE command (Places buy/sell orders via Alpaca)
+4:30 PM ET  - ANALYZE command (Updates positions, checks exits)
+5:00 PM ET  - Learning analysis
 ```
 
-**Option 2: Start Small**
-Test with limited capital exposure:
+**All commands run automatically.** The Alpaca integration works seamlessly with your existing cron automation.
 
-1. Modify `position_size_pct` in GO command output to 1% (instead of 10%)
-2. Run EXECUTE with just 1-2 stocks
-3. Monitor Alpaca dashboard for order execution
-4. Verify positions sync correctly
+### Environment Setup (Completed)
 
-### What to Monitor
+✅ Alpaca keys added to `/root/.env` (sourced by cron scripts)
+✅ Integration verified with cron environment
+✅ Test script passes all checks
+✅ Ready for autonomous trading
 
-**1. Agent Console Output**
-Look for these messages during EXECUTE:
+### What Happens Automatically
+
+**Tomorrow morning (if it's a weekday):**
+
+1. **9:00 AM ET** - GO command runs
+   - Claude analyzes market
+   - Selects 10 stocks
+   - Saves recommendations
+
+2. **9:45 AM ET** - EXECUTE command runs
+   - Loads Alpaca positions (currently 0)
+   - Places BUY orders via Alpaca for new stocks
+   - Logs order IDs
+   - Updates portfolio JSON
+
+3. **4:30 PM ET** - ANALYZE command runs
+   - Loads positions from Alpaca
+   - Checks for stop loss/target hits
+   - Places SELL orders via Alpaca if triggered
+   - Logs closed trades to CSV
+
+### How to Monitor (Optional)
+
+You don't need to monitor anything - the system runs autonomously. But if you want to check progress:
+
+**1. Check Execution Logs**
+```bash
+ssh root@174.138.67.26
+tail -f /root/paper_trading_lab/logs/execute.log
+```
+
+Look for these messages:
 ```
 ✓ Alpaca: Bought N shares via Alpaca (Order: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX)
 ```
@@ -90,9 +107,12 @@ Look for these messages during EXECUTE:
 - Verify orders appear with status "filled"
 - Check "Positions" tab for holdings
 
-**3. Position Sync**
-After EXECUTE, verify positions match:
+**3. Check Position Sync (After First Trades)**
 ```bash
+ssh root@174.138.67.26
+cd /root/paper_trading_lab
+source venv/bin/activate && source /root/.env
+
 # Check agent's view
 cat portfolio_data/current_portfolio.json
 
