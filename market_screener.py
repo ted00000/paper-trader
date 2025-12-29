@@ -55,7 +55,7 @@ MIN_RS_PCT = None  # REMOVED - RS now used for scoring only, not filtering
 MIN_PRICE = 10.0   # Minimum stock price (Deep Research: >$10)
 MIN_MARKET_CAP = 1_000_000_000  # $1B minimum
 MIN_DAILY_VOLUME_USD = 50_000_000  # $50M minimum (Deep Research: >$50M)
-TOP_N_CANDIDATES = 150  # Number to output (wide screening, AI filters hard)
+TOP_N_CANDIDATES = 40  # REDUCED from 150 (Dec 29 audit: precision governor)
 
 # ============================================================================
 # P2-10: RECENCY WINDOWS - Catalyst-Specific Approach
@@ -1349,11 +1349,11 @@ class MarketScreener:
             # Calculate 20-day average volume
             recent_volumes = [r['v'] for r in results[-20:]]
             avg_volume_20d = sum(recent_volumes) / len(recent_volumes)
-
-            # Find 52-week high from PAST data (excluding last 5 days)
-            historical_high = max(r['h'] for r in results[:-5]) if len(results) > 5 else 0
-
-            # Check last 5 days for breakout
+            # Find TRUE 52-week high from ALL data (FIX: Dec 29, 2025)
+            # Bug was: excluded last 5 days, so could never detect breakouts IN those days
+            high_52w = max(r['h'] for r in results)
+            
+            # Check last 5 days for NEW 52-week highs with volume confirmation
             has_breakout = False
             breakout_day_idx = None
             days_ago = None
@@ -1362,8 +1362,9 @@ class MarketScreener:
                 day_high = results[i]['h']
                 day_volume = results[i]['v']
 
-                # Check if this day broke the 52-week high with volume confirmation
-                if day_high > historical_high and day_volume >= (avg_volume_20d * 1.5):
+                # Check if this day made a NEW 52-week high (within 0.1% tolerance)
+                # AND had strong volume confirmation
+                if day_high >= high_52w * 0.999 and day_volume >= (avg_volume_20d * 1.5):
                     has_breakout = True
                     breakout_day_idx = i
                     days_ago = len(results) - 1 - i  # Days ago from today
@@ -2662,14 +2663,17 @@ class MarketScreener:
             gap_up_result.get('catalyst_type') in ['gap_up_major', 'gap_up']  # PHASE 2.5
         )
 
-        # DEEP RESEARCH CATALYST FILTER:
-        # Hard filter: Catalyst presence required (any tier)
-        # Deep Research Line 84: "rule-based filters for catalyst presence eliminate low-quality opportunities"
+        # HARD FILTER #2: Tier 1/2/4 Required (CRITICAL FIX - Dec 29, 2025)
+        # Both audits confirm: Tier 3 (sector rotation) should be SUPPORTING, not PRIMARY
+        # Third-party: "Stop the sector rotation spray" - this removes 127 junk candidates
+        # Architecture spec: "Catalyst presence required (Tier 1 or Tier 2)"
+        
+        # Allow Tier 1, Tier 2, or strong Tier 4 (breakouts with quality confirmation)
+        # REJECT pure Tier 3 (sector rotation/insider buying as standalone)
+        has_qualifying_catalyst = has_tier1_catalyst or has_tier2_catalyst or has_tier4_catalyst
 
-        has_any_catalyst = has_tier1_catalyst or has_tier2_catalyst or has_tier3_catalyst_alt or has_tier4_catalyst
-
-        if not has_any_catalyst:
-            return None  # REJECT: No catalyst detected (Deep Research hard filter)
+        if not has_qualifying_catalyst:
+            return None  # REJECT: No Tier 1/2/4 catalyst (Tier 3 alone insufficient)
 
         # STEP 3: Full technical analysis (only for catalyst stocks or strong momentum)
         time.sleep(0.1)  # Rate limit
@@ -2680,6 +2684,13 @@ class MarketScreener:
         # Hard filter prevents slippage on low-liquidity names
         avg_volume = volume_result.get('avg_volume_20d', 0)
         current_price = technical_result.get('current_price', 0)
+
+        # HARD FILTER #1: Price >$10 (CRITICAL FIX - Dec 29, 2025)
+        # Third-party audit found $2.25 and $4.65 stocks passing through
+        # Sub-$10 stocks are disproportionately noisy, manipulated, or structurally different
+        if current_price < MIN_PRICE:
+            return None  # REJECT: Price below $10 threshold
+
 
         if avg_volume > 0 and current_price > 0:
             avg_dollar_volume = avg_volume * current_price
