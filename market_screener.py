@@ -780,7 +780,7 @@ class MarketScreener:
             # HARD FILTER: Reject if most recent data is >5 trading days old
             # (allows for 3-day weekends + 1 buffer day, but catches week+ stale data)
             if days_since_last_trade > 5:
-                return {'has_breakout': False, 'score': 0, 'catalyst_type': None}
+                return {'has_gap_up': False, 'score': 0, 'catalyst_type': None}
 
             # Calculate 20-day average volume
             recent_volumes = [r['v'] for r in results[-20:]]
@@ -1254,6 +1254,13 @@ class MarketScreener:
             if data.get('status') in ['OK', 'DELAYED'] and 'results' in data and len(data['results']) >= 20:
                 results = data['results']
 
+                # DATA FRESHNESS CHECK (Dec 29, 2025 - ATMC bug)
+                most_recent_bar_timestamp = results[-1]['t']
+                most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
+                days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
+                if days_since_last_trade > 5:
+                    return {'volume_ratio': 1.0, 'avg_volume_20d': 0, 'yesterday_volume': 0, 'score': 33.3}
+
                 # Calculate 20-day average volume (excluding yesterday)
                 avg_volume = sum(r['v'] for r in results[:-1][-20:]) / 20
                 yesterday_volume = results[-1]['v']
@@ -1291,6 +1298,13 @@ class MarketScreener:
 
             if data.get('status') in ['OK', 'DELAYED'] and 'results' in data and len(data['results']) >= 2:
                 results = data['results']
+
+                # DATA FRESHNESS CHECK (Dec 29, 2025 - ATMC bug)
+                most_recent_bar_timestamp = results[-1]['t']
+                most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
+                days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
+                if days_since_last_trade > 5:
+                    return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
 
                 # Find 52-week high
                 high_52w = max(r['h'] for r in results)
