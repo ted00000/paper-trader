@@ -1,0 +1,130 @@
+This is a good question, and the fact that you went from “148 junk names” → “1 name” tells me two things immediately:
+	1	You successfully fixed the noise problem, and
+	2	You likely overshot on strictness, especially given the calendar
+I’ll break this into three parts:
+	1	Is returning 1 stock a bug or a market-timing effect?
+	2	What in the updated screener mechanically explains this outcome?
+	3	What I would change (minimally) to restore balance without re-introducing junk
+I’m basing this on a full read of market screener 30 dec 25.txt
+market screener 30 dec 25
+.
+
+1️⃣ Is “1 stock returned” a problem?
+Short answer
+No — not automatically.Given Dec 30 + holiday conditions, this outcome is plausible, but only if it is rare and explainable.
+Long answer
+For a best-in-class swing system, the screener should:
+	•	Sometimes return 0–3 names in thin, low-news periods
+	•	Sometimes return 10–30 names in active tape
+	•	Never force output just to “have something”
+So the key question is not “is 1 too few?”It’s:
+Is the funnel now behaving consistently with its stated philosophy?
+In this case, the answer is mostly yes, with two tuning issues I’ll outline.
+
+2️⃣ Why this screener only returned one stock (mechanically)
+This result is not random. It is the compound effect of multiple correct but interacting constraints, amplified by holiday timing.
+A. Holiday effect (REAL, not theoretical)
+On Dec 30:
+	•	Very few earnings beats (Tier 1)
+	•	Almost no fresh M&A / FDA (Tier 1)
+	•	Low institutional participation
+	•	Many stocks fail freshness checks
+This matters because you now require genuine, fresh catalysts — which is correct.
+
+B. Your freshness logic is now extremely strict (by design)
+You added 48-hour freshness hard gates in multiple places:
+	•	Gap-ups market screener 30 dec 25
+	•	Volume analysis market screener 30 dec 25
+	•	Technical setup (52-week proximity) market screener 30 dec 25
+	•	Breakouts market screener 30 dec 25
+This line appears repeatedly:
+if hours_since_last_trade > 48: reject
+This is correct logic, but during:
+	•	long weekends
+	•	holidays
+	•	thin tape
+…it becomes multiplicative rejection, not additive filtering.
+Net effect:A stock can be:
+	•	fundamentally great
+	•	technically strong…but rejected because its last “meaningful” bar is 3–4 calendar days old
+That’s expected on Dec 30.
+
+C. You effectively removed Tier 3 as a primary path (good)
+Your earlier problem — sector-rotation flooding — is now gone.
+Sector rotation:
+	•	No longer auto-qualifies
+	•	No longer sprays Healthcare names
+	•	Acts as context only
+That alone probably removed 100+ candidates, which is good.
+
+D. Tier 4 (breakouts/gaps) is now extremely selective
+You fixed real bugs here (good fixes), but the resulting criteria stack is very tight:
+A Tier 4 candidate must now satisfy:
+	•	Fresh data (<48h)
+	•	True 52-week high
+	•	Occurred within last 5 days
+	•	Volume ≥150%
+	•	Price still within 3% of high
+During a holiday week, almost nothing meets all of that.
+This is not a bug — it’s calendar sensitivity.
+
+3️⃣ So… bug or timing?
+My judgment:
+This is primarily timing + compounding strictness, not a broken file.
+However…
+There is one architectural issue you should address now, or you will see frequent “0–1 candidate” days even in normal markets.
+
+4️⃣ The real issue: compounding hard gates across layers
+Right now, you have:
+	•	Freshness hard gates
+	•	Catalyst hard gates
+	•	Volume hard gates
+	•	Breakout maintenance hard gates
+All of them are reasonable individually.
+But best-in-class systems rarely make every layer hard.
+What’s happening
+A stock can fail any one of:
+	•	news freshness
+	•	bar freshness
+	•	volume confirmation
+	•	breakout maintenance
+…and get rejected before Claude ever sees it.
+That’s why you got 1 name.
+
+5️⃣ What I would change (minimal, high-signal fixes)
+🔧 Fix #1 — Introduce ONE “soft freshness” escape hatch
+Right now, freshness is binary everywhere.
+I would change exactly one place:
+If a stock has a Tier 1 catalyst, allow 72–96h freshnessElse keep 48h
+Why:
+	•	Tier 1 catalysts persist across holidays
+	•	Institutions don’t stop caring because of Christmas
+	•	This restores realism without re-opening junk
+
+🔧 Fix #2 — Make Tier 4 “maintenance” a score penalty, not a hard reject
+Instead of:
+“>3% from high = reject”
+Change to:
+	•	≤3% → full score
+	•	3–6% → partial score
+	•	6% → reject
+This prevents near-perfect setups from being thrown out due to normal digestion.
+
+🔧 Fix #3 — Accept that 1–3 candidates on holidays is OK (but log it)
+This is more operational than code:
+	•	Log: “LOW OPPORTUNITY DAY – HOLIDAY / THIN TAPE”
+	•	Do not force output
+	•	Let Claude see why the funnel is tight
+Best desks do this.
+
+6️⃣ Final verdict
+Screener quality (post-fix)
+7.6 / 10⬆️ Up materially from the prior 5.x score
+About the “1 stock” result
+	•	❌ Not a bug
+	•	❌ Not overfitting
+	•	✅ Mostly calendar + correct tightening
+	•	⚠️ Slight over-strictness via compounded hard gates
+If this happens:
+	•	Occasionally (holidays, low news): GOOD
+	•	Frequently in normal weeks: TOO STRICT

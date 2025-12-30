@@ -249,3 +249,202 @@
 
 **Status:** v8.0 complete, dashboard update documented in parking lot
 **Next Step:** Monitor Alpaca execution quality for 1-2 weeks
+
+---
+
+## 🔍 MARKET SCREENER AUDIT - DEFERRED RECOMMENDATIONS
+**Date Added:** December 30, 2025
+**Context:** Third-party LLM audit after screener returned only 1 stock (Dec 30, holiday conditions)
+**Audit Score:** 7.6/10 (up from 5.x) - Screener fixes successful, slight overshoot on strictness
+
+### **What We're Implementing (Targeted Fixes)**
+✅ **Tier-aware freshness:** Allow 72-96h for Tier 1 catalysts (vs. 48h for others)
+✅ **Breakout maintenance soft scoring:** ≤3% full score, 3-6% partial, >6% reject
+✅ **Near-miss logging (simplified):** Log stocks passing hard gates with composite_score ≥50
+✅ **Low opportunity logging:** Flag when output <5 candidates
+
+### **What We're SKIPPING (and Why)**
+
+#### 1. Complete Hard/Soft Gate Restructure → DEFERRED
+**Recommendation:** Restructure entire screener into 4 sections with centralized `qualifies_as_candidate()` function
+
+**Why Skip:**
+- **Too invasive** - Major refactoring during live trading is high-risk
+- **Current structure works** - Code is well-organized and maintainable
+- **Diminishing returns** - Targeted fixes solve 90% of the problem
+- **Better timing** - Consider only if problems persist after targeted fixes
+
+**Revisit IF:**
+- Targeted fixes don't improve candidate counts to 10-30 in normal markets
+- Code becomes unmaintainable due to complexity
+- Major strategy change requires architectural overhaul
+
+---
+
+#### 2. Tier Quotas (Hard Caps per Tier) → SKIP
+**Recommendation:** Hard caps like "Tier 1: max 15, Tier 2: max 15, Tier 4: max 10"
+
+**Why Skip:**
+- **Artificial constraints** - If 20 genuine Tier 1 earnings beats exist, why cap at 15?
+- **Current TOP_N=40 works** - Global cap achieves output control without tier quotas
+- **Quality over arbitrary limits** - Let natural quality determine tier distribution
+- **Complexity without benefit** - Adds logic that might reject valid candidates arbitrarily
+
+**Alternative Approach:**
+- Keep global TOP_N cap (currently 40)
+- Let scoring system naturally prioritize best candidates across all tiers
+- Monitor tier distribution in daily logs (informational only)
+
+**Revisit IF:**
+- One tier consistently floods output (e.g., 38/40 are Tier 4 breakouts)
+- Quality degrades because weak tiers crowd out strong tiers
+- User explicitly requests tier balancing
+
+---
+
+#### 3. Widening Breakout Maintenance to 8% During Holidays → SKIP
+**Recommendation:** Allow stocks 8% below 52-week high during holidays (vs. current 3%)
+
+**Why Skip:**
+- **Strategy drift** - 8% below high isn't a breakout, it's a pullback play
+- **Momentum thesis breaks down** - Stocks 8% off highs have lost breakout energy
+- **Defeats precision goal** - Loosening standards just to "get more names" is wrong approach
+- **3-6% partial scoring sufficient** - Allows normal digestion without compromising thesis
+
+**What We're Doing Instead:**
+- Implementing 3-6% partial scoring (middle ground)
+- Tier-aware freshness allows legitimate holiday setups to qualify
+- Accept that 1-5 candidates on Dec 30 is CORRECT, not a bug
+
+**Revisit IF:**
+- After 2-3 months, data shows rejected 4-7% pullbacks outperform acceptances
+- Consistently getting 0 candidates even in active markets
+- Strategy evolves to include pullback entries (requires full thesis change)
+
+---
+
+#### 4. Complex Near-Miss Threshold Logic → SIMPLIFIED
+**Recommendation:**
+```
+passed_universal_hard == True AND
+(catalyst_score >= 8 OR news_scaled_score >= 25 OR tier in {1,2,4}) AND
+len(rejection_reasons) <= 2
+```
+
+**Why Simplify:**
+- **Over-engineered** - Too many conditions create edge cases and maintenance burden
+- **Goal is transparency** - Want to see what almost qualified, not create another complex filter
+- **Simpler is better** - Easier to audit, easier to understand
+
+**What We're Doing Instead:**
+```
+passed_universal_hard_gates == True AND
+composite_score >= 50
+```
+
+**Rationale:**
+- Composite score already incorporates catalyst quality, RS, technical setup
+- Score ≥50 means "had some merit but didn't make top 40"
+- Simple rule, easy to audit, captures the learning signal we need
+
+**Revisit IF:**
+- Near-miss logs flood with obvious junk (threshold too low)
+- Learning system can't extract signal from logs (need more granularity)
+- User wants specific rejection reason analysis
+
+---
+
+#### 5. "Would Have Been Rank" Calculation → SKIP
+**Recommendation:** Calculate hypothetical ranking for rejected stocks
+
+**Why Skip:**
+- **Computational waste** - Ranking stocks we're rejecting adds processing time
+- **Not actionable** - Knowing rejected stock "would have been #12" doesn't inform decisions
+- **False precision** - Implies rejected stocks are comparable to accepted ones (they're not)
+- **Log scores instead** - Can manually compare if needed
+
+**What We're Doing Instead:**
+- Log actual composite_score for near-misses
+- Log rejection_reasons for context
+- If needed, can manually sort near-miss logs by score for analysis
+
+**Revisit IF:**
+- Learning system specifically needs ranking data for ML model training
+- User requests percentile analysis of rejected stocks
+- Building automated rule adjustment system (not planned)
+
+---
+
+### **Philosophy: Precision Over Recall**
+
+**Auditor's Perspective:** "Maximize signal capture" - ensure we never miss a good trade
+
+**Our Perspective:** "Precision over recall" - better to miss a few good trades than flood Claude with mediocre names
+
+**Why We're Right:**
+- Claude evaluates 40 candidates/day, selects top 5-10 with scorecard ≥60
+- System goal: 65-70% win rate (proven via backtesting)
+- Flooding with 100+ candidates degrades Claude's signal-to-noise ratio
+- "1 stock on Dec 30" is CORRECT given holiday conditions + low institutional activity
+
+**The Audit Confirms:**
+- Screener quality improved from 5.x → 7.6/10
+- Noise problem solved (148 junk names → 1 quality name)
+- Slight overshoot on strictness (targeted fixes address this)
+- Core logic is sound
+
+---
+
+### **Decision Criteria for Revisiting Skipped Items**
+
+**Revisit Architectural Refactor IF:**
+- After 30 trading days, candidate count averages <10/day in normal markets
+- Code complexity makes maintenance difficult
+- Multiple bugs emerge from interaction between layers
+
+**Revisit Tier Quotas IF:**
+- One tier consistently represents >75% of output
+- Quality metrics show tier imbalance correlates with poor performance
+- User explicitly requests tier balancing
+
+**Revisit 8% Maintenance Window IF:**
+- After 60 trading days, data shows 4-7% pullbacks from highs outperform
+- Strategy explicitly evolves to include pullback entries
+- Consistently getting 0-1 candidates in active markets
+
+**Revisit Complex Near-Miss Logic IF:**
+- Simple version floods logs with obvious junk
+- Learning system can't extract actionable insights
+- Automated rule tuning system implemented (requires granular data)
+
+**Revisit "Would Have Been Rank" IF:**
+- Building ML model that requires training data with rankings
+- User specifically requests percentile analysis of rejections
+- Pattern emerges where near-misses consistently outperform acceptances
+
+---
+
+### **Implementation Priority (Next Steps)**
+
+**Phase 1: Targeted Fixes (This Week)**
+1. Implement tier-aware freshness (72-96h for Tier 1)
+2. Implement breakout maintenance soft scoring (3-6% partial)
+3. Add simplified near-miss logging (hard gates passed + score ≥50)
+4. Add low opportunity day logging (<5 candidates)
+
+**Phase 2: Validation (2-4 Weeks)**
+1. Monitor candidate counts in normal market conditions
+2. Review near-miss logs for patterns
+3. Validate win rates remain ≥65%
+4. Assess whether skipped recommendations need reconsideration
+
+**Phase 3: Iterate (As Needed)**
+1. If problems persist → revisit architectural refactor
+2. If tier imbalance emerges → revisit tier quotas
+3. If too strict in active markets → revisit maintenance windows
+4. If learning system needs more data → revisit complex near-miss logic
+
+---
+
+**Status:** Audit reviewed, targeted fixes prioritized, skipped items documented with rationale
+**Next Step:** Implement Phase 1 targeted fixes to market_screener.py

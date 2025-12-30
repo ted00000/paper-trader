@@ -1,0 +1,177 @@
+Below is a Hard vs Soft Gate Matrix you can hand to Claude and use directly to refactor the screener. It’s designed to solve the exact failure mode you hit (148 → 1) by preventing compounding hard rejects, while still keeping junk out.
+I’m also including a clean spec for “near-miss rejection tracking” so your learning engine can learn from what almost made it through.
+
+1) Hard vs Soft Gate Matrix (Claude-ready)
+Guiding rule (put this at top of the screener)
+Only 3 categories should be “HARD REJECT”:(A) Tradability, (B) Data integrity, (C) Explicit risk flags.Everything else should be soft/score/penalty unless it is the primary strategy thesis.
+
+A. Universal gates (apply to all tickers)
+Gate
+Type
+Default Threshold
+Holiday / Low-liquidity adjustment
+Rationale
+Implementation note
+Price floor
+HARD
+price >= 10
+none
+Avoid microstructure junk
+Reject early
+Market cap
+HARD
+mcap >= 1B
+none
+Liquidity/quality proxy
+Reject early
+Dollar volume
+HARD
+avg_dvol >= 50M
+none
+Tradability
+Reject early
+Data freshness (bars)
+HARD but tier-aware
+hours_since_last_trade <= 48
+allow <=96 if Tier 1 catalyst
+Avoid halted/stale
+Must not nuke Tier 1 during long weekends
+Negative news flags (lawsuit, dilution, downgrade, etc.)
+HARD
+any hit ⇒ reject
+none
+Systematic risk
+Your current negative filters are good
+Law-firm spam
+HARD
+any hit ⇒ reject
+none
+Noise control
+Keep
+Claude instruction: “Do not add more hard gates than these unless we intentionally change strategy.”
+
+B. Catalyst qualification gates (what earns “candidate” status)
+Primary decision: do you require Tier 1/2 to qualify?
+Given your platform goals, this is the cleanest way to prevent Tier 3/4 swamps.
+Recommended policy:
+	•	Tier 1 / Tier 2 catalysts ⇒ can qualify as candidate
+	•	Tier 4 (breakout/gap) ⇒ can qualify only if it passes stricter technical + RS percentile gates
+	•	Tier 3 (sector rotation) ⇒ never qualifies alone; can only boost a qualifying candidate
+Catalyst class
+Candidate qualification
+Gate type
+Notes
+Tier 1 (earnings beat, M&A target, FDA approval, major contract)
+Qualifies
+HARD (presence)
+Must be fresh-ish, but allow holiday extension
+Tier 2 (analyst upgrade, guidance raise, partnership, product launch)
+Qualifies
+HARD (presence)
+Recency windows as you defined
+Tier 4 (breakout/gap)
+Conditional qualify
+HARD + SOFT
+Hard gate for “real breakout,” then score controls output
+Tier 3 (sector rotation)
+Never qualifies alone
+SOFT only
+Treat as context multiplier
+Claude implementation note: Candidate “qualification” should be a single boolean set by a centralized function like qualifies_as_candidate(catalysts, technicals, rs).
+
+C. Technical gates: make most of these SOFT (avoid “1-stock days”)
+Technical condition
+Recommended type
+Default rule
+Holiday adjustment
+Why
+52-week breakout detected
+HARD for Tier 4 qualify
+must be new high in last 5 trading days + volume >= 1.5x
+none
+If you claim it’s a breakout, it must be real
+Breakout “maintenance” distance from high
+SOFT penalty
+≤3% = full; 3–6% = partial; >6% = reject
+widen to 8% during holidays
+Prevent false rejects from normal digestion
+Gap-up detected
+HARD for Tier 4 qualify
+gap >=3% + volume >=1.2x + not filled
+none
+Gap-up is binary
+Trend alignment (above 50d / 150d / 200d)
+SOFT (or HARD for Tier 4)
+score boosts
+none
+Don’t hard kill Tier 1/2 names
+RS percentile
+SOFT globally; HARD for Tier 4
+Tier 4 must have RS percentile >= 70
+none
+Prevent technical-only junk
+Volume surge (yesterday vs avg)
+SOFT
+bonus points
+none
+Low-volume holiday sessions otherwise kill everything
+
+D. “Precision governor” (prevents 148 AND prevents 1)
+This is the most important structural piece: cap output and rank within tiers.
+Rule
+Type
+Default
+Output cap
+HARD
+TOP_N = 25–40
+Tier quotas
+HARD
+e.g., Tier1: up to 15, Tier2: up to 15, Tier4: up to 10
+Score threshold
+SOFT
+Use to rank, not to qualify (except Tier 4 threshold)
+“No-catalyst” candidates
+HARD
+never pass
+Claude instruction: Make sure the screener can output 0–40 candidates. “0” is acceptable and should be explained in logs.
+
+2) Near-Miss Rejection Tracking for Learning (Yes—good idea)
+This is a strong enhancement, and it fits your philosophy (human-in-loop learning, high auditability).
+What to track
+For every rejected ticker, store a “rejection record” if it was close.
+Define “close” (simple and robust)
+Mark as near_miss = True if:
+	•	It passed all Universal HARD gates, AND
+	•	It had some catalyst evidence, OR scored above a threshold, AND
+	•	It failed only 1–2 conditions.
+Concrete thresholds (Claude-ready):
+	•	passed_universal_hard == True
+	•	catalyst_score >= 8 OR news_scaled_score >= 25 OR tier in {1,2,4}
+	•	len(rejection_reasons) <= 2
+What fields to log (minimum viable)
+Store one JSON row per near-miss:
+	•	date
+	•	ticker
+	•	sector
+	•	price, market_cap, avg_dvol
+	•	tier_detected (or “none”)
+	•	scores: composite, news_scaled, rs_pct, rs_percentile, volume_ratio, distance_from_52w_high
+	•	failed_rules: list (e.g., ["breakout_maintenance", "data_freshness_48h"])
+	•	nearest_thresholds: dict (e.g., {"distance_from_high": 3.8, "limit": 3.0})
+	•	top_articles (optional but huge for later analysis)
+	•	would_have_been_rank: compute rank if it had passed (optional)
+Why this is valuable
+It lets Learning answer questions like:
+	•	“Do near-miss breakouts outperform after 2–3 days?”
+	•	“Are we too strict on maintenance distance?”
+	•	“Are holiday freshness rules rejecting legit setups?”
+	•	“What rejection reason correlates with later winners?”
+How to use it without overfitting
+Learning should NOT auto-change rules from near-misses. Instead:
+	•	produce weekly report:
+	◦	top rejection reasons
+	◦	near-miss subsequent performance (if you fetch later returns)
+	◦	recommended rule dial changes (human review)
+
+3) Exact instruction you can paste to Claude
+Refactor the screener gates into 4 sections: Universal Hard Gates, Candidate Qualification, Technical Scoring, Precision Governor.Only Universal Hard Gates can hard-reject unconditionally.Candidate Qualification must require Tier 1/2, OR allow Tier 4 only if RS percentile >=70 and breakout/gap criteria are met.Sector rotation (Tier 3) must never qualify a candidate; it can only boost score of an already-qualified candidate.Implement near-miss logging for rejected stocks that pass universal gates and fail only 1–2 rules.

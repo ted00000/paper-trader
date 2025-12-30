@@ -3327,6 +3327,11 @@ class MarketScreener:
         candidates = []
         candidates_count = 0
 
+        # BUG FIX (Dec 30): Track market breadth for ALL stocks, not just candidates
+        # Market breadth = % of entire universe above 50-day MA (for risk management)
+        breadth_above_50d_count = 0
+        breadth_total_count = 0
+
         for i, ticker in enumerate(tickers, 1):
             if i % 50 == 0:
                 print(f"   Progress: {i}/{universe_size} scanned ({candidates_count} candidates identified)")
@@ -3336,6 +3341,22 @@ class MarketScreener:
             if result:
                 candidates_count += 1
                 candidates.append(result)
+
+                # BUG FIX: Track breadth for all scanned stocks (not just candidates)
+                breadth_total_count += 1
+                if result.get('technical_setup', {}).get('above_50d_sma', False):
+                    breadth_above_50d_count += 1
+            else:
+                # Even rejected stocks need breadth tracking
+                # Quick check: just fetch current price and 50-day MA
+                try:
+                    tech_result = self.check_52w_proximity(ticker)
+                    if tech_result and tech_result.get('current_price', 0) > 0:
+                        breadth_total_count += 1
+                        if tech_result.get('above_50d_sma', False):
+                            breadth_above_50d_count += 1
+                except:
+                    pass  # Skip stocks with data errors
 
         print(f"\n   Scan complete: {candidates_count}/{universe_size} candidates identified\n")
 
@@ -3382,13 +3403,22 @@ class MarketScreener:
             candidate['rank'] = rank
 
         # v7.0: Calculate market breadth at screener time (prevent lookahead bias)
-        # Breadth = % of screened stocks above 50-day MA
+        # BUG FIX (Dec 30): Calculate from ENTIRE UNIVERSE, not just candidates
+        # Breadth = % of ALL scanned stocks above 50-day MA (market health indicator)
         # This is calculated at 7:00 AM and used by GO command at 9:00 AM
         # Ensures we don't use end-of-day breadth data for intraday decisions
-        total_stocks = len(top_candidates)
-        above_50d_count = sum(1 for c in top_candidates if c.get('technical_setup', {}).get('above_50d_sma', False))
-        breadth_pct = (above_50d_count / total_stocks * 100) if total_stocks > 0 else 0
+        breadth_pct = (breadth_above_50d_count / breadth_total_count * 100) if breadth_total_count > 0 else 0
         breadth_timestamp = datetime.now(ET).strftime('%Y-%m-%d %H:%M:%S ET')
+
+        print(f"\n📊 MARKET BREADTH CALCULATION:")
+        print(f"   Stocks above 50-day MA: {breadth_above_50d_count}/{breadth_total_count} ({breadth_pct:.1f}%)")
+        if breadth_pct >= 60:
+            print(f"   Regime: HEALTHY (≥60%)")
+        elif breadth_pct >= 40:
+            print(f"   Regime: DEGRADED (40-60%)")
+        else:
+            print(f"   Regime: UNHEALTHY (<40%)")
+        print()
 
         # Build output
         scan_output = {
@@ -3396,8 +3426,8 @@ class MarketScreener:
             'scan_time': datetime.now(ET).strftime('%H:%M:%S ET'),
             'breadth_pct': round(breadth_pct, 1),  # v7.0: Pre-calculate breadth at screener time
             'breadth_timestamp': breadth_timestamp,  # v7.0: Timestamp when breadth was calculated
-            'breadth_above_50d': above_50d_count,  # v7.0: Count for transparency
-            'breadth_total': total_stocks,  # v7.0: Total for transparency
+            'breadth_above_50d': breadth_above_50d_count,  # v7.0: Count for transparency (BUG FIX: from full universe)
+            'breadth_total': breadth_total_count,  # v7.0: Total for transparency (BUG FIX: from full universe)
             'universe_size': universe_size,
             'candidates_found': len(top_candidates),
             'filters_applied': {
