@@ -300,6 +300,17 @@ class MarketScreener:
         # PHASE 3.3: Real-time sector classification cache
         self.sector_cache = {}  # {ticker: sector_name}
 
+        # BUG FIX (Dec 30): Rejection reason tracking for diagnostics
+        self.rejection_reasons = {
+            'freshness_stale': 0,       # hours_since_last_trade > 96
+            'no_catalyst': 0,           # No Tier 1/2/3/4 catalyst found
+            'price_too_low': 0,         # Price < $10
+            'mcap_too_low': 0,          # Market cap < $1B
+            'volume_too_low': 0,        # Dollar volume < $50M
+            'negative_news': 0,         # Lawsuit/dilution/downgrade
+            'data_error': 0             # API errors, missing data
+        }
+
         if not self.api_key:
             raise ValueError("POLYGON_API_KEY not set in environment")
 
@@ -802,11 +813,12 @@ class MarketScreener:
             days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
             
             # HARD FILTER: Reject if most recent data is >5 trading days old
-            # (allows for 3-day weekends + 1 buffer day, but catches week+ stale data)
+            # BUG FIX (Dec 30): 96 hours allows 3-day weekends + 1 buffer day
+            # (48 hours was incorrectly rejecting stocks after 3-day weekends)
             # Use hours for more precise check (days truncate to integers)
             hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
-            # 48 hours catches weekends but rejects stale/halted stocks
-            if hours_since_last_trade > 48:
+            # 96 hours = 4 calendar days (covers Fri 4pm → Tue 4pm for 3-day weekends)
+            if hours_since_last_trade > 96:
                 return {'has_gap_up': False, 'score': 0, 'catalyst_type': None}
 
             # Calculate 20-day average volume
@@ -1124,6 +1136,7 @@ class MarketScreener:
             guidance_magnitude = None
             ma_premium = None
             fda_approval_type = None
+            catalyst_ma_confidence = None  # BUG FIX (Dec 30): Track M&A detection confidence
 
             # Check for Tier 1 catalysts in news first (with recency and sentiment filtering)
             for article in articles[:20]:
@@ -1158,15 +1171,37 @@ class MarketScreener:
                 is_acquirer = any(acq_word in text for acq_word in acquirer_keywords)
                 is_target = any(tgt_word in text for tgt_word in target_keywords)
 
+                # BUG FIX (Dec 30): ENHANCED M&A TARGET DETECTION
+                # Three-tier detection to catch "Company X to acquire Company Y" headlines
+                # TIER 1 (EXPLICIT): Target phrases present → High confidence
+                # TIER 2 (INFERRED): Ticker in article + M&A keywords + NOT acquirer → Medium confidence
+                # TIER 3 (REJECTED): No evidence or stock is acquirer
+                ma_detection_confidence = None
+
+                if is_target:
+                    ma_detection_confidence = 'EXPLICIT'  # High confidence - explicit target phrases
+                elif not is_acquirer:
+                    # TIER 2: Inferred target from Polygon metadata
+                    # Check if this ticker appears in article's ticker list (Polygon metadata)
+                    article_tickers = article.get('tickers', [])
+                    if ticker in article_tickers:
+                        # Ticker in article + M&A context + not acquirer = likely target
+                        # Additional safety: check for "{TICKER} to acquire" pattern
+                        ticker_lower = ticker.lower()
+                        acquirer_patterns = [f"{ticker_lower} to acquire", f"{ticker_lower} will acquire",
+                                           f"{ticker_lower} acquires", f"{ticker_lower} acquiring"]
+                        if not any(pattern in text for pattern in acquirer_patterns):
+                            ma_detection_confidence = 'INFERRED'  # Medium confidence - inferred from metadata
+
                 # Check Tier 1 keywords (M&A, FDA, contracts) with SAME-DAY RECENCY
                 for keyword, points in tier1_keywords.items():
                     if keyword in text:
                         # CRITICAL: Only accept M&A/FDA/contract news from SAME DAY (0-1 days old)
                         if 'acquisition' in keyword or 'merger' in keyword or 'acquire' in keyword:
-                            # AUDIT FIX: REQUIRE stock is TARGET (being acquired)
-                            # Reject if: (1) stock is acquirer OR (2) no M&A context at all
-                            if not is_target:
-                                continue  # Skip - must be explicit target (being acquired)
+                            # BUG FIX (Dec 30): ENHANCED M&A TARGET DETECTION
+                            # Accept EXPLICIT or INFERRED targets (reject only if no evidence or is acquirer)
+                            if ma_detection_confidence not in ['EXPLICIT', 'INFERRED']:
+                                continue  # Skip - no M&A target evidence
 
                             # Additional validation: ticker must be in title for M&A
                             if ticker.upper() not in title.upper():
@@ -1178,6 +1213,8 @@ class MarketScreener:
                                 if not catalyst_type_news:
                                     catalyst_type_news = 'M&A_news'
                                     catalyst_news_age_days = days_ago
+                                    # LOG: Track detection confidence for monitoring
+                                    catalyst_ma_confidence = ma_detection_confidence
                                 # PHASE 1.3: Extract M&A premium percentage
                                 if ma_premium is None:
                                     ma_premium = parse_ma_premium(text)
@@ -1255,7 +1292,9 @@ class MarketScreener:
                 'contract_value': contract_value,  # Dollar amount for contracts
                 'guidance_magnitude': guidance_magnitude,  # % raise/cut for guidance
                 'ma_premium': ma_premium,  # % premium for M&A deals
-                'fda_approval_type': fda_approval_type  # FDA approval classification
+                'fda_approval_type': fda_approval_type,  # FDA approval classification
+                # BUG FIX (Dec 30): M&A detection confidence for monitoring
+                'ma_detection_confidence': catalyst_ma_confidence  # EXPLICIT | INFERRED | None
             }
 
         except Exception:
@@ -1285,10 +1324,10 @@ class MarketScreener:
                 most_recent_bar_timestamp = results[-1]['t']
                 most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
                 days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
-                # Use hours for more precise check (days truncate to integers)
+                # BUG FIX (Dec 30): Use hours for more precise check (days truncate to integers)
                 hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
-                # 48 hours catches weekends but rejects stale/halted stocks
-                if hours_since_last_trade > 48:
+                # 96 hours = 4 calendar days (covers 3-day weekends + buffer)
+                if hours_since_last_trade > 96:
                     return {'volume_ratio': 1.0, 'avg_volume_20d': 0, 'yesterday_volume': 0, 'score': 33.3}
 
                 # Calculate 20-day average volume (excluding yesterday)
@@ -1333,10 +1372,10 @@ class MarketScreener:
                 most_recent_bar_timestamp = results[-1]['t']
                 most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
                 days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
-                # Use hours for more precise check (days truncate to integers)
+                # BUG FIX (Dec 30): Use hours for more precise check (days truncate to integers)
                 hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
-                # 48 hours catches weekends but rejects stale/halted stocks
-                if hours_since_last_trade > 48:
+                # 96 hours = 4 calendar days (covers 3-day weekends + buffer)
+                if hours_since_last_trade > 96:
                     return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
 
                 # Find 52-week high
@@ -1412,12 +1451,12 @@ class MarketScreener:
             most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
             days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
             
-            # HARD FILTER: Reject if most recent data is >5 trading days old
-            # (allows for 3-day weekends + 1 buffer day, but catches week+ stale data)
+            # BUG FIX (Dec 30): 96 hours allows 3-day weekends + 1 buffer day
+            # (48 hours was incorrectly rejecting stocks after 3-day weekends)
             # Use hours for more precise check (days truncate to integers)
             hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
-            # 48 hours catches weekends but rejects stale/halted stocks
-            if hours_since_last_trade > 48:
+            # 96 hours = 4 calendar days (covers Fri 4pm → Tue 4pm for 3-day weekends)
+            if hours_since_last_trade > 96:
                 return {'has_breakout': False, 'score': 0, 'catalyst_type': None}
 
             # Calculate 20-day average volume
@@ -2772,6 +2811,7 @@ class MarketScreener:
         has_qualifying_catalyst = has_tier1_catalyst or has_tier2_catalyst or has_tier4_catalyst
 
         if not has_qualifying_catalyst:
+            self.rejection_reasons['no_catalyst'] += 1  # BUG FIX (Dec 30): Track rejection
             return None  # REJECT: No Tier 1/2/4 catalyst (Tier 3 alone insufficient)
 
         # STEP 3: Full technical analysis (only for catalyst stocks or strong momentum)
@@ -2788,6 +2828,7 @@ class MarketScreener:
         # Third-party audit found $2.25 and $4.65 stocks passing through
         # Sub-$10 stocks are disproportionately noisy, manipulated, or structurally different
         if current_price < MIN_PRICE:
+            self.rejection_reasons['price_too_low'] += 1  # BUG FIX (Dec 30): Track rejection
             return None  # REJECT: Price below $10 threshold
 
 
@@ -2796,6 +2837,7 @@ class MarketScreener:
 
             if avg_dollar_volume < MIN_DAILY_VOLUME_USD:  # $50M minimum (Deep Research)
                 # REJECT: Insufficient liquidity
+                self.rejection_reasons['volume_too_low'] += 1  # BUG FIX (Dec 30): Track rejection
                 return None  # Skip low-liquidity stocks to avoid slippage
 
         # Calculate composite score with TIER-AWARE WEIGHTING (Enhancement 0.2)
@@ -3401,6 +3443,17 @@ class MarketScreener:
         # Add rank
         for rank, candidate in enumerate(top_candidates, 1):
             candidate['rank'] = rank
+
+        # BUG FIX (Dec 30): Log rejection reasons for diagnostics
+        print(f"\n📊 REJECTION ANALYSIS:")
+        total_rejections = sum(self.rejection_reasons.values())
+        if total_rejections > 0:
+            print(f"   Total Rejected: {total_rejections}/{universe_size} stocks")
+            print(f"   No catalyst: {self.rejection_reasons['no_catalyst']} ({self.rejection_reasons['no_catalyst']/total_rejections*100:.1f}%)")
+            print(f"   Price filter (<$10): {self.rejection_reasons['price_too_low']} ({self.rejection_reasons['price_too_low']/total_rejections*100:.1f}%)")
+            print(f"   Volume filter (<$50M): {self.rejection_reasons['volume_too_low']} ({self.rejection_reasons['volume_too_low']/total_rejections*100:.1f}%)")
+            print(f"   Data errors: {self.rejection_reasons['data_error']} ({self.rejection_reasons['data_error']/total_rejections*100:.1f}%)")
+        print()
 
         # v7.0: Calculate market breadth at screener time (prevent lookahead bias)
         # BUG FIX (Dec 30): Calculate from ENTIRE UNIVERSE, not just candidates

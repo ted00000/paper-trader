@@ -448,3 +448,176 @@ composite_score >= 50
 
 **Status:** Audit reviewed, targeted fixes prioritized, skipped items documented with rationale
 **Next Step:** Implement Phase 1 targeted fixes to market_screener.py
+
+---
+
+## 🐛 CRITICAL BUGS IDENTIFIED - THIRD-PARTY LOGIC AUDIT
+**Date Added:** December 30, 2025 (Post-Audit)
+**Source:** Third-party LLM logic audit (follow-up to 7.6/10 audit)
+
+### **Bug #1: 48-Hour Freshness Math Error (CRITICAL)**
+
+**Issue:**
+- Code: `hours_since_last_trade > 48` (rejects after 48 hours)
+- Comment: "5 trading days old... allows 3-day weekends + 1 buffer"
+- Reality: 48 hours = 2 calendar days, NOT 5 trading days
+
+**Impact:**
+- Monday after 3-day weekend: Friday 4pm → Monday 7am = 63 hours → **REJECTED**
+- Dec 30 (after Christmas): Many stocks rejected due to holiday closure
+- Primary cause of "1 stock" output on Dec 30
+
+**Why This Is Wrong:**
+- Not a design choice - it's a **math error** in comments vs implementation
+- Rejects stocks with fresh catalysts due to calendar, not quality
+- Conflicts with our precision-over-recall strategy (broken precision, not intentional filtering)
+
+**Fix: Change 48h → 96h Everywhere**
+```python
+# BEFORE (BUGGY):
+if hours_since_last_trade > 48:  # ❌ Rejects 3-day weekends
+    return None
+
+# AFTER (FIXED):
+if hours_since_last_trade > 96:  # ✅ Allows 4 calendar days (covers 3-day weekend + buffer)
+    return None
+```
+
+**Locations to Fix:**
+1. `detect_gap_up()` - Line ~780
+2. `check_volume_surge()` - Line ~1270
+3. `detect_52week_high_breakout()` - Line ~1380
+4. `check_technical_setup()` - Line ~1320
+
+**Rationale for 96 Hours:**
+- 96 hours = 4 calendar days
+- Covers: Fri 4pm → Tue 4pm (3-day weekend + 1 day buffer)
+- Holiday weeks: Wed close → Mon open (5 calendar days with 96h limit)
+- Still maintains freshness discipline (<4 days old is fresh)
+
+**Status:** ✅ IMPLEMENTING (not parking lot - this is a bug)
+
+---
+
+### **Bug #2: M&A Target Detection Too Strict (HIGH PRIORITY)**
+
+**Issue:**
+Current logic requires ALL of:
+1. Headline contains "acquisition/merger/acquire"
+2. AND `is_target == True` (requires "acquired by", "to be acquired", "buyout offer")
+3. AND ticker in headline
+
+**Misses Common Headlines:**
+- "Company X to acquire Company Y" → `is_target = False` (no "acquired by" phrase)
+- Even though Y is clearly the target, we reject it
+- This is standard financial press format
+
+**Impact:**
+- Missing Tier 1 M&A catalysts (highest institutional value)
+- Undermines our "institutional-grade detection" thesis
+- May be rejecting 20-30% of M&A targets
+
+**Fix: Enhanced Detection with Confidence Levels**
+```python
+def is_ma_target_enhanced(article, ticker):
+    """
+    Three-tier detection:
+    1. EXPLICIT: "acquired by", "to be acquired" → High confidence
+    2. INFERRED: Ticker in Polygon tickers list + M&A keywords + NOT acquirer → Medium confidence
+    3. NO_EVIDENCE: Reject
+    """
+
+    text = (article.get('title', '') + ' ' + article.get('description', '')).lower()
+
+    # TIER 1: Explicit target phrases (HIGH CONFIDENCE)
+    target_phrases = ['acquired by', 'to be acquired', 'buyout offer',
+                      'takeover target', 'acquisition target', 'being bought by',
+                      'sold to', 'agreed to be acquired']
+    if any(phrase in text for phrase in target_phrases):
+        return True, 'EXPLICIT'
+
+    # TIER 2: Inferred from Polygon metadata (MEDIUM CONFIDENCE)
+    ma_keywords = ['acquire', 'acquisition', 'merger', 'buyout', 'takeover']
+    acquirer_phrases = ['to acquire', 'will acquire', 'acquires', 'acquiring', 'buys', 'to buy']
+
+    article_tickers = article.get('tickers', [])
+    if ticker in article_tickers:
+        if any(kw in text for kw in ma_keywords):
+            # Safety check: Is this ticker the ACQUIRER?
+            ticker_lower = ticker.lower()
+            if any(f"{ticker_lower} {phrase}" in text for phrase in acquirer_phrases):
+                return False, 'LIKELY_ACQUIRER'  # Reject - buying company (stock often drops)
+            else:
+                return True, 'INFERRED_TARGET'  # Accept - likely the target (premium paid)
+
+    return False, 'NO_EVIDENCE'
+```
+
+**Why This Approach:**
+- ✅ Captures more Tier 1 catalysts (institutional M&A deals)
+- ✅ Maintains precision (rejects acquirer, requires ticker in article metadata)
+- ✅ Uses Polygon structured data (more reliable than pure NLP)
+- ✅ Logs confidence level for auditing
+
+**Risk Mitigation:**
+- Log `EXPLICIT` vs `INFERRED_TARGET` detections separately
+- Monitor for false positives (buying acquirer by mistake)
+- Can tighten if we see bad trades
+
+**Status:** ✅ IMPLEMENTING (conservative enhancement, logged for monitoring)
+
+---
+
+### **Bug #3: Rejection Reason Logging (DIAGNOSTIC)**
+
+**Issue:**
+- Can't tell WHY stocks are rejected
+- Hard to debug "1 stock" days
+- Can't validate if freshness bug or M&A bug is the primary cause
+
+**Fix: Add Rejection Counters**
+```python
+# Track rejection reasons during scan
+rejection_reasons = {
+    'freshness_stale': 0,      # hours_since_last_trade > 96
+    'ma_target_gating': 0,     # M&A keyword but not target
+    'no_catalyst': 0,          # No Tier 1/2/3/4 catalyst
+    'price_too_low': 0,        # Price < $10
+    'volume_too_low': 0,       # Dollar volume < $50M
+    'negative_news': 0         # Lawsuit/dilution/downgrade
+}
+
+# At end of scan
+print(f"\n📊 REJECTION ANALYSIS:")
+print(f"   Freshness (>96h): {rejection_reasons['freshness_stale']}")
+print(f"   M&A target gating: {rejection_reasons['ma_target_gating']}")
+print(f"   No catalyst: {rejection_reasons['no_catalyst']}")
+print(f"   Price filter: {rejection_reasons['price_too_low']}")
+print(f"   Volume filter: {rejection_reasons['volume_too_low']}")
+print(f"   Negative news: {rejection_reasons['negative_news']}")
+```
+
+**Status:** ✅ IMPLEMENTING (helps validate other fixes)
+
+---
+
+## 📋 COMPLETE FIX LIST (7 Total Fixes)
+
+### **CRITICAL BUGS (Do First)**
+1. ✅ Fix 48h → 96h freshness bug (4 locations)
+2. ✅ Fix market breadth calculation (COMPLETED Dec 30)
+3. ✅ Enhanced M&A target detection (conservative approach)
+
+### **AUDIT RECOMMENDATIONS (Phase 1)**
+4. ✅ Tier-aware freshness (72-96h for Tier 1, integrates with Bug #1 fix)
+5. ✅ Breakout maintenance soft scoring (≤3% full, 3-6% partial, >6% reject)
+6. ✅ Near-miss logging (passed hard gates + score ≥50)
+7. ✅ Low opportunity logging (<5 candidates flag)
+
+### **DIAGNOSTIC (Enables Validation)**
+8. ✅ Rejection reason logging (validates bug fixes)
+
+---
+
+**Status:** Ready to implement all 7 fixes systematically
+**Next Step:** Begin implementation with careful verification at each step
