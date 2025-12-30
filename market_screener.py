@@ -600,6 +600,30 @@ class MarketScreener:
         else:
             return 'Technology'  # Default
 
+    def get_current_price(self, ticker):
+        """
+        Get current stock price using Polygon API
+        
+        Returns: Float (current price) or None if unavailable
+        """
+        try:
+            # Use previous day's close (most reliable for market hours)
+            url = f'https://api.polygon.io/v2/aggs/ticker/{ticker}/prev'
+            params = {'apiKey': self.api_key}
+            
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+            
+            if data.get('status') in ['OK', 'DELAYED'] and 'results' in data:
+                results = data['results']
+                if results and len(results) > 0:
+                    return results[0].get('c')  # Close price
+            
+            return None
+            
+        except Exception:
+            return None
+
     def get_3month_return(self, ticker):
         """
         Calculate 3-month return using Polygon API
@@ -779,7 +803,10 @@ class MarketScreener:
             
             # HARD FILTER: Reject if most recent data is >5 trading days old
             # (allows for 3-day weekends + 1 buffer day, but catches week+ stale data)
-            if days_since_last_trade > 5:
+            # Use hours for more precise check (days truncate to integers)
+            hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
+            # 48 hours catches weekends but rejects stale/halted stocks
+            if hours_since_last_trade > 48:
                 return {'has_gap_up': False, 'score': 0, 'catalyst_type': None}
 
             # Calculate 20-day average volume
@@ -1258,7 +1285,10 @@ class MarketScreener:
                 most_recent_bar_timestamp = results[-1]['t']
                 most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
                 days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
-                if days_since_last_trade > 5:
+                # Use hours for more precise check (days truncate to integers)
+                hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
+                # 48 hours catches weekends but rejects stale/halted stocks
+                if hours_since_last_trade > 48:
                     return {'volume_ratio': 1.0, 'avg_volume_20d': 0, 'yesterday_volume': 0, 'score': 33.3}
 
                 # Calculate 20-day average volume (excluding yesterday)
@@ -1303,7 +1333,10 @@ class MarketScreener:
                 most_recent_bar_timestamp = results[-1]['t']
                 most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
                 days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
-                if days_since_last_trade > 5:
+                # Use hours for more precise check (days truncate to integers)
+                hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
+                # 48 hours catches weekends but rejects stale/halted stocks
+                if hours_since_last_trade > 48:
                     return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
 
                 # Find 52-week high
@@ -1381,7 +1414,10 @@ class MarketScreener:
             
             # HARD FILTER: Reject if most recent data is >5 trading days old
             # (allows for 3-day weekends + 1 buffer day, but catches week+ stale data)
-            if days_since_last_trade > 5:
+            # Use hours for more precise check (days truncate to integers)
+            hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
+            # 48 hours catches weekends but rejects stale/halted stocks
+            if hours_since_last_trade > 48:
                 return {'has_breakout': False, 'score': 0, 'catalyst_type': None}
 
             # Calculate 20-day average volume
@@ -1657,23 +1693,33 @@ class MarketScreener:
             is_tier1 = True
         else:
             # No premium disclosed - check for definitive agreement language
-            # This catches deals announced without terms disclosed yet
-            top_articles = news_result.get('top_articles', [])
-            has_definitive_agreement = False
-
-            for article in top_articles[:3]:  # Check top 3 articles
-                text = f"{article.get('title', '')} {article.get('description', '')}".lower()
-                if any(term in text for term in [
-                    'definitive agreement', 'merger agreement', 'acquisition agreement',
-                    'signed agreement', 'binding offer', 'to be acquired by'
-                ]):
-                    has_definitive_agreement = True
-                    break
-
-            if not has_definitive_agreement:
-                # No premium AND no definitive agreement = likely rumor or speculation
-                return {'has_tier1_ma': False, 'score': 0, 'catalyst_type': None}
-
+            top_articles = news_result.get("top_articles", [])
+            
+            # BUGFIX (Dec 29, 2025): Handle missing top_articles
+            if not top_articles:
+                # No articles available - check if SEC 8-K shows M&A (more reliable)
+                if sec_8k_result.get("catalyst_type_8k") == "M&A_8k":
+                    is_tier1 = True  # SEC filing = definitive
+                else:
+                    return {"has_tier1_ma": False, "score": 0, "catalyst_type": None}
+            else:
+                has_definitive_agreement = False
+            
+                # Check ALL articles with M&A keywords, not just top 3
+                for article in top_articles:
+                    text = f"{article.get("title", "")} {article.get("description", "")}".lower()
+                    if any(term in text for term in [
+                        "definitive agreement", "merger agreement", "acquisition agreement",
+                        "signed agreement", "binding offer", "to be acquired by",
+                        "agreed to acquire", "agreement to merge"  # Added variations
+                    ]):
+                        has_definitive_agreement = True
+                        break
+            
+                if not has_definitive_agreement:
+                    return {"has_tier1_ma": False, "score": 0, "catalyst_type": None}
+            
+                is_tier1 = True
             is_tier1 = True
 
         # Calculate score based on premium magnitude
@@ -2069,6 +2115,13 @@ class MarketScreener:
                             recent_buys += 1
                             total_shares_bought += change
                             # PHASE 1.6: Calculate dollar value of purchase
+                            # BUGFIX (Dec 29, 2025): Fallback if share price missing
+                            if share_price <= 0:
+                                # Use current price as proxy (better than ignoring the transaction)
+                                current_price = self.get_current_price(ticker)
+                                if current_price and current_price > 0:
+                                    share_price = current_price
+                            
                             if share_price > 0:
                                 total_dollar_value += change * share_price
                 except Exception:
@@ -2177,14 +2230,22 @@ class MarketScreener:
                 elif contract_type == 'put':
                     total_put_volume += volume
 
-            # Avoid division by zero
-            if total_put_volume == 0:
-                call_put_ratio = total_call_volume if total_call_volume > 0 else 0
+            # Handle division by zero with proper edge cases (BUGFIX Dec 29, 2025)
+            if total_call_volume == 0 and total_put_volume == 0:
+                # No options data at all
+                call_put_ratio = None
+            elif total_put_volume == 0:
+                # All calls, no puts - cap at max reasonable ratio to avoid inflation
+                call_put_ratio = min(total_call_volume / 1.0, 10.0)  # Cap at 10:1
             else:
                 call_put_ratio = total_call_volume / total_put_volume
 
             # Bullish signal: call/put ratio >2.0 AND some unusual activity
-            has_unusual_activity = call_put_ratio > 2.0 and unusual_call_volume > 0
+            # Handle None case (no options data)
+            if call_put_ratio is None:
+                has_unusual_activity = False
+            else:
+                has_unusual_activity = call_put_ratio > 2.0 and unusual_call_volume > 0
 
             # Score: 0-30 points based on call/put ratio
             # 2.0 = 20 pts, 3.0 = 25 pts, 4.0+ = 30 pts
