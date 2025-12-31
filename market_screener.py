@@ -1348,9 +1348,13 @@ class MarketScreener:
         except Exception:
             return {'volume_ratio': 1.0, 'avg_volume_20d': 0, 'yesterday_volume': 0, 'score': 33.3}
 
-    def get_technical_setup(self, ticker):
+    def get_technical_setup(self, ticker, skip_freshness_check=False):
         """
         Check proximity to 52-week high and calculate 50-day MA for market breadth
+
+        Args:
+            ticker: Stock ticker symbol
+            skip_freshness_check: If True, skip 96h freshness check (used for breadth calculation)
 
         Returns: Dict with technical metrics including above_50d_sma for breadth calculation
         """
@@ -1369,14 +1373,16 @@ class MarketScreener:
                 results = data['results']
 
                 # DATA FRESHNESS CHECK (Dec 29, 2025 - ATMC bug)
-                most_recent_bar_timestamp = results[-1]['t']
-                most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
-                days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
-                # BUG FIX (Dec 30): Use hours for more precise check (days truncate to integers)
-                hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
-                # 96 hours = 4 calendar days (covers 3-day weekends + buffer)
-                if hours_since_last_trade > 96:
-                    return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
+                # Skip for breadth calculation (we want ALL stocks, not just fresh ones)
+                if not skip_freshness_check:
+                    most_recent_bar_timestamp = results[-1]['t']
+                    most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
+                    days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
+                    # BUG FIX (Dec 30): Use hours for more precise check (days truncate to integers)
+                    hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
+                    # 96 hours = 4 calendar days (covers 3-day weekends + buffer)
+                    if hours_since_last_trade > 96:
+                        return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
 
                 # Find 52-week high
                 high_52w = max(r['h'] for r in results)
@@ -3377,8 +3383,9 @@ class MarketScreener:
 
             try:
                 # Use get_technical_setup() which includes 50-day MA calculation
+                # Skip freshness check for breadth - we want ALL stocks regardless of trading activity
                 time.sleep(0.1)  # Rate limit: 10 req/sec (Polygon free tier allows 5 req/sec)
-                tech_result = self.get_technical_setup(ticker)
+                tech_result = self.get_technical_setup(ticker, skip_freshness_check=True)
                 if tech_result and tech_result.get('current_price', 0) > 0:
                     breadth_total_count += 1
                     if tech_result.get('above_50d_sma', False):
