@@ -3376,7 +3376,9 @@ class MarketScreener:
                 print(f"   Breadth scan: {i}/{universe_size} processed")
 
             try:
-                tech_result = self.check_52w_proximity(ticker)
+                # Use get_technical_setup() which includes 50-day MA calculation
+                time.sleep(0.1)  # Rate limit: 10 req/sec (Polygon free tier allows 5 req/sec)
+                tech_result = self.get_technical_setup(ticker)
                 if tech_result and tech_result.get('current_price', 0) > 0:
                     breadth_total_count += 1
                     if tech_result.get('above_50d_sma', False):
