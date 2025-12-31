@@ -1019,7 +1019,7 @@ class MarketScreener:
             articles = response.json().get('results', [])
 
             if not articles:
-                return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0, 'top_articles': []}
+                return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0, 'top_articles': [], 'has_negative_flag': False, 'negative_reasons': []}
 
             # Score news articles with TIER 1 catalyst detection + RECENCY FILTERING
             # Tier 1 catalysts get MUCH higher weight
@@ -1065,24 +1065,35 @@ class MarketScreener:
                 'new high': 2
             }
 
-            # NEGATIVE sentiment keywords (filter these out)
-            negative_keywords = [
-                'investigation',
-                'lawsuit',
-                'legal action',
-                'sec filing',
+            # CRITICAL NEGATIVE NEWS (hard reject stocks with these)
+            # BUG FIX (Dec 31, 2025): Changed from "skip article" to "flag stock"
+            # These should REJECT the stock, not just filter out the article
+            critical_negative_keywords = [
                 'dilutive offering',
                 'public offering',
                 'share offering',
                 'secondary offering',
+                'lawsuit',
+                'legal action',
+                'class action',
+                'investigation',
+                'sec investigation',
+                'downgrade',
+                'guidance cut',
+                'lowers guidance',
+                'reduces guidance',
+                'disappoints',
+                'misses estimates',
+                'earnings miss'
+            ]
+
+            # SOFT NEGATIVE KEYWORDS (reduce score but don't auto-reject)
+            soft_negative_keywords = [
+                'concern',
+                'warning',
                 'reduces stake',
                 'sells shares',
-                'cutting',
-                'downgrade',
-                'misses',
-                'disappoints',
-                'concern',
-                'warning'
+                'cutting'
             ]
 
             # LAW FIRM SPAM FILTERS (V5 - filter out shareholder alerts)
@@ -1133,6 +1144,10 @@ class MarketScreener:
             catalyst_type_news = None
             catalyst_news_age_days = None
 
+            # BUG FIX (Dec 31, 2025): Track negative news for hard rejection
+            has_negative_flag = False
+            negative_reasons = []
+
             # PHASE 1.3-1.5: Track magnitude data for contracts, guidance, M&A, FDA
             contract_value = None
             guidance_magnitude = None
@@ -1159,10 +1174,18 @@ class MarketScreener:
                 except Exception:
                     days_ago = 999  # Unknown date = reject
 
-                # NEGATIVE SENTIMENT FILTER
-                is_negative = any(neg_word in text for neg_word in negative_keywords)
-                if is_negative:
-                    continue  # Skip negative news entirely
+                # BUG FIX (Dec 31, 2025): CHECK FOR CRITICAL NEGATIVE NEWS
+                # Instead of skipping articles, FLAG the stock for rejection
+                # This ensures we DETECT dilution/lawsuits instead of missing them
+                for neg_keyword in critical_negative_keywords:
+                    if neg_keyword in text:
+                        has_negative_flag = True
+                        negative_reasons.append(f"{neg_keyword} ({days_ago}d ago)")
+                        # Continue scanning to capture all negative flags
+
+                # If critical negative found, skip scoring this article but continue scanning
+                if any(neg_word in text for neg_word in critical_negative_keywords):
+                    continue  # Skip positive scoring for negative articles
 
                 # V5: LAW FIRM SPAM FILTER
                 is_law_firm_spam = any(spam_word in text for spam_word in law_firm_spam_keywords)
@@ -1296,11 +1319,14 @@ class MarketScreener:
                 'ma_premium': ma_premium,  # % premium for M&A deals
                 'fda_approval_type': fda_approval_type,  # FDA approval classification
                 # BUG FIX (Dec 30): M&A detection confidence for monitoring
-                'ma_detection_confidence': catalyst_ma_confidence  # EXPLICIT | INFERRED | None
+                'ma_detection_confidence': catalyst_ma_confidence,  # EXPLICIT | INFERRED | None
+                # BUG FIX (Dec 31, 2025): Negative news detection for hard rejection
+                'has_negative_flag': has_negative_flag,  # True if dilution/lawsuit/downgrade detected
+                'negative_reasons': negative_reasons  # List of negative keywords found with age
             }
 
         except Exception:
-            return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0, 'top_articles': []}
+            return {'score': 0, 'count': 0, 'keywords': [], 'scaled_score': 0, 'top_articles': [], 'has_negative_flag': False, 'negative_reasons': []}
 
     def get_volume_analysis(self, ticker):
         """
@@ -2762,6 +2788,15 @@ class MarketScreener:
         # Do lightweight news check BEFORE applying RS filter
         news_result = self.get_news_score(ticker)
         sec_8k_result = self.get_sec_8k_filings(ticker)  # Check SEC filings
+
+        # BUG FIX (Dec 31, 2025): HARD GATE - Reject stocks with negative news
+        # This is a UNIVERSAL HARD GATE per audit recommendations
+        # Dilution, lawsuits, downgrades = systematic risk that overrides all other signals
+        if news_result.get('has_negative_flag', False):
+            negative_reasons = news_result.get('negative_reasons', [])
+            print(f"   ❌ REJECT: {ticker} - NEGATIVE NEWS: {', '.join(negative_reasons[:3])}")
+            self.rejection_reasons['negative_news'] += 1
+            return None
 
         has_fresh_tier1 = (
             (news_result.get('catalyst_type_news') in ['M&A_news', 'FDA_news'] and
