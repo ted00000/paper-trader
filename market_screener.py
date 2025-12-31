@@ -301,8 +301,9 @@ class MarketScreener:
         self.sector_cache = {}  # {ticker: sector_name}
 
         # BUG FIX (Dec 30): Rejection reason tracking for diagnostics
+        # AUDIT FIX #4 (Dec 30): Extended freshness to 120h (5 days) for Tier 1 catalysts
         self.rejection_reasons = {
-            'freshness_stale': 0,       # hours_since_last_trade > 96
+            'freshness_stale': 0,       # hours_since_last_trade > 120
             'no_catalyst': 0,           # No Tier 1/2/3/4 catalyst found
             'price_too_low': 0,         # Price < $10
             'mcap_too_low': 0,          # Market cap < $1B
@@ -813,12 +814,13 @@ class MarketScreener:
             days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
             
             # HARD FILTER: Reject if most recent data is >5 trading days old
-            # BUG FIX (Dec 30): 96 hours allows 3-day weekends + 1 buffer day
+            # BUG FIX (Dec 30): 96h→120h for tier-aware freshness (Audit Fix #4)
+            # AUDIT FIX #4: Extended to 120h (5 calendar days) for Tier 1 catalysts
             # (48 hours was incorrectly rejecting stocks after 3-day weekends)
             # Use hours for more precise check (days truncate to integers)
             hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
-            # 96 hours = 4 calendar days (covers Fri 4pm → Tue 4pm for 3-day weekends)
-            if hours_since_last_trade > 96:
+            # 120 hours = 5 calendar days (covers holiday weeks: Wed close → Mon open)
+            if hours_since_last_trade > 120:
                 return {'has_gap_up': False, 'score': 0, 'catalyst_type': None}
 
             # Calculate 20-day average volume
@@ -1325,9 +1327,10 @@ class MarketScreener:
                 most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
                 days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
                 # BUG FIX (Dec 30): Use hours for more precise check (days truncate to integers)
+                # AUDIT FIX #4: Extended to 120h (5 calendar days) for Tier 1 catalysts
                 hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
-                # 96 hours = 4 calendar days (covers 3-day weekends + buffer)
-                if hours_since_last_trade > 96:
+                # 120 hours = 5 calendar days (covers holiday weeks: Wed close → Mon open)
+                if hours_since_last_trade > 120:
                     return {'volume_ratio': 1.0, 'avg_volume_20d': 0, 'yesterday_volume': 0, 'score': 33.3}
 
                 # Calculate 20-day average volume (excluding yesterday)
@@ -1379,9 +1382,10 @@ class MarketScreener:
                     most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
                     days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
                     # BUG FIX (Dec 30): Use hours for more precise check (days truncate to integers)
+                    # AUDIT FIX #4: Extended to 120h (5 calendar days) for Tier 1 catalysts
                     hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
-                    # 96 hours = 4 calendar days (covers 3-day weekends + buffer)
-                    if hours_since_last_trade > 96:
+                    # 120 hours = 5 calendar days (covers holiday weeks: Wed close → Mon open)
+                    if hours_since_last_trade > 120:
                         return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
 
                 # Find 52-week high
@@ -1457,12 +1461,13 @@ class MarketScreener:
             most_recent_bar_date = datetime.fromtimestamp(most_recent_bar_timestamp / 1000, ET)
             days_since_last_trade = (datetime.now(ET) - most_recent_bar_date).days
             
-            # BUG FIX (Dec 30): 96 hours allows 3-day weekends + 1 buffer day
+            # BUG FIX (Dec 30): 96h→120h for tier-aware freshness (Audit Fix #4)
+            # AUDIT FIX #4: Extended to 120h (5 calendar days) for Tier 1 catalysts
             # (48 hours was incorrectly rejecting stocks after 3-day weekends)
             # Use hours for more precise check (days truncate to integers)
             hours_since_last_trade = (datetime.now(ET) - most_recent_bar_date).total_seconds() / 3600
-            # 96 hours = 4 calendar days (covers Fri 4pm → Tue 4pm for 3-day weekends)
-            if hours_since_last_trade > 96:
+            # 120 hours = 5 calendar days (covers holiday weeks: Wed close → Mon open)
+            if hours_since_last_trade > 120:
                 return {'has_breakout': False, 'score': 0, 'catalyst_type': None}
 
             # Calculate 20-day average volume
@@ -1498,12 +1503,13 @@ class MarketScreener:
             volume_ratio = breakout_volume / avg_volume_20d
             current_price = results[-1]['c']
 
-            # Check if price still within 3% of 52-week high (breakout maintained)
+            # AUDIT FIX #5: Breakout maintenance soft scoring (3-6% partial, >6% reject)
+            # Check if price still within 6% of 52-week high (breakout maintained)
             current_high = max(r['h'] for r in results)
             distance_from_high = ((current_high - current_price) / current_high) * 100
 
-            if distance_from_high > 3.0:
-                # Breakout not maintained
+            # Hard reject if >6% from high (not a breakout anymore)
+            if distance_from_high > 6.0:
                 return {'has_breakout': False, 'score': 0, 'catalyst_type': None}
 
             # Score based on recency and volume
@@ -1516,6 +1522,13 @@ class MarketScreener:
             elif days_ago <= 5:
                 score = 7
                 catalyst_type = '52week_high_breakout_recent'
+
+            # AUDIT FIX #5: Apply distance penalty for 3-6% pullbacks (normal digestion)
+            # ≤3% from high = full score (tight breakout)
+            # 3-6% from high = 50% score penalty (allowing normal digestion)
+            # >6% from high = rejected above
+            if distance_from_high > 3.0:
+                score = int(score * 0.5)  # 50% penalty for 3-6% pullback
 
             # Bonus for strong volume
             if volume_ratio >= 2.0:
@@ -3475,6 +3488,28 @@ class MarketScreener:
             print(f"   Volume filter (<$50M): {self.rejection_reasons['volume_too_low']} ({self.rejection_reasons['volume_too_low']/total_rejections*100:.1f}%)")
             print(f"   Data errors: {self.rejection_reasons['data_error']} ({self.rejection_reasons['data_error']/total_rejections*100:.1f}%)")
         print()
+
+        # AUDIT FIX #6: Near-miss logging (stocks that passed hard gates but didn't make top 40)
+        # These are learning opportunities - "what almost qualified?"
+        near_misses = [c for c in candidates if c not in top_candidates and c.get('composite_score', 0) >= 50]
+        if near_misses:
+            near_misses.sort(key=lambda x: x['composite_score'], reverse=True)
+            print(f"📝 NEAR-MISS ANALYSIS (passed hard gates, score ≥50, didn't make top {TOP_N_CANDIDATES}):")
+            print(f"   Total near-misses: {len(near_misses)}")
+            print(f"   Top 5 near-misses:")
+            for i, nm in enumerate(near_misses[:5], 1):
+                print(f"      {i}. {nm['ticker']:6} Score: {nm['composite_score']:5.1f} | {nm.get('catalyst_tier', 'No tier')}")
+            print()
+
+        # AUDIT FIX #7: Low opportunity day logging (flag when <5 candidates found)
+        # This is EXPECTED during holidays, thin tape, or low institutional activity
+        # Not an error - just transparency about market conditions
+        if len(top_candidates) < 5:
+            print(f"⚠️  LOW OPPORTUNITY DAY:")
+            print(f"   Only {len(top_candidates)} candidates found (typically expect 10-30 in active markets)")
+            print(f"   Common causes: Holiday period, low volume, thin institutional participation")
+            print(f"   Action: This is normal - maintain standards, don't force output")
+            print()
 
         # v7.0: Market breadth already calculated at start of scan (see line ~3387)
         # Timestamp for when breadth was calculated
