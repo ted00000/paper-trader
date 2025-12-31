@@ -1,8 +1,37 @@
 # PARKING LOT - Deferred Enhancements
 
-**Last Updated:** December 28, 2025 (v8.0)
-**Status:** Alpaca Integration COMPLETE, Dashboard Update Deferred
-**Next Phase:** Validate Alpaca execution quality, then update dashboard
+**Last Updated:** December 31, 2025 (v8.1)
+**Status:** Critical negative news detection bug FIXED
+**Recent:** Audit fixes #1-7 completed, AXTI dilution news bug resolved
+
+---
+
+## 🐛 CRITICAL BUG FIXES (Dec 31, 2025)
+
+### Negative News Detection Failure (AXTI Public Offering)
+
+**Issue Discovered:**
+- AXTI passed screener on Dec 31 with active public offering (dilutive)
+- User found "several news articles about public stock offering"
+- Screener showed: `news_result: {score: null, top_articles: []}`
+
+**Root Cause:**
+- Old logic: `if 'public offering' in text: continue` (skip article)
+- Articles were FILTERED OUT instead of FLAGGING the stock
+- Stock proceeded through pipeline without negative news detection
+
+**Fix Applied (Commit 42f06cc):**
+1. Split negative keywords:
+   - **Critical** (dilution, lawsuits, downgrades) → FLAG stock for rejection
+   - **Soft** (concern, warning) → reduce score only
+2. Changed article loop: detect negative keywords → set `has_negative_flag = True`
+3. Added return fields: `has_negative_flag`, `negative_reasons[]`
+4. Added HARD GATE in `scan_stock()`: reject if `has_negative_flag = True`
+
+**Impact:**
+- Prevents dilutive offerings from passing through screener
+- Aligns with audit spec: "Universal Hard Gate: negative news"
+- Improves precision by blocking systematic risk stocks
 
 ---
 
