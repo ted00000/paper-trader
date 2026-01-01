@@ -379,7 +379,7 @@ class MarketScreener:
             news_summary = "No recent news articles found in last 7 days."
 
         # Build prompt
-        user_message = f"""Analyze this stock for catalyst-driven swing trading opportunities.
+        user_message = f"""Analyze this stock for catalyst-driven swing trading opportunities (3-7 day holding period).
 
 Stock: {ticker}
 Sector: {sector}
@@ -392,36 +392,47 @@ Technical Context:
 - Volume ratio: {technical_data.get('volume_ratio', 0):.1f}x average
 - RS Percentile: {technical_data.get('rs_percentile', 0)} (relative strength vs market)
 
-TASK: Identify if this stock has a TIER 1 or TIER 2 catalyst for swing trading.
+YOUR ROLE: You are the ONLY filter for news sentiment and catalyst quality. Keyword matching has been removed. You must:
+1. REJECT stocks with material negative news (offerings, lawsuits, downgrades, guidance cuts, earnings misses)
+2. IDENTIFY high-quality bullish catalysts (Tier 1 or Tier 2)
+3. CLASSIFY catalyst strength and confidence
 
 TIER DEFINITIONS:
-- **Tier 1** (BEST): FDA approvals/priority review, M&A acquisition targets with premium >15%, earnings beats >10% with guidance raise, major government/enterprise contracts
-- **Tier 2** (GOOD): Analyst upgrades with PT raise >10%, guidance raises without beat, significant product launches, partnership announcements
-- **Tier 3** (CONTEXT ONLY): Sector rotation, industry tailwinds - NOT enough alone
+- **Tier 1** (BEST): FDA approvals/priority review, M&A acquisition targets with premium >15%, earnings beats >10% with guidance raise, major government/enterprise contracts (>$100M)
+- **Tier 2** (GOOD): Analyst upgrades with PT raise >10%, guidance raises without beat, significant product launches, partnership announcements, moderate earnings beats (5-10%)
+- **Tier 3** (SUPPORTING ONLY): Sector rotation, industry tailwinds - NOT enough alone, must have Tier 1/2 also
 - **Tier 4** (TECHNICAL): 52-week breakouts, gap-ups - use technical data provided
+- **None**: No catalyst OR negative news outweighs positives
 
 CRITICAL NUANCE DETECTION:
-- "FDA Priority Review" (bullish Tier 1) vs "FDA delays review" (bearish)
-- "Company X to acquire Y" - determine if ticker is TARGET (bullish) or ACQUIRER (often bearish)
-- "Raises guidance" vs "guidance in-line" vs "guidance cut"
-- Multi-catalyst bonus: earnings beat + guidance raise + analyst upgrade = stronger
+- "FDA Priority Review" (bullish Tier 1) vs "FDA delays review" (bearish REJECT)
+- "FDA advisory committee recommends approval" (bullish Tier 1) vs "advisory committee rejects" (bearish REJECT)
+- "Company X to acquire Y" - if {ticker} is TARGET = bullish Tier 1, if {ticker} is ACQUIRER = bearish (often dilutive)
+- "Raises guidance" (bullish) vs "guidance in-line" (neutral) vs "guidance cut" (bearish REJECT)
+- "Beats earnings" (bullish) vs "misses earnings" (bearish REJECT)
+- "Price target raised to $X" (bullish) vs "price target lowered" (bearish)
+- "Upgraded to Buy" (bullish) vs "downgraded to Sell" (bearish REJECT)
+- Multi-catalyst bonus: earnings beat + guidance raise + analyst upgrade = highest conviction (Tier 1, multi_catalyst=true)
 
-NEGATIVE FLAGS TO SPOT:
-- Dilutive offerings, secondary offerings
-- Lawsuits, investigations, regulatory issues
-- Analyst downgrades
-- Guidance cuts, earnings misses
+NEGATIVE FLAGS (AUTOMATIC REJECT):
+- **Dilutive offerings**: "announces public offering", "secondary offering", "shelf registration"
+- **Legal issues**: "class action lawsuit", "SEC investigation", "DOJ probe", "faces lawsuit"
+- **Analyst bearishness**: "downgraded", "price target lowered", "lowers rating"
+- **Fundamental weakness**: "guidance cut", "earnings miss", "revenue miss", "lowers forecast"
+- **Regulatory setbacks**: "FDA rejects", "regulatory delay", "clinical trial failure", "recall"
+
+If you detect ANY negative flags above, set tier="None" and include the flag in negative_flags array.
 
 Return ONLY valid JSON (no markdown, no explanation):
 {{
   "has_tier1_catalyst": true/false,
-  "catalyst_type": "FDA_Priority_Review|M&A_Target|Earnings_Beat|Analyst_Upgrade|None",
+  "catalyst_type": "FDA_Priority_Review|M&A_Target|Earnings_Beat|Analyst_Upgrade|Product_Launch|Contract_Win|None",
   "tier": "Tier1|Tier2|Tier3|Tier4|None",
   "confidence": "High|Medium|Low",
   "reasoning": "1-2 sentence explanation focusing on WHY this matters for swing trading",
   "catalyst_age_days": 0-7,
   "multi_catalyst": true/false,
-  "negative_flags": []
+  "negative_flags": ["offering", "lawsuit", "downgrade", "earnings_miss", "guidance_cut", "regulatory_delay"]
 }}"""
 
         try:
@@ -3017,9 +3028,71 @@ Return ONLY valid JSON (no markdown, no explanation):
                 'score': 0
             }
 
+    def scan_stock_binary_gates(self, ticker):
+        """
+        HYBRID SCREENER v10.0 (Jan 1, 2026): Binary Hard Gates Only
+
+        This function applies ONLY objective, binary filters that require NO interpretation:
+        - Price ≥ $10 (liquidity, institutional participation)
+        - Daily dollar volume ≥ $50M (execution quality)
+        - Data freshness (traded in last 5 days)
+
+        ALL news sentiment, catalyst detection, and quality judgments are delegated to Claude.
+
+        Philosophy: "If it's not binary, Claude decides."
+
+        Returns: Dict with basic data + news for Claude analysis, or None if rejected
+        """
+        # Get sector
+        sector = self.get_stock_sector(ticker)
+
+        # STEP 1: Get technical data (for binary price/volume checks)
+        time.sleep(0.1)  # Rate limit
+        volume_result = self.get_volume_analysis(ticker)
+        technical_result = self.get_technical_setup(ticker)
+
+        # Extract binary metrics
+        avg_volume = volume_result.get('avg_volume_20d', 0)
+        current_price = technical_result.get('current_price', 0)
+
+        # BINARY GATE #1: Price ≥ $10
+        if current_price < MIN_PRICE:
+            self.rejection_reasons['price_too_low'] += 1
+            return None  # REJECT: Price below $10 threshold
+
+        # BINARY GATE #2: Daily Dollar Volume ≥ $50M
+        if avg_volume > 0 and current_price > 0:
+            avg_dollar_volume = avg_volume * current_price
+            if avg_dollar_volume < MIN_DAILY_VOLUME_USD:  # $50M minimum
+                self.rejection_reasons['volume_too_low'] += 1
+                return None  # REJECT: Insufficient liquidity
+
+        # BINARY GATE #3: Data freshness (implicit in technical_result)
+        # If technical_result returned data, stock is active
+
+        # STEP 2: Fetch news for Claude analysis (NO keyword filtering)
+        time.sleep(0.1)  # Rate limit
+        news_result = self.get_news_score(ticker)
+
+        # STEP 3: Calculate relative strength (for Claude context, not filtering)
+        rs_result = self.calculate_relative_strength(ticker, sector)
+
+        # Return basic data + news for Claude to analyze
+        return {
+            'ticker': ticker,
+            'sector': sector,
+            'price': current_price,
+            'volume_analysis': volume_result,
+            'technical_setup': technical_result,
+            'relative_strength': rs_result,
+            'catalyst_signals': news_result,  # Raw news, no keyword filtering
+            'passed_binary_gates': True
+        }
+
     def scan_stock(self, ticker):
         """
-        Complete analysis of a single stock
+        LEGACY FUNCTION (v9.0 and earlier)
+        Complete analysis of a single stock with keyword-based catalyst detection
 
         DEEP RESEARCH FLOW (Dec 15, 2025):
         1. Calculate RS (used as scoring factor 0-5 pts, NOT filter)
@@ -3027,6 +3100,9 @@ Return ONLY valid JSON (no markdown, no explanation):
         3. Check for Tier 1 & Tier 2 catalysts
         4. Full technical analysis if passed
         5. Composite scoring (RS contributes to overall score)
+
+        NOTE: This function is DEPRECATED in v10.0 (Hybrid Screener with Claude)
+        Use scan_stock_binary_gates() instead for binary-only filtering.
 
         Returns: Dict with all metrics, or None if rejected
         """
@@ -3707,7 +3783,8 @@ Return ONLY valid JSON (no markdown, no explanation):
         print(f"\nScanning {universe_size} stocks for candidates...")
         print("(This will take 5-10 minutes due to API rate limits)\n")
 
-        # Scan each stock
+        # HYBRID SCREENER v10.0: Apply ONLY binary hard gates
+        # All news sentiment and catalyst detection delegated to Claude
         candidates = []
         candidates_count = 0
 
@@ -3715,80 +3792,114 @@ Return ONLY valid JSON (no markdown, no explanation):
             if i % 50 == 0:
                 print(f"   Progress: {i}/{universe_size} scanned ({candidates_count} candidates identified)")
 
-            result = self.scan_stock(ticker)
+            # Use binary-only gates (price, volume, freshness)
+            result = self.scan_stock_binary_gates(ticker)
 
             if result:
                 candidates_count += 1
                 candidates.append(result)
 
-        print(f"\n   Scan complete: {candidates_count}/{universe_size} candidates identified\n")
+        print(f"\n   Scan complete: {candidates_count}/{universe_size} candidates passed binary gates\n")
 
-        # HYBRID SCREENER v9.0: Claude Catalyst Analysis
-        # Replace keyword-based catalyst detection with AI-powered analysis
+        # HYBRID SCREENER v10.0: Claude Catalyst Analysis (ALL stocks with news)
+        # Claude is now the ONLY filter for news sentiment and catalyst quality
         if CLAUDE_API_KEY and candidates:
             print("\n" + "=" * 60)
-            print("PHASE 2: CLAUDE CATALYST ANALYSIS (v9.0)")
+            print("PHASE 2: CLAUDE CATALYST ANALYSIS (v10.0)")
             print("=" * 60)
+            print(f"   Philosophy: Binary gates only. Claude decides everything else.")
+            print()
 
-            # Prepare stocks for Claude analysis
-            # Only analyze stocks with news articles (Claude needs context)
+            # Prepare ALL stocks for Claude analysis
+            # Claude will filter negative news, identify catalysts, and assign tiers
             stocks_for_claude = []
+            stocks_without_news = 0
+
             for candidate in candidates:
                 news_articles = candidate.get('catalyst_signals', {}).get('top_articles', [])
-                if news_articles:  # Only send stocks with news to Claude
-                    stocks_for_claude.append({
-                        'ticker': candidate['ticker'],
-                        'sector': candidate['sector'],
-                        'news_articles': news_articles,
-                        'technical_data': {
-                            'price': candidate['technical_setup']['current_price'],
-                            'high_52w': candidate['technical_setup']['high_52w'],
-                            'distance_from_52w_high_pct': candidate['technical_setup']['distance_from_52w_high_pct'],
-                            'volume_ratio': candidate['volume_analysis']['volume_ratio'],
-                            'rs_percentile': candidate.get('relative_strength', {}).get('rs_percentile', 0)
+
+                # Send ALL stocks to Claude (even without news - Claude can classify as Tier4 technical)
+                stocks_for_claude.append({
+                    'ticker': candidate['ticker'],
+                    'sector': candidate['sector'],
+                    'news_articles': news_articles if news_articles else [],
+                    'technical_data': {
+                        'price': candidate.get('price', 0),
+                        'high_52w': candidate['technical_setup'].get('high_52w', 0),
+                        'distance_from_52w_high_pct': candidate['technical_setup'].get('distance_from_52w_high_pct', 0),
+                        'volume_ratio': candidate['volume_analysis'].get('volume_ratio', 0),
+                        'rs_percentile': candidate.get('relative_strength', {}).get('rs_percentile', 0)
+                    }
+                })
+
+                if not news_articles:
+                    stocks_without_news += 1
+
+            print(f"   Analyzing {len(stocks_for_claude)} stocks ({len(stocks_for_claude) - stocks_without_news} with news, {stocks_without_news} technical-only)")
+            print(f"   Using model: {CLAUDE_MODEL}")
+            print(f"   Expected cost: ~${len(stocks_for_claude) * 0.0003:.2f} (~$0.0003 per stock)\n")
+
+            # Batch analyze with Claude
+            claude_results = self.batch_analyze_catalysts(stocks_for_claude)
+
+            # Filter candidates based on Claude's analysis
+            # REJECT stocks with negative flags or tier="None"
+            filtered_candidates = []
+            rejected_by_claude = 0
+            negative_news_rejections = 0
+
+            for candidate in candidates:
+                ticker = candidate['ticker']
+                if ticker in claude_results:
+                    claude_analysis = claude_results[ticker]
+
+                    # Store Claude's full analysis
+                    candidate['claude_catalyst'] = claude_analysis
+
+                    # REJECT if Claude found negative flags or assigned tier="None"
+                    if claude_analysis.get('negative_flags') or claude_analysis.get('tier') == 'None':
+                        rejected_by_claude += 1
+                        if claude_analysis.get('negative_flags'):
+                            negative_news_rejections += 1
+                        continue  # Skip this candidate
+
+                    # ACCEPT: Claude identified a catalyst (Tier 1/2/3/4)
+                    if claude_analysis.get('tier') in ['Tier1', 'Tier2', 'Tier3', 'Tier4']:
+                        # Map Claude's tier to display format
+                        tier_map = {
+                            'Tier1': 'Tier 1',
+                            'Tier2': 'Tier 2',
+                            'Tier3': 'Tier 3',
+                            'Tier4': 'Tier 4'
                         }
-                    })
+                        candidate['catalyst_tier'] = tier_map.get(claude_analysis['tier'], 'No Catalyst')
+                        candidate['why_selected'] = f"{claude_analysis['catalyst_type']}: {claude_analysis['reasoning']}"
 
-            if stocks_for_claude:
-                # Batch analyze with Claude
-                claude_results = self.batch_analyze_catalysts(stocks_for_claude)
+                        # Initialize composite score if not present
+                        if 'composite_score' not in candidate:
+                            # Base score from RS and technical setup
+                            rs_score = candidate.get('relative_strength', {}).get('score', 0)
+                            candidate['composite_score'] = rs_score
 
-                # Update candidates with Claude's analysis
-                for candidate in candidates:
-                    ticker = candidate['ticker']
-                    if ticker in claude_results:
-                        claude_analysis = claude_results[ticker]
+                        # Boost composite score for high-confidence Tier 1/2
+                        if claude_analysis['tier'] in ['Tier1', 'Tier2'] and claude_analysis['confidence'] == 'High':
+                            tier_bonus = 15 if claude_analysis['tier'] == 'Tier1' else 10
+                            confidence_bonus = 5 if claude_analysis['multi_catalyst'] else 0
+                            candidate['composite_score'] += tier_bonus + confidence_bonus
+                            candidate['composite_score'] = min(candidate['composite_score'], 100)  # Cap at 100
 
-                        # Store Claude's full analysis
-                        candidate['claude_catalyst'] = claude_analysis
+                        filtered_candidates.append(candidate)
 
-                        # Update catalyst tier based on Claude's judgment
-                        # Claude's tier classification overrides keyword matching
-                        if claude_analysis.get('tier') in ['Tier1', 'Tier2', 'Tier3', 'Tier4']:
-                            # Map Claude's tier to display format
-                            tier_map = {
-                                'Tier1': 'Tier 1',
-                                'Tier2': 'Tier 2',
-                                'Tier3': 'Tier 3',
-                                'Tier4': 'Tier 4'
-                            }
-                            candidate['catalyst_tier'] = tier_map.get(claude_analysis['tier'], 'No Catalyst')
-                            candidate['why_selected'] = f"{claude_analysis['catalyst_type']}: {claude_analysis['reasoning']}"
+            print(f"   ✓ Claude Analysis Complete")
+            print(f"   ✓ Accepted: {len(filtered_candidates)} stocks with catalysts")
+            print(f"   ✓ Rejected: {rejected_by_claude} stocks (negative news: {negative_news_rejections}, no catalyst: {rejected_by_claude - negative_news_rejections})\n")
 
-                            # Boost composite score for high-confidence Tier 1/2
-                            if claude_analysis['tier'] in ['Tier1', 'Tier2'] and claude_analysis['confidence'] == 'High':
-                                # Add bonus points for AI-confirmed catalysts
-                                tier_bonus = 15 if claude_analysis['tier'] == 'Tier1' else 10
-                                confidence_bonus = 5 if claude_analysis['multi_catalyst'] else 0
-                                candidate['composite_score'] += tier_bonus + confidence_bonus
-                                candidate['composite_score'] = min(candidate['composite_score'], 100)  # Cap at 100
+            # Replace candidates with filtered list
+            candidates = filtered_candidates
 
-                print(f"   ✓ Updated {len(claude_results)} candidates with Claude analysis\n")
-            else:
-                print("   ⚠️  No stocks with news articles for Claude analysis\n")
         else:
             if not CLAUDE_API_KEY:
-                print("\n   ⚠️  CLAUDE_API_KEY not set - using keyword-based catalyst detection\n")
+                print("\n   ⚠️  CLAUDE_API_KEY not set - binary gates only (no catalyst filtering)\n")
             else:
                 print("\n   ℹ️   No candidates to analyze\n")
 
