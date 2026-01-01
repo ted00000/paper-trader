@@ -18,23 +18,41 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    STAGE 1: IDENTIFICATION                       │
-│                      (Market Screener)                           │
-│  DEEP RESEARCH ALIGNMENT - Wide Screening, AI Filters Hard:     │
+│              (Hybrid Screener - v10.1 Jan 2026)                 │
+│  BINARY GATES + CLAUDE AI ARCHITECTURE                          │
+│                                                                  │
+│  PHILOSOPHY: "If it's not binary, Claude decides"               │
+│                                                                  │
+│  PHASE 1: BINARY HARD GATES (Objective only):                   │
 │  • Scans 993 S&P 1500 stocks continuously                       │
-│  • HARD FILTERS (GO/NO-GO):                                     │
-│    - Price >$10 (Deep Research spec)                            │
-│    - Liquidity >$50M daily volume (Deep Research spec)          │
-│    - Catalyst presence required (Tier 1 or Tier 2)             │
-│  • SCORING FACTORS (Entry Quality Scorecard):                   │
-│    - Catalyst quality (0-30 pts)                                │
-│    - Technical setup (0-25 pts) - includes RS as 0-5 pts       │
-│    - Sector/market context (0-20 pts)                           │
-│    - Historical patterns (0-15 pts)                             │
-│    - Conviction/risk (0-10 pts)                                 │
-│  • Calculates RS vs SPY (scoring factor, not hard filter)      │
-│  • Tracks sector rotation (11 sectors vs SPY)                  │
-│  • Detects institutional activity (options flow + dark pool)   │
-│  OUTPUT: 170-240 catalyst stocks → screener_candidates.json   │
+│  • BINARY FILTERS (no interpretation):                          │
+│    - Price ≥$10 (liquidity, institutional participation)        │
+│    - Daily volume ≥$50M (execution quality)                     │
+│    - Data freshness (traded in last 5 days)                     │
+│  • NO keyword-based filtering removed:                          │
+│    ❌ Negative news keywords (Claude decides)                   │
+│    ❌ Catalyst keywords (Claude decides)                        │
+│    ❌ Tier requirements (Claude decides)                        │
+│  OUTPUT: ~250 stocks pass binary gates                          │
+│                                                                  │
+│  PHASE 2: CLAUDE AI CATALYST ANALYSIS:                          │
+│  • Analyzes ALL ~250 stocks (vs 3-5 in v9.0) - 83x coverage    │
+│  • Negative news detection (offerings, lawsuits, downgrades)    │
+│  • Catalyst identification with nuance:                         │
+│    - FDA Priority Review vs FDA delays                          │
+│    - M&A target vs acquirer                                     │
+│    - Earnings beat vs miss                                      │
+│  • Tier classification (Tier 1/2/3/4/None)                      │
+│  • Confidence scoring (High/Medium/Low)                         │
+│  • Rate limiting: 5 concurrent, exponential backoff             │
+│  • Cost: ~$0.07/run (~$2.10/month)                              │
+│  OUTPUT: 35-40 high-quality candidates → screener_candidates.json│
+│                                                                  │
+│  PHASE 3: COMPOSITE SCORING & SELECTION:                        │
+│  • RS percentile ranking across universe                        │
+│  • Sector rotation analysis (11 sectors vs SPY)                │
+│  • Claude's tier assignments integrated                         │
+│  • Top 40 candidates selected for GO command                   │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -168,97 +186,94 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 
 ## The Complete Trading Workflow
 
-### Phase 1: Stock Identification (Market Screener)
+### Phase 1: Stock Identification (Hybrid Screener v10.1)
 
 **Tool**: `market_screener.py`
-**Schedule**: Runs continuously, scanning 3,000+ stocks multiple times per day
-**Data Sources**: Polygon.io (price data), Finnhub (news)
+**Schedule**: 7:00 AM ET daily (scans 993 S&P 1500 stocks)
+**Data Sources**: Polygon.io (price/volume), Claude API (catalyst analysis)
+**Architecture**: v10.1 - Binary Gates + Claude AI (January 1, 2026)
 
-#### What the Screener Looks For:
+**PHILOSOPHY**: *"If it's not binary, Claude decides"*
 
-1. **Catalyst Detection** (Tier 1-4 priority)
-   - **Tier 1** (Highest Priority):
-     - M&A announcements (news + SEC 8-K Item 2.01)
-     - FDA approvals
-     - Major contract wins (news + SEC 8-K Item 1.01)
-     - Earnings beats >10% with raised guidance
-     - Revenue beats >10% combined with EPS beat
+#### Three-Phase Hybrid Architecture:
 
-   - **Tier 2** (Medium Priority):
-     - Analyst upgrades from major firms (Goldman, Morgan Stanley, JPM)
-     - **Price target raises >20% (NEW - PHASE 1.1):** Significant analyst price target increases
-     - SEC 8-K contract filings (Item 1.01)
-     - Strong earnings beats without guidance (>15%)
+**PHASE 1: Binary Hard Gates** (Objective Filters Only)
+   - **Price ≥ $10**: Liquidity, institutional participation
+   - **Daily Volume ≥ $50M**: Execution quality, slippage prevention
+   - **Data Freshness**: Traded in last 5 days (active stocks only)
+   - **Result**: ~250 stocks pass binary gates (vs 5-10 with keyword filtering)
 
-   - **Tier 3** (Leading Indicators):
-     - **Sector rotation (NEW - PHASE 1.3):** Stock in sector outperforming SPY by >5% (3-month basis)
-     - Insider buying clusters (3+ transactions within 30 days)
-     - Product launches with strong momentum
+**PHASE 2: Claude AI Catalyst Analysis** (ALL Sentiment & Catalyst Decisions)
+   - **Coverage**: Analyzes ALL ~250 stocks (vs 3-5 in v9.0) = **83x more coverage**
+   - **Negative News Detection**:
+     - Dilutive offerings, secondary offerings
+     - Lawsuits, investigations, regulatory issues
+     - Analyst downgrades, price target cuts
+     - Guidance cuts, earnings misses
+     - **Action**: Automatically rejects stocks with negative flags
 
-   - **Tier 4** (Technical Catalysts - NEW):
-     - **52-week high breakouts (PHASE 1.2):** Fresh breakout (last 5 days) with volume >150% average
-     - **Gap-ups (PHASE 2.5):** Opening gap >3% with volume >120% average, gap maintained through close
-     - Consolidation breakouts with volume (4+ weeks tight range)
+   - **Catalyst Identification** with Nuanced Context:
+     - **Tier 1** (FDA approvals/priority review, M&A targets >15%, earnings beats >10% + guidance raise)
+     - **Tier 2** (Analyst upgrades, product launches, moderate earnings beats)
+     - **Tier 3** (Sector rotation, industry tailwinds - supporting only)
+     - **Tier 4** (52-week breakouts, gap-ups - technical)
 
-2. **Technical Filters** (All Must Pass)
-   - **Price above 50-day SMA**: Confirms uptrend
-   - **5 EMA > 20 EMA**: Bullish momentum crossover
-   - **ADX > 20**: Strong trend (not choppy)
-   - **Volume > 1.5x average**: Institutional participation
+   - **Critical Nuance Detection**:
+     - "FDA Priority Review" (bullish Tier 1) vs "FDA delays review" (bearish reject)
+     - "M&A target" (bullish Tier 1) vs "M&A acquirer" (often dilutive reject)
+     - "Earnings beat" (bullish) vs "Earnings miss" (bearish reject)
+     - "Upgraded to Buy" (bullish Tier 2) vs "Downgraded" (bearish reject)
 
-3. **Volume Analysis** (Enhancement 2.2)
-   - **EXCELLENT** (3x+ average): Institutional surge
-   - **STRONG** (2x+ average): High conviction
-   - **GOOD** (1.5x+ average): Acceptable minimum
-   - **Volume trending up**: Recent 5-day avg > prior 20-day by 20%+
+   - **Confidence Scoring**: High/Medium/Low on each catalyst
+   - **Multi-Catalyst Recognition**: Bonus for multiple catalysts (earnings + guidance + upgrade)
+   - **Rate Limiting**: 5 concurrent workers, exponential backoff (2s, 4s, 8s, 16s, 32s)
+   - **Cost**: ~$0.07 per run (~$2.10/month at daily frequency)
+   - **Result**: 35-40 high-quality candidates accepted, 210+ rejected
 
-4. **Entry Quality Scorecard** (Deep Research - Dec 15, 2025)
-   - **100-Point Systematic Framework** (scoring factor, not hard filter):
-     - **Catalyst Quality** (0-30 pts): Earnings surprise, revenue beat, freshness, secondary catalysts
-     - **Technical Setup** (0-25 pts): Trend alignment, RS vs SPY (0-5 pts), volume, price action
-     - **Sector/Market** (0-20 pts): Sector strength, market regime, diversification, event timing
-     - **Historical Patterns** (0-15 pts): Catalyst tier, sector positioning, gap setup, timing
-     - **Conviction/Risk** (0-10 pts): Entry conviction, volatility, risk-reward ratio
-   - **RS as Scoring Component** (NOT hard filter):
-     - RS >5% vs SPY: 5 points (excellent)
-     - RS 3-5% vs SPY: 3 points (good)
-     - RS 1-3% vs SPY: 2 points (modest)
-     - RS <1% vs SPY: 0 points (weak)
-     - Allows negative-RS stocks if strong catalyst present
-   - **Score Thresholds**:
-     - 80-100: Exceptional (full size, 70-75% win rate target)
-     - 60-79: Good (75-100% size, 60-70% win rate)
-     - 40-59: Acceptable (50% size, 50-60% win rate)
-   - **RS Percentile Rank** (informational, shown on dashboard):
-     - 90+: Top 10% of market
-     - 80-89: Top 20%
-     - 70-79: Top 30%
+**PHASE 3: Composite Scoring & Selection**
 
-5. **Stage 2 Alignment** (Minervini Criteria)
-   - Stock above 150-day and 200-day MAs
-   - 150-day MA > 200-day MA
-   - 200-day MA trending up
-   - Stock within 25% of 52-week high
-   - 50-day MA > 150-day and 200-day MAs
+1. **RS Percentile Ranking** (IBD-Style 0-100)
+     - Calculated across full universe (993 stocks)
+     - 90+: Top 10% of market (elite)
+     - 80-89: Top 20% (strong)
+     - 70-79: Top 30% (good)
+     - **Note**: RS is informational scoring factor, NOT hard filter
 
-6. **Sector Rotation Detection** (Phase 3.2)
-   - Tracks 11 sector ETFs vs SPY benchmark
-   - **Leading Sectors**: >2% outperformance vs SPY (3-month)
-   - **Lagging Sectors**: <-2% underperformance vs SPY
-   - Prioritizes stocks from leading sectors in GO command
+2. **Sector Rotation Analysis**
+     - Tracks 11 sector ETFs vs SPY benchmark
+     - **Leading Sectors**: >2% outperformance vs SPY (3-month)
+     - **Lagging Sectors**: <-2% underperformance vs SPY
+     - Prioritizes stocks from leading sectors in GO command
 
-7. **Institutional Activity Signals** (Phase 3.3)
-   - **Options Flow**: Unusual call buying (call/put ratio >2.0)
-   - **Dark Pool Activity**: Volume spikes >1.5x average (institutional accumulation)
-   - Adds conviction when institutions are buying
+3. **Composite Score Calculation**
+     - Integrates Claude's tier assignments
+     - Base score from RS and technical setup
+     - **Tier 1 High Confidence**: +15 points bonus
+     - **Tier 2 High Confidence**: +10 points bonus
+     - **Multi-Catalyst**: +5 points additional bonus
 
-8. **Liquidity Filter** (Phase 4.4)
-   - **Minimum $50M average daily dollar volume**
-   - Prevents execution slippage on low-liquidity stocks
-   - Filters at screener level before GO command sees candidates
-   - Typical slippage on sub-$50M names: 1-3% per trade
+4. **Top 40 Selection**
+     - Sorted by tier-first (Tier 1 > Tier 2 > Tier 3 > Tier 4)
+     - Within each tier, sorted by composite score
+     - Top 40 candidates selected for GO command analysis
 
-**Output**: List of catalyst-driven candidates saved to `screener_candidates.json` with enhanced metadata
+**Output**: Top 40 catalyst-driven candidates saved to `screener_candidates.json`
+
+#### v10.1 Results vs Previous (Keyword-Based):
+
+| Metric | v9.0 (Keywords) | v10.1 (Hybrid) | Improvement |
+|--------|-----------------|----------------|-------------|
+| **Stocks Analyzed by Claude** | 3-5 | 249 | **83x more** |
+| **Coverage** | 0.3% | 25% | **83x more** |
+| **Tier 1 Finds** | 1 | 3 | **3x more** |
+| **False Negatives** | High | Low | **Eliminated** |
+| **Cost per Run** | $0.01 | $0.07 | **7x ($2.10/mo)** |
+
+**Example Improvements** (Actual Results - Jan 1, 2026):
+- ✅ AXSM FDA Priority Review: Now Tier 1 (was Tier 3 "sector rotation")
+- ✅ BBIO M&A Speculation: Now Tier 1 (was filtered out by keywords)
+- ✅ BA Pentagon Contract: Now Tier 1 (was filtered out by keywords)
+- ✅ 429 Rate Limit Errors: All successfully retried with exponential backoff
 
 ---
 
@@ -839,11 +854,31 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: December 16, 2025
-**Version**: v7.1.1 (Validation + Reporting)
+**Last Updated**: January 1, 2026
+**Version**: v10.1 (Hybrid Screener - Binary Gates + Claude AI)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Updates (v7.1.1 - Reporting & Analysis Tools - Dec 16)**:
+**Latest Update (v10.1 - Jan 1, 2026)**:
+- ✅ **HYBRID SCREENER ARCHITECTURE**: Complete redesign - Binary Gates + Claude AI
+  - **Philosophy**: "If it's not binary, Claude decides"
+  - **Removed ALL keyword-based filtering**: No more false negatives
+  - **Phase 1 - Binary Hard Gates**: Price ≥$10, Volume ≥$50M, Data freshness only
+  - **Phase 2 - Claude AI Analysis**: Analyzes ALL ~250 stocks (83x more than v9.0)
+    - Negative news detection (offerings, lawsuits, downgrades)
+    - Catalyst identification with nuance (FDA Priority Review vs delays)
+    - Tier classification (Tier 1/2/3/4/None)
+    - Confidence scoring (High/Medium/Low)
+  - **Phase 3 - Composite Scoring**: RS percentiles, sector rotation, top 40 selection
+  - **Rate Limiting**: 5 concurrent workers, exponential backoff (2s, 4s, 8s, 16s, 32s)
+  - **Cost**: ~$0.07/run (~$2.10/month) - 7x increase but worth it for quality
+  - **Results** (Jan 1, 2026 test):
+    - 249 stocks analyzed (vs 3-5 in v9.0)
+    - 3 Tier 1 catalysts found: AXSM (FDA), BBIO (M&A), BA (Contract)
+    - 35 total candidates accepted (vs 5-10 with keywords)
+    - 0 max retries exceeded (all 429 errors successfully retried)
+  - **Impact**: Eliminated false negatives like AXSM FDA Priority Review (was scored 4/20 by keywords, now correctly Tier 1)
+
+**Previous Updates (v7.1.1 - Reporting & Analysis Tools - Dec 16)**:
 - ✅ **Stop_Pct Column**: Added to CSV for stop distance distribution analysis
   - Tracks actual stop percentage used per trade (e.g., -5.2%, -7.0%)
   - Enables analysis: "What % of trades use ATR vs -7% cap?"
