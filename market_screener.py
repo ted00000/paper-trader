@@ -50,15 +50,24 @@ SECTOR_ETF_MAP = {
     'Communication Services': 'XLC'
 }
 
-# Screening Parameters
+# Screening Parameters (v10.2 - Regime-Aware Thresholds)
 # DEEP RESEARCH ALIGNMENT: RS is a SCORING factor, not a HARD FILTER
-# Hard filters: Price >$10, Liquidity >$50M, Catalyst presence
+# Hard filters: Price >$10, Liquidity (regime-aware), Catalyst presence
 # Scoring factors: RS, technical setup, catalyst quality (0-100 point scorecard)
 MIN_RS_PCT = None  # REMOVED - RS now used for scoring only, not filtering
 MIN_PRICE = 10.0   # Minimum stock price (Deep Research: >$10)
 MIN_MARKET_CAP = 1_000_000_000  # $1B minimum
-MIN_DAILY_VOLUME_USD = 50_000_000  # $50M minimum (Deep Research: >$50M)
-TOP_N_CANDIDATES = 40  # REDUCED from 150 (Dec 29 audit: precision governor)
+
+# REGIME-AWARE LIQUIDITY THRESHOLDS (v10.2 - Third-Party Audit Recommendation)
+# Philosophy: Static $50M threshold is too strict for S&P 1500, especially during holidays
+# Use 20-day median notional for stability, adjust by market regime
+LIQUIDITY_THRESHOLDS = {
+    'normal': 25_000_000,      # $25M/day (20-day median) - Normal market conditions
+    'holiday': 15_000_000,     # $15M/day (60-day median) - Holiday weeks (low volume)
+    'risk_off': 40_000_000     # $40M/day (20-day median) - VIX >25 (require higher liquidity)
+}
+MIN_DAILY_VOLUME_USD = LIQUIDITY_THRESHOLDS['normal']  # Default to normal
+TOP_N_CANDIDATES = 40  # Number of candidates to pass to GO command
 
 # ============================================================================
 # P2-10: RECENCY WINDOWS - Catalyst-Specific Approach
@@ -1671,15 +1680,19 @@ Return ONLY valid JSON (no markdown, no explanation):
                 if hours_since_last_trade > 120:
                     return {'volume_ratio': 1.0, 'avg_volume_20d': 0, 'yesterday_volume': 0, 'score': 33.3}
 
-                # Calculate 20-day average volume (excluding yesterday)
-                avg_volume = sum(r['v'] for r in results[:-1][-20:]) / 20
+                # Calculate 20-day median volume (v10.2 - Third-Party Audit Recommendation)
+                # Median is more stable than mean, especially during holidays
+                import statistics
+                volumes_20d = [r['v'] for r in results[:-1][-20:]]
+                median_volume = statistics.median(volumes_20d) if volumes_20d else 0
                 yesterday_volume = results[-1]['v']
 
-                volume_ratio = yesterday_volume / avg_volume if avg_volume > 0 else 1.0
+                volume_ratio = yesterday_volume / median_volume if median_volume > 0 else 1.0
 
                 return {
                     'volume_ratio': round(volume_ratio, 2),
-                    'avg_volume_20d': int(avg_volume),
+                    'avg_volume_20d': int(median_volume),  # Now median, not mean
+                    'median_volume_20d': int(median_volume),  # Explicit for clarity
                     'yesterday_volume': int(yesterday_volume),
                     'score': min(volume_ratio / 3 * 100, 100)  # 3x+ volume = perfect score
                 }
@@ -3761,18 +3774,80 @@ Return ONLY valid JSON (no markdown, no explanation):
             'why_selected': why_selected
         }
 
+    def detect_market_regime(self):
+        """
+        Detect current market regime for regime-aware liquidity thresholds (v10.2)
+
+        Returns:
+            tuple: (regime_name, liquidity_threshold, description)
+        """
+        import calendar
+        from datetime import datetime, timedelta
+
+        # Get VIX data for risk-off detection
+        try:
+            vix_data = requests.get(
+                f"https://api.polygon.io/v2/aggs/ticker/VIX/prev?apiKey={self.polygon_key}",
+                timeout=10
+            )
+            vix_close = vix_data.json().get('results', [{}])[0].get('c', 20)  # Default to 20 if unavailable
+        except:
+            vix_close = 20  # Default to normal if VIX unavailable
+
+        # Detect holiday weeks
+        today = datetime.now()
+        is_holiday_week = False
+
+        # US Market Holidays (major ones that impact volume)
+        holiday_weeks = [
+            (12, 24, 12, 31),  # Christmas week
+            (1, 1, 1, 2),      # New Year
+            (7, 1, 7, 7),      # Independence Day week
+            (11, 22, 11, 28),  # Thanksgiving week (approx)
+        ]
+
+        for month_start, day_start, month_end, day_end in holiday_weeks:
+            if (month_start <= today.month <= month_end):
+                if (today.month == month_start and today.day >= day_start) or \
+                   (today.month == month_end and today.day <= day_end) or \
+                   (month_start < today.month < month_end):
+                    is_holiday_week = True
+                    break
+
+        # Determine regime
+        if vix_close > 25:
+            regime = 'risk_off'
+            threshold = LIQUIDITY_THRESHOLDS['risk_off']
+            description = f"VIX {vix_close:.1f} (Risk-Off)"
+        elif is_holiday_week:
+            regime = 'holiday'
+            threshold = LIQUIDITY_THRESHOLDS['holiday']
+            description = "Holiday Week"
+        else:
+            regime = 'normal'
+            threshold = LIQUIDITY_THRESHOLDS['normal']
+            description = f"VIX {vix_close:.1f} (Normal)"
+
+        return regime, threshold, description
+
     def run_scan(self):
         """
-        Execute full market scan
+        Execute full market scan (v10.2 - Regime-Aware Liquidity)
 
         Returns: Dict with scan results
         """
+        # Detect market regime and set liquidity threshold
+        regime, liquidity_threshold, regime_description = self.detect_market_regime()
+        global MIN_DAILY_VOLUME_USD
+        MIN_DAILY_VOLUME_USD = liquidity_threshold
+
         print("=" * 60)
-        print("MARKET SCREENER - S&P 1500 Scan")
+        print("MARKET SCREENER - S&P 1500 Scan (v10.2)")
         print("=" * 60)
         print(f"Date: {self.today}")
         print(f"Time: {datetime.now(ET).strftime('%H:%M:%S')} ET")
-        print(f"Filters: Price ≥${MIN_PRICE}, MCap ≥${MIN_MARKET_CAP:,}")
+        print(f"Market Regime: {regime_description}")
+        print(f"Filters: Price ≥${MIN_PRICE}, Liquidity ≥${liquidity_threshold/1e6:.0f}M")
         print(f"         (RS used for scoring, not filtering)\n")
 
         # Load Finnhub earnings calendar (TIER 1 CATALYST DATA)
