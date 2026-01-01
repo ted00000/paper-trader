@@ -322,10 +322,10 @@ class MarketScreener:
             print("   ⚠️ WARNING: FINNHUB_API_KEY not set - Tier 1 catalyst detection disabled")
             print("   Sign up at https://finnhub.io/register for free API key\n")
 
-    def analyze_catalyst_with_claude(self, ticker, sector, news_articles, technical_data):
+    def analyze_catalyst_with_claude(self, ticker, sector, news_articles, technical_data, retry_count=0, max_retries=5):
         """
-        HYBRID SCREENER ARCHITECTURE (Dec 31, 2025)
-        Use Claude to analyze catalysts instead of keyword matching
+        HYBRID SCREENER v10.0 (Jan 1, 2026)
+        Use Claude to analyze catalysts with exponential backoff retry logic
 
         This replaces the old keyword-based catalyst detection with AI-powered analysis
         that understands nuance, context, and multi-catalyst setups.
@@ -335,6 +335,8 @@ class MarketScreener:
             sector: Stock sector (for context)
             news_articles: List of recent news articles from Polygon (last 7 days)
             technical_data: Dict with price, volume, RS data
+            retry_count: Current retry attempt (for exponential backoff)
+            max_retries: Maximum number of retries for 429 errors
 
         Returns:
             Dict with Claude's catalyst analysis:
@@ -455,6 +457,34 @@ Return ONLY valid JSON (no markdown, no explanation):
                 json=payload,
                 timeout=30
             )
+
+            # Handle rate limiting with exponential backoff
+            if response.status_code == 429:
+                if retry_count < max_retries:
+                    # Exponential backoff: 2^retry_count seconds (2s, 4s, 8s, 16s, 32s)
+                    wait_time = 2 ** (retry_count + 1)
+                    print(f"   ⏳ {ticker}: Rate limited (429), retrying in {wait_time}s (attempt {retry_count + 1}/{max_retries})")
+                    time.sleep(wait_time)
+
+                    # Recursive retry with incremented count
+                    return self.analyze_catalyst_with_claude(
+                        ticker, sector, news_articles, technical_data,
+                        retry_count=retry_count + 1, max_retries=max_retries
+                    )
+                else:
+                    print(f"   ❌ {ticker}: Max retries exceeded for rate limiting")
+                    return {
+                        'has_tier1_catalyst': False,
+                        'catalyst_type': 'None',
+                        'tier': 'None',
+                        'confidence': 'Low',
+                        'reasoning': 'Rate limit exceeded after retries',
+                        'catalyst_age_days': 0,
+                        'multi_catalyst': False,
+                        'negative_flags': [],
+                        'error': '429 Too Many Requests - max retries exceeded'
+                    }
+
             response.raise_for_status()
 
             # Parse Claude's response
@@ -480,6 +510,20 @@ Return ONLY valid JSON (no markdown, no explanation):
                     'error': 'JSON parse failure'
                 }
 
+        except requests.exceptions.HTTPError as e:
+            # Handle other HTTP errors (not 429)
+            print(f"   ⚠️ {ticker}: Claude API HTTP error: {e}")
+            return {
+                'has_tier1_catalyst': False,
+                'catalyst_type': 'None',
+                'tier': 'None',
+                'confidence': 'Low',
+                'reasoning': f'HTTP error: {str(e)[:50]}',
+                'catalyst_age_days': 0,
+                'multi_catalyst': False,
+                'negative_flags': [],
+                'error': str(e)
+            }
         except Exception as e:
             print(f"   ⚠️ {ticker}: Claude API error: {e}")
             return {
@@ -498,6 +542,8 @@ Return ONLY valid JSON (no markdown, no explanation):
         """
         Batch process Claude catalyst analysis with parallel API calls
 
+        v10.0: Rate-limited with exponential backoff retry logic
+
         Args:
             stocks_with_news: List of dicts with {ticker, sector, news_articles, technical_data}
 
@@ -510,14 +556,15 @@ Return ONLY valid JSON (no markdown, no explanation):
         print(f"=" * 60)
         print(f"   Analyzing {len(stocks_with_news)} stocks with news catalysts")
         print(f"   Using model: {CLAUDE_MODEL}")
-        print(f"   Batch size: 50 stocks (parallel processing)\n")
+        print(f"   Rate limiting: 5 concurrent workers + exponential backoff")
+        print(f"   Batch size: 40 stocks (to respect rate limits)\n")
 
         results = {}
         total = len(stocks_with_news)
         processed = 0
 
-        # Process in batches of 50 for rate limiting
-        batch_size = 50
+        # Process in batches of 40 for rate limiting (reduced from 50)
+        batch_size = 40
         for batch_start in range(0, total, batch_size):
             batch_end = min(batch_start + batch_size, total)
             batch = stocks_with_news[batch_start:batch_end]
@@ -525,7 +572,8 @@ Return ONLY valid JSON (no markdown, no explanation):
             print(f"   Processing batch {batch_start//batch_size + 1}: stocks {batch_start+1}-{batch_end} of {total}")
 
             # Parallel API calls using ThreadPoolExecutor
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            # Reduced from 10 to 5 workers to avoid rate limits
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
                 future_to_ticker = {
                     executor.submit(
                         self.analyze_catalyst_with_claude,
@@ -563,9 +611,10 @@ Return ONLY valid JSON (no markdown, no explanation):
                             'error': str(e)
                         }
 
-            # Small delay between batches to respect rate limits
+            # Delay between batches to respect rate limits (increased from 2s to 5s)
             if batch_end < total:
-                time.sleep(2)
+                time.sleep(5)
+                print(f"   ⏸️  Waiting 5s before next batch...\n")
 
         print(f"\n   ✓ Completed: {processed}/{total} stocks analyzed")
 
