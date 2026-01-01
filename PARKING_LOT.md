@@ -1,8 +1,66 @@
 # PARKING LOT - Deferred Enhancements
 
-**Last Updated:** December 31, 2025 (v8.1)
-**Status:** Critical negative news detection bug FIXED
-**Recent:** Audit fixes #1-7 completed, AXTI dilution news bug resolved
+**Last Updated:** December 31, 2025 (v9.0 - HYBRID SCREENER ARCHITECTURE)
+**Status:** MAJOR ARCHITECTURE CHANGE - Claude integrated into screener
+**Recent:** Hybrid screener implementation, validation phase refactor
+
+---
+
+## 🚀 MAJOR ARCHITECTURE CHANGE (v9.0 - Dec 31, 2025)
+
+### Hybrid Screener: Claude-Powered Catalyst Analysis
+
+**Problem Identified:**
+- User insight: "We are using keywords during the screener on a very important aspect of our analysis, news. When claude is so much better at doing this. why is claude not part of the screener process?"
+- Keyword matching failed to detect AXSM FDA Priority Review (gave 4/20 score)
+- Validation phase re-fetched news AFTER Claude decided, then vetoed Claude's recommendations
+- Data should be fetched BEFORE Claude analyzes, not used to veto afterward
+
+**Old Architecture (BROKEN):**
+1. Screener (7 AM): Keyword matching for catalysts (crude, misses nuance)
+2. GO Command (8:45 AM): Claude sees top 15 candidates only
+3. Validation: Re-fetches news, can veto Claude with automated scoring
+
+**New Architecture (v9.0 - HYBRID):**
+1. **Phase 1 - Universal Hard Gates (Python):**
+   - Price ≥ $10, Market cap ≥ $1B, Dollar volume ≥ $50M
+   - Data freshness (96h general, 120h for Tier 1)
+   - Negative news detection (dilution, lawsuits, downgrades)
+   - **Output:** ~200-300 stocks passing basic quality filters
+
+2. **Phase 2 - Claude Catalyst Analysis (AI):**
+   - Batch process 200-300 stocks in parallel (50 at a time)
+   - Claude analyzes news with full context and nuance
+   - Identifies: Tier 1/2/3/4, catalyst type, confidence, multi-catalyst setups
+   - **Cost:** ~$0.05 per screener run (using Haiku model)
+   - **Time:** ~2-3 minutes (parallel processing)
+
+3. **Phase 3 - Composite Scoring (Python):**
+   - Combine Claude's tier classification with technical/RS data
+   - Return top 40 candidates to GO command
+
+4. **GO Command (8:45 AM):**
+   - Claude sees ALL top 40 candidates with full context
+   - Makes final portfolio decisions (HOLD/EXIT/BUY)
+
+5. **EXECUTE Command:**
+   - Applies only safety rails: buying power, position limits, macro blackouts
+   - **NO MORE NEWS VETO** - trusts Claude's analysis from screener + GO
+
+**Benefits:**
+- ✅ Claude analyzes 200-300 stocks vs 15 (13x more coverage)
+- ✅ Nuanced catalyst detection (FDA Priority Review vs FDA delays)
+- ✅ M&A target vs acquirer distinction
+- ✅ Multi-catalyst setup recognition
+- ✅ No more validation phase vetoing Claude's decisions
+- ✅ Minimal cost increase (~$1.50/month at $0.05/day)
+
+**Implementation Status:**
+- ✅ `analyze_catalyst_with_claude()` - Single stock analysis
+- ✅ `batch_analyze_catalysts()` - Parallel batch processing
+- ⏳ Integration into `run_scan()` - IN PROGRESS
+- ⏳ Remove validation phase news veto
+- ⏳ Testing on server
 
 ---
 

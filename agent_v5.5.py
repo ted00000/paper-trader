@@ -5552,31 +5552,50 @@ RECENT LESSONS LEARNED:
                         validation_passed = False
                         rejection_reasons.append(age_check['reason'])
 
-                    # PHASE 1: Check news validation
+                    # HYBRID SCREENER v9.0 (Dec 31, 2025): News validation removed
+                    # ARCHITECTURAL FIX: Data should be fetched BEFORE Claude analyzes, not used to veto after
+                    #
+                    # Old (BROKEN) flow:
+                    #   1. Screener (7 AM): Keyword matching for catalysts
+                    #   2. GO (8:45 AM): Claude sees top 15, makes recommendations
+                    #   3. Validation: Re-fetches news, vetoes Claude if score < 5
+                    #
+                    # New (v9.0) flow:
+                    #   1. Screener (7 AM): Claude analyzes 200-300 stocks with news
+                    #   2. GO (8:45 AM): Claude sees top 40 with Claude's tier classifications
+                    #   3. Validation: Only applies safety rails (buying power, VIX, macro blackouts)
+                    #
+                    # We trust Claude's catalyst analysis from screener + GO command.
+                    # Validation no longer re-fetches news or vetoes based on automated scoring.
+
+                    # PHASE 1: News validation - INFORMATIONAL ONLY (no veto)
+                    # Keep the function call for logging/monitoring, but don't reject based on score
                     news_result = self.calculate_news_validation_score(
                         ticker=ticker,
                         catalyst_type=catalyst_type,
                         catalyst_age_days=catalyst_age
                     )
 
-                    # Log validation event
+                    # Log validation event (for monitoring only)
                     self.log_news_monitoring(
                         ticker=ticker,
                         event_type='VALIDATION',
                         result=news_result
                     )
 
-                    # News score must be ≥5
-                    if news_result['score'] < 5:
-                        validation_passed = False
-                        rejection_reasons.append(f"News score too low ({news_result['score']}/20)")
+                    # v9.0: DO NOT VETO based on news score - trust Claude's analysis
+                    # The news_result is kept for logging/learning purposes only
+                    # if news_result['score'] < 5:  # REMOVED - no longer vetoes
+                    #     validation_passed = False
+                    #     rejection_reasons.append(f"News score too low ({news_result['score']}/20}")
 
                     # PHASE 3: Apply regime-based filtering
                     if regime_adjustment == 'HIGHEST_CONVICTION_ONLY':
-                        # VIX 30-35: Only accept Tier 1 with news score ≥15
-                        if tier_result['tier'] != 'Tier1' or news_result['score'] < 15:
+                        # v9.0: VIX 30-35 only accepts Tier 1 (removed news score requirement)
+                        # Trust Claude's tier classification from screener, don't re-check news score
+                        if tier_result['tier'] != 'Tier1':
                             validation_passed = False
-                            rejection_reasons.append(f"VIX {vix_result['vix']} - requires Tier1 + News≥15")
+                            rejection_reasons.append(f"VIX {vix_result['vix']} - requires Tier1 only")
 
                     # PHASE 4: Relative Strength + Conviction Sizing
                     rs_result = self.calculate_relative_strength(ticker, sector)

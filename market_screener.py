@@ -31,6 +31,9 @@ PROJECT_DIR = Path(__file__).parent
 POLYGON_API_KEY = os.environ.get('POLYGON_API_KEY', '')
 FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', '')
 FMP_API_KEY = os.environ.get('FMP_API_KEY', '')  # PHASE 2.2: Financial Modeling Prep (free tier)
+CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
+CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages'
+CLAUDE_MODEL = 'claude-3-5-haiku-20241022'  # Haiku for cost efficiency ($0.25/1M input tokens)
 
 # S&P 1500 Sector ETF Mapping (same as agent)
 SECTOR_ETF_MAP = {
@@ -318,6 +321,255 @@ class MarketScreener:
         if not self.finnhub_key:
             print("   ⚠️ WARNING: FINNHUB_API_KEY not set - Tier 1 catalyst detection disabled")
             print("   Sign up at https://finnhub.io/register for free API key\n")
+
+    def analyze_catalyst_with_claude(self, ticker, sector, news_articles, technical_data):
+        """
+        HYBRID SCREENER ARCHITECTURE (Dec 31, 2025)
+        Use Claude to analyze catalysts instead of keyword matching
+
+        This replaces the old keyword-based catalyst detection with AI-powered analysis
+        that understands nuance, context, and multi-catalyst setups.
+
+        Args:
+            ticker: Stock symbol
+            sector: Stock sector (for context)
+            news_articles: List of recent news articles from Polygon (last 7 days)
+            technical_data: Dict with price, volume, RS data
+
+        Returns:
+            Dict with Claude's catalyst analysis:
+            {
+                'has_tier1_catalyst': bool,
+                'catalyst_type': str,  # FDA_Priority_Review, M&A_Target, etc.
+                'tier': str,  # Tier1, Tier2, Tier3, Tier4, None
+                'confidence': str,  # High, Medium, Low
+                'reasoning': str,  # 1-2 sentence explanation
+                'catalyst_age_days': int,
+                'multi_catalyst': bool,
+                'negative_flags': list  # Any bearish signals spotted
+            }
+        """
+
+        if not CLAUDE_API_KEY:
+            # Fallback to keyword matching if Claude API not available
+            return {
+                'has_tier1_catalyst': False,
+                'catalyst_type': 'None',
+                'tier': 'None',
+                'confidence': 'Low',
+                'reasoning': 'Claude API not configured - using keyword fallback',
+                'catalyst_age_days': 0,
+                'multi_catalyst': False,
+                'negative_flags': [],
+                'error': 'CLAUDE_API_KEY not set'
+            }
+
+        # Format news for Claude
+        news_summary = ""
+        if news_articles:
+            news_summary = "Recent News (last 7 days):\n"
+            for i, article in enumerate(news_articles[:5], 1):  # Top 5 articles
+                title = article.get('title', '')
+                description = article.get('description', '')[:200]
+                published = article.get('published', 'Recent')
+                news_summary += f"{i}. [{published}] {title}\n"
+                if description:
+                    news_summary += f"   {description}...\n"
+        else:
+            news_summary = "No recent news articles found in last 7 days."
+
+        # Build prompt
+        user_message = f"""Analyze this stock for catalyst-driven swing trading opportunities.
+
+Stock: {ticker}
+Sector: {sector}
+
+{news_summary}
+
+Technical Context:
+- Price: ${technical_data.get('price', 0):.2f}
+- 52-week high: ${technical_data.get('high_52w', 0):.2f} ({technical_data.get('distance_from_52w_high_pct', 0):.1f}% from high)
+- Volume ratio: {technical_data.get('volume_ratio', 0):.1f}x average
+- RS Percentile: {technical_data.get('rs_percentile', 0)} (relative strength vs market)
+
+TASK: Identify if this stock has a TIER 1 or TIER 2 catalyst for swing trading.
+
+TIER DEFINITIONS:
+- **Tier 1** (BEST): FDA approvals/priority review, M&A acquisition targets with premium >15%, earnings beats >10% with guidance raise, major government/enterprise contracts
+- **Tier 2** (GOOD): Analyst upgrades with PT raise >10%, guidance raises without beat, significant product launches, partnership announcements
+- **Tier 3** (CONTEXT ONLY): Sector rotation, industry tailwinds - NOT enough alone
+- **Tier 4** (TECHNICAL): 52-week breakouts, gap-ups - use technical data provided
+
+CRITICAL NUANCE DETECTION:
+- "FDA Priority Review" (bullish Tier 1) vs "FDA delays review" (bearish)
+- "Company X to acquire Y" - determine if ticker is TARGET (bullish) or ACQUIRER (often bearish)
+- "Raises guidance" vs "guidance in-line" vs "guidance cut"
+- Multi-catalyst bonus: earnings beat + guidance raise + analyst upgrade = stronger
+
+NEGATIVE FLAGS TO SPOT:
+- Dilutive offerings, secondary offerings
+- Lawsuits, investigations, regulatory issues
+- Analyst downgrades
+- Guidance cuts, earnings misses
+
+Return ONLY valid JSON (no markdown, no explanation):
+{{
+  "has_tier1_catalyst": true/false,
+  "catalyst_type": "FDA_Priority_Review|M&A_Target|Earnings_Beat|Analyst_Upgrade|None",
+  "tier": "Tier1|Tier2|Tier3|Tier4|None",
+  "confidence": "High|Medium|Low",
+  "reasoning": "1-2 sentence explanation focusing on WHY this matters for swing trading",
+  "catalyst_age_days": 0-7,
+  "multi_catalyst": true/false,
+  "negative_flags": []
+}}"""
+
+        try:
+            headers = {
+                'x-api-key': CLAUDE_API_KEY,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json'
+            }
+
+            payload = {
+                'model': CLAUDE_MODEL,
+                'max_tokens': 500,  # Small response for JSON only
+                'temperature': 0,  # Deterministic for consistency
+                'messages': [{'role': 'user', 'content': user_message}]
+            }
+
+            response = requests.post(
+                CLAUDE_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            response.raise_for_status()
+
+            # Parse Claude's response
+            response_data = response.json()
+            response_text = response_data.get('content', [{}])[0].get('text', '{}')
+
+            # Extract JSON from response (Claude might wrap in markdown)
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group(0))
+                return result
+            else:
+                print(f"   ⚠️ {ticker}: Claude returned non-JSON response")
+                return {
+                    'has_tier1_catalyst': False,
+                    'catalyst_type': 'None',
+                    'tier': 'None',
+                    'confidence': 'Low',
+                    'reasoning': 'Failed to parse Claude response',
+                    'catalyst_age_days': 0,
+                    'multi_catalyst': False,
+                    'negative_flags': [],
+                    'error': 'JSON parse failure'
+                }
+
+        except Exception as e:
+            print(f"   ⚠️ {ticker}: Claude API error: {e}")
+            return {
+                'has_tier1_catalyst': False,
+                'catalyst_type': 'None',
+                'tier': 'None',
+                'confidence': 'Low',
+                'reasoning': f'API error: {str(e)[:50]}',
+                'catalyst_age_days': 0,
+                'multi_catalyst': False,
+                'negative_flags': [],
+                'error': str(e)
+            }
+
+    def batch_analyze_catalysts(self, stocks_with_news):
+        """
+        Batch process Claude catalyst analysis with parallel API calls
+
+        Args:
+            stocks_with_news: List of dicts with {ticker, sector, news_articles, technical_data}
+
+        Returns:
+            Dict mapping ticker -> Claude analysis result
+        """
+        import concurrent.futures
+
+        print(f"\n🤖 CLAUDE CATALYST ANALYSIS")
+        print(f"=" * 60)
+        print(f"   Analyzing {len(stocks_with_news)} stocks with news catalysts")
+        print(f"   Using model: {CLAUDE_MODEL}")
+        print(f"   Batch size: 50 stocks (parallel processing)\n")
+
+        results = {}
+        total = len(stocks_with_news)
+        processed = 0
+
+        # Process in batches of 50 for rate limiting
+        batch_size = 50
+        for batch_start in range(0, total, batch_size):
+            batch_end = min(batch_start + batch_size, total)
+            batch = stocks_with_news[batch_start:batch_end]
+
+            print(f"   Processing batch {batch_start//batch_size + 1}: stocks {batch_start+1}-{batch_end} of {total}")
+
+            # Parallel API calls using ThreadPoolExecutor
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_ticker = {
+                    executor.submit(
+                        self.analyze_catalyst_with_claude,
+                        stock['ticker'],
+                        stock['sector'],
+                        stock['news_articles'],
+                        stock['technical_data']
+                    ): stock['ticker']
+                    for stock in batch
+                }
+
+                for future in concurrent.futures.as_completed(future_to_ticker):
+                    ticker = future_to_ticker[future]
+                    try:
+                        result = future.result()
+                        results[ticker] = result
+                        processed += 1
+
+                        # Show progress for high-confidence Tier 1/2 finds
+                        if result.get('tier') in ['Tier1', 'Tier2'] and result.get('confidence') == 'High':
+                            catalyst_type = result.get('catalyst_type', 'Unknown')
+                            print(f"      ✓ {ticker}: {result['tier']} - {catalyst_type}")
+
+                    except Exception as e:
+                        print(f"      ✗ {ticker}: Analysis failed - {e}")
+                        results[ticker] = {
+                            'has_tier1_catalyst': False,
+                            'catalyst_type': 'None',
+                            'tier': 'None',
+                            'confidence': 'Low',
+                            'reasoning': f'Batch processing error: {str(e)[:30]}',
+                            'catalyst_age_days': 0,
+                            'multi_catalyst': False,
+                            'negative_flags': [],
+                            'error': str(e)
+                        }
+
+            # Small delay between batches to respect rate limits
+            if batch_end < total:
+                time.sleep(2)
+
+        print(f"\n   ✓ Completed: {processed}/{total} stocks analyzed")
+
+        # Summary statistics
+        tier1_count = sum(1 for r in results.values() if r.get('tier') == 'Tier1')
+        tier2_count = sum(1 for r in results.values() if r.get('tier') == 'Tier2')
+        multi_catalyst_count = sum(1 for r in results.values() if r.get('multi_catalyst'))
+
+        print(f"\n   📊 CATALYST BREAKDOWN:")
+        print(f"      Tier 1 (FDA, M&A, Major Earnings): {tier1_count}")
+        print(f"      Tier 2 (Upgrades, PT Raises): {tier2_count}")
+        print(f"      Multi-catalyst setups: {multi_catalyst_count}")
+        print(f"   {'='*60}\n")
+
+        return results
 
     def get_sp1500_tickers(self):
         """
@@ -3470,6 +3722,75 @@ class MarketScreener:
                 candidates.append(result)
 
         print(f"\n   Scan complete: {candidates_count}/{universe_size} candidates identified\n")
+
+        # HYBRID SCREENER v9.0: Claude Catalyst Analysis
+        # Replace keyword-based catalyst detection with AI-powered analysis
+        if CLAUDE_API_KEY and candidates:
+            print("\n" + "=" * 60)
+            print("PHASE 2: CLAUDE CATALYST ANALYSIS (v9.0)")
+            print("=" * 60)
+
+            # Prepare stocks for Claude analysis
+            # Only analyze stocks with news articles (Claude needs context)
+            stocks_for_claude = []
+            for candidate in candidates:
+                news_articles = candidate.get('catalyst_signals', {}).get('top_articles', [])
+                if news_articles:  # Only send stocks with news to Claude
+                    stocks_for_claude.append({
+                        'ticker': candidate['ticker'],
+                        'sector': candidate['sector'],
+                        'news_articles': news_articles,
+                        'technical_data': {
+                            'price': candidate['technical_setup']['current_price'],
+                            'high_52w': candidate['technical_setup']['high_52w'],
+                            'distance_from_52w_high_pct': candidate['technical_setup']['distance_from_52w_high_pct'],
+                            'volume_ratio': candidate['volume_analysis']['volume_ratio'],
+                            'rs_percentile': candidate.get('relative_strength', {}).get('rs_percentile', 0)
+                        }
+                    })
+
+            if stocks_for_claude:
+                # Batch analyze with Claude
+                claude_results = self.batch_analyze_catalysts(stocks_for_claude)
+
+                # Update candidates with Claude's analysis
+                for candidate in candidates:
+                    ticker = candidate['ticker']
+                    if ticker in claude_results:
+                        claude_analysis = claude_results[ticker]
+
+                        # Store Claude's full analysis
+                        candidate['claude_catalyst'] = claude_analysis
+
+                        # Update catalyst tier based on Claude's judgment
+                        # Claude's tier classification overrides keyword matching
+                        if claude_analysis.get('tier') in ['Tier1', 'Tier2', 'Tier3', 'Tier4']:
+                            # Map Claude's tier to display format
+                            tier_map = {
+                                'Tier1': 'Tier 1',
+                                'Tier2': 'Tier 2',
+                                'Tier3': 'Tier 3',
+                                'Tier4': 'Tier 4'
+                            }
+                            candidate['catalyst_tier'] = tier_map.get(claude_analysis['tier'], 'No Catalyst')
+                            candidate['why_selected'] = f"{claude_analysis['catalyst_type']}: {claude_analysis['reasoning']}"
+
+                            # Boost composite score for high-confidence Tier 1/2
+                            if claude_analysis['tier'] in ['Tier1', 'Tier2'] and claude_analysis['confidence'] == 'High':
+                                # Add bonus points for AI-confirmed catalysts
+                                tier_bonus = 15 if claude_analysis['tier'] == 'Tier1' else 10
+                                confidence_bonus = 5 if claude_analysis['multi_catalyst'] else 0
+                                candidate['composite_score'] += tier_bonus + confidence_bonus
+                                candidate['composite_score'] = min(candidate['composite_score'], 100)  # Cap at 100
+
+                print(f"   ✓ Updated {len(claude_results)} candidates with Claude analysis\n")
+            else:
+                print("   ⚠️  No stocks with news articles for Claude analysis\n")
+        else:
+            if not CLAUDE_API_KEY:
+                print("\n   ⚠️  CLAUDE_API_KEY not set - using keyword-based catalyst detection\n")
+            else:
+                print("\n   ℹ️   No candidates to analyze\n")
 
         # PHASE 3.1: Calculate IBD-style RS percentile rankings
         print("=" * 60)
