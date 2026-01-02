@@ -5541,22 +5541,7 @@ RECENT LESSONS LEARNED:
                         buy_pos['requires_close_monitoring'] = True
 
                     # PHASE 2: Check catalyst tier
-                    # BUG FIX (Jan 2, 2026): Use screener's tier classification instead of recalculating
-                    # The screener already ran Claude analysis and classified tiers - validation should trust it
-                    screener_tier = screener_candidate.get('catalyst_tier')
-
-                    if screener_tier:
-                        # Use screener's tier (already validated by Claude in screener)
-                        tier_result = {
-                            'tier': screener_tier.replace(' ', ''),  # 'Tier 1' → 'Tier1'
-                            'tier_name': f'Screener Validated - {screener_tier}',
-                            'reasoning': f'Tier assigned by screener Claude analysis'
-                        }
-                        print(f"   ℹ️  Using screener tier: {screener_tier}")
-                    else:
-                        # Fallback: recalculate tier if screener didn't classify
-                        tier_result = self.classify_catalyst_tier(catalyst_type, catalyst_details)
-                        print(f"   ⚠️  Screener tier missing, recalculating: {tier_result['tier']}")
+                    tier_result = self.classify_catalyst_tier(catalyst_type, catalyst_details)
 
                     # Auto-reject Tier 3 catalysts
                     if tier_result['tier'] == 'Tier3':
@@ -5703,6 +5688,17 @@ RECENT LESSONS LEARNED:
                     sector_perf = sector_rotation.get('sector_performance', {}).get(sector, {})
                     sector_leading = sector_perf.get('is_leading', False)
                     sector_vs_spy = sector_perf.get('vs_spy', 0)
+
+                    # BUG FIX (Jan 2, 2026): Use screener's tier classification instead of recalculating
+                    # The screener already ran Claude analysis and classified tiers - trust it
+                    screener_tier = screener_candidate.get('catalyst_tier')
+
+                    if screener_tier:
+                        # Override tier_result with screener's tier (more accurate)
+                        tier_result['tier'] = screener_tier.replace(' ', '')  # 'Tier 1' → 'Tier1'
+                        tier_result['tier_name'] = f'Screener Validated - {screener_tier}'
+                        tier_result['reasoning'] = 'Tier assigned by screener Claude analysis'
+                        print(f"   ℹ️  Using screener tier: {screener_tier}")
 
                     conviction_result = self.calculate_conviction_level(
                         catalyst_tier=tier_result['tier'],
