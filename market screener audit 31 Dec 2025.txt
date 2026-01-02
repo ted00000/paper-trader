@@ -1,0 +1,85 @@
+Grade vs best-in-class (overall platform)
+8.0 / 10 today.
+You’re in the “institutional-leaning prototype” tier: clear strategy intent, risk governance concepts, and an emerging separation of duties (hard filters → LLM catalyst triage). The biggest gaps to true best-in-class are still (a) portfolio construction & correlation-aware sizing, (b) formal performance attribution / regime modeling beyond VIX, and (c) closed-loop improvement controls (even conservative ones).
+
+Grade of the new screener architecture (hard filters → Claude does news)
+8.2 / 10 conceptually, but execution risk is currently high.
+What you’re doing right:
+	•	Hard gates first is the right move for cost/latency and for keeping Claude focused on “decision-quality” candidates.
+	•	You explicitly frame RS as scoring not a gate (good; avoids throwing out winners too early). market screener 30 dec 25
+	•	You’re trying to enforce “tradable only” via price + liquidity gates. market screener 30 dec 25
+Where it can fail (and why you’re seeing “low quality”):
+	•	Your current hard gates are tuned like a large-cap institutional liquidity filter, but your universe is S&P1500 and your objective is “best-in-class swing trading,” which often includes midcaps that don’t do $50M/day notional—especially outside earnings season and especially around holidays. market screener 30 dec 25
+	•	You still have a lot of in-screener news/catalyst parsing infrastructure (tiers, recency windows, source multipliers) even though you’ve moved catalyst determination to Claude. That creates drift and confusion about “what is authoritative.” market screener 30 dec 25
+
+“We only returned one stock” — bug vs holiday timing?
+It can be either, but with your current gates it’s completely plausible during the holiday period. Here’s how I’d allocate probability:
+Likely contributor: holiday + your liquidity gate (high probability)
+	•	$50M/day notional is a very aggressive minimum. market screener 30 dec 25During late-Dec, volumes can drop materially. If you compute notional using that day’s volume (or a short window that includes holiday sessions), you will collapse the candidate set.
+Also likely: a logic bug that quietly nukes catalysts (medium–high probability)
+I do see a concrete logical error pattern in the screener code you provided:
+	•	In classify_fda_approval(text), you check lowercase keywords against text without lowercasing text first, meaning this function becomes case-sensitive and will miss many matches depending on headline casing. market screener 30 dec 25Fix: convert once at the top: t = text.lower() then check keywords in t.This same pattern may exist in other classifier helpers (worth grepping).
+This kind of bug doesn’t always show up as a crash—just “mysteriously few catalysts.”
+Smaller, but real: documentation/output mismatches (low–medium probability)
+Your header says “Top 50 candidates,” but TOP_N_CANDIDATES = 40.
+market screener 30 dec 25
+market screener 30 dec 25
+Not fatal, but it’s a symptom of drift that often correlates with “we think we’re doing X but code is doing Y.”
+
+Hard-filter audit: are they too high?
+Based on what’s visible in the screener:
+Current hard gates (as implemented)
+	•	MIN_PRICE = $10 market screener 30 dec 25
+	•	MIN_MARKET_CAP = $1B market screener 30 dec 25
+	•	MIN_DAILY_VOLUME_USD = $50M market screener 30 dec 25
+My verdict
+	•	$10 price: reasonable.
+	•	$1B market cap: reasonable as a default, but you might want regime/volatility overrides if you want “best ideas” rather than “institutional only.”
+	•	$50M/day notional: very likely too strict for consistent daily candidate flow in S&P1500—especially outside earnings season and around holidays.
+If your goal is “best-in-class autonomous swing,” the screener should be regime-aware on liquidity, not static.
+
+The matrix (Claude-friendly) — what to change, and why
+Below is a “tuning matrix” Claude can apply directly in code as parameters and conditional thresholds.
+Gates (hard filters)
+	1	Tradability Gate
+	•	Price: $10+ (static)
+	•	Market cap: $1B+ (static baseline)
+	•	Liquidity (notional): use 20-day median not “today”
+	◦	Normal: >= $25M/day
+	◦	Holiday week: >= $15M/day (or use 60-day median)
+	◦	Risk-off (VIX high): raise to >= $40M/day
+	2	Quality Gate (technical)
+	•	Stage 2 / trend alignment gate (if you use it in screener): must be hard gate (not score)
+	•	Avoid “low quality” by adding spread / ATR% sanity checks (if you have data):
+	◦	e.g., ATR% between 2% and 8% (too low = no movement, too high = chop)
+	3	Catalyst Eligibility Gate
+	•	Screener should only require: “has any potentially relevant catalyst inputs available”
+	•	Claude should decide: Tier and acceptance
+	•	BUT: during catalyst droughts, allow a small “technical exception bucket” with strict rules (or you will get 0–1 names routinely)
+Ranking (scoring, not gates)
+	•	RS percentile
+	•	Volume trend / accumulation quality
+	•	Setup quality
+	•	Claude catalyst strength / specificity
+
+Your idea: “learning should track close rejections”
+Yes — do it. It’s one of the highest ROI upgrades you can make right now.
+Implement: for any rejection, if it fails by a small margin (e.g., within 10–15% of a threshold), store a near_miss record:
+	•	ticker, date
+	•	which gate failed + margin
+	•	features snapshot (price, mcap, notional, RS, setup metrics)
+	•	and then check 5/10/20-day forward returns
+This will quickly tell you whether your hard filters are:
+	•	correctly excluding junk, or
+	•	accidentally excluding tomorrow’s winners.
+
+Quick list of inconsistencies / contradictions I can already prove from the screener file
+	1	“Top 50 candidates” vs TOP_N_CANDIDATES = 40 market screener 30 dec 25market screener 30 dec 25
+	2	Architecture drift: file contains extensive internal catalyst tiering/recency/source weighting logic even though you’ve stated Claude is doing the news/catalyst analysis. market screener 30 dec 25
+	3	Likely catalyst under-detection bug: case-sensitive keyword checking in FDA classifier. market screener 30 dec 25
+
+Bottom line
+	•	One stock returned can absolutely be holiday-driven under your current liquidity threshold.
+	•	But you also have at least one real logical error that can suppress catalyst detection.
+	•	To get “best-in-class” behavior, make liquidity windowed + regime-aware, and start logging near-miss rejects for learning.
+If you want, I can produce a very explicit “parameter block” (constants + regime overrides) that Claude can paste into the screener and wire into the gates in ~1 pass.

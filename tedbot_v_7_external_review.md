@@ -1,14 +1,35 @@
-# Tedbot v7.x – Consolidated Technical Review & Bug Assessment
+# Tedbot v10.1 – Consolidated Technical Review & Architecture Overview
 
-_Last updated: Dec 2025_
+_Last updated: Jan 1, 2026 (v10.1 - Binary Gates + Claude Hybrid Architecture)_
 
 This document consolidates **all feedback to date** on the Tedbot system, including:
 - Main agent (`agent_v5.5.py`) review
-- Market screener (`market_screener.py` / `screener.txt`) review
+- Market screener (`market_screener.py`) - **MAJOR v10.1 ARCHITECTURE CHANGE**
 - Bug / reliability assessment
 - Architecture, logic, and data-pipeline risks
 
 The intent is to provide **one authoritative review artifact** you can reference as Tedbot continues its 6–12 month validation run.
+
+## ⚠️ MAJOR ARCHITECTURE CHANGE (v10.1 - Jan 1, 2026)
+
+**Hybrid Screener: Binary Gates + Claude AI Analysis**
+
+The screener has undergone a fundamental redesign based on the principle:
+> **"If it's not binary, Claude decides."**
+
+**Old Architecture (v7-v9):**
+- Keyword-based catalyst detection (negative news, FDA, M&A, earnings)
+- Python hard gates for everything (price, volume, catalysts, sentiment)
+- Claude only analyzed top 15 candidates at GO command time
+- High false negative rate (missed AXSM FDA Priority Review, BBIO M&A speculation)
+
+**New Architecture (v10.1):**
+- **Phase 1**: Binary-only hard gates (price ≥$10, volume ≥$50M, data freshness)
+- **Phase 2**: Claude analyzes ALL ~250 stocks passing binary gates
+- **Phase 3**: Composite scoring and top 40 selection
+- 83x more coverage, AI-powered nuance detection, exponential backoff rate limiting
+
+See Section 3 for full details.
 
 ---
 
