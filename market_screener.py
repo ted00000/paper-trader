@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 """
-MARKET SCREENER - S&P 1500 Universe Scanner (v10.2)
+MARKET SCREENER - S&P 1500 Universe Scanner (v10.3)
 ====================================================
 
-Hybrid Screener: Binary Gates + Claude AI Analysis
+Hybrid Screener: Binary Gates + Claude AI Analysis + Near-Miss Learning
 
 Philosophy: "If it's not binary, Claude decides"
 
 Process:
-- Phase 1: Binary hard gates (price, volume, freshness)
+- Phase 1: Binary hard gates (price, volume, freshness) + Near-miss logging
 - Phase 2: Claude AI analyzes ALL passing stocks (catalyst detection)
 - Phase 3: Composite scoring and top 40 selection
+
+Near-Miss Learning (v10.3):
+- Track stocks that barely fail gates (within 15% of threshold)
+- Log ticker, date, gate failed, margin, and snapshot of features
+- Enables learning: "Are we rejecting tomorrow's winners?"
 
 Output: Top 40 candidates for GO command analysis
 
 Author: Paper Trading Lab
-Version: 10.2 (Regime-Aware Liquidity)
+Version: 10.3 (Near-Miss Learning)
 Updated: 2026-01-01
 """
 
@@ -72,6 +77,12 @@ LIQUIDITY_THRESHOLDS = {
 }
 MIN_DAILY_VOLUME_USD = LIQUIDITY_THRESHOLDS['normal']  # Default to normal
 TOP_N_CANDIDATES = 40  # Number of candidates to pass to GO command
+
+# NEAR-MISS LEARNING (v10.3 - Third-Party Audit Recommendation)
+# Track stocks that barely fail gates to learn if filters are too strict
+# Philosophy: "Are we rejecting tomorrow's winners?"
+NEAR_MISS_MARGIN = 0.15  # 15% - if stock fails by <15%, log it as near-miss
+NEAR_MISS_LOG_PATH = PROJECT_DIR / 'strategy_evolution' / 'near_miss_log.csv'
 
 # ============================================================================
 # P2-10: RECENCY WINDOWS - Catalyst-Specific Approach
@@ -334,6 +345,60 @@ class MarketScreener:
         if not self.finnhub_key:
             print("   ⚠️ WARNING: FINNHUB_API_KEY not set - Tier 1 catalyst detection disabled")
             print("   Sign up at https://finnhub.io/register for free API key\n")
+
+        # Initialize near-miss logging (v10.3)
+        self._init_near_miss_log()
+
+    def _init_near_miss_log(self):
+        """
+        Initialize near-miss logging CSV file (v10.3)
+
+        Creates CSV with headers if it doesn't exist:
+        - Date, Ticker, Gate_Failed, Threshold, Actual_Value, Margin_Pct
+        - Price, Market_Cap, Volume_20d, RS_Pct, Sector
+        - Forward_5d, Forward_10d, Forward_20d (filled later for learning)
+        """
+        if not NEAR_MISS_LOG_PATH.exists():
+            NEAR_MISS_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(NEAR_MISS_LOG_PATH, 'w') as f:
+                f.write('Date,Ticker,Gate_Failed,Threshold,Actual_Value,Margin_Pct,')
+                f.write('Price,Market_Cap,Volume_20d,RS_Pct,Sector,')
+                f.write('Forward_5d,Forward_10d,Forward_20d\n')
+
+    def log_near_miss(self, ticker, gate_failed, threshold, actual_value, features):
+        """
+        Log a near-miss rejection (v10.3)
+
+        Args:
+            ticker: Stock symbol
+            gate_failed: 'price' or 'volume'
+            threshold: The gate threshold (e.g., $10, $25M)
+            actual_value: The actual value that failed (e.g., $9.50, $22M)
+            features: Dict with price, market_cap, volume_20d, rs_pct, sector
+
+        Near-miss criteria:
+            - If actual_value is within 15% of threshold (below), log it
+            - Enables learning: "Are our gates rejecting tomorrow's winners?"
+        """
+        # Calculate margin percentage
+        margin_pct = abs((threshold - actual_value) / threshold)
+
+        # Only log if within near-miss margin
+        if margin_pct > NEAR_MISS_MARGIN:
+            return  # Not a near-miss
+
+        # Extract features with defaults
+        price = features.get('price', 0)
+        market_cap = features.get('market_cap', 0)
+        volume_20d = features.get('volume_20d', 0)
+        rs_pct = features.get('rs_pct', 0)
+        sector = features.get('sector', 'Unknown')
+
+        # Append to CSV
+        with open(NEAR_MISS_LOG_PATH, 'a') as f:
+            f.write(f'{self.today},{ticker},{gate_failed},{threshold},{actual_value},{margin_pct:.4f},')
+            f.write(f'{price:.2f},{market_cap},{volume_20d},{rs_pct:.2f},{sector},')
+            f.write(',,\n')  # Forward returns filled later by batch job
 
     def analyze_catalyst_with_claude(self, ticker, sector, news_articles, technical_data, retry_count=0, max_retries=5):
         """
@@ -3096,16 +3161,19 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     def scan_stock_binary_gates(self, ticker):
         """
-        HYBRID SCREENER v10.0 (Jan 1, 2026): Binary Hard Gates Only
+        HYBRID SCREENER v10.3 (Jan 1, 2026): Binary Hard Gates + Near-Miss Learning
 
         This function applies ONLY objective, binary filters that require NO interpretation:
         - Price ≥ $10 (liquidity, institutional participation)
-        - Daily dollar volume ≥ $50M (execution quality)
+        - Daily dollar volume ≥ regime-aware threshold (execution quality)
         - Data freshness (traded in last 5 days)
 
         ALL news sentiment, catalyst detection, and quality judgments are delegated to Claude.
 
         Philosophy: "If it's not binary, Claude decides."
+
+        v10.3 Enhancement: Log "near-miss" rejections (within 15% of threshold)
+        to learn if gates are rejecting tomorrow's winners.
 
         Returns: Dict with basic data + news for Claude analysis, or None if rejected
         """
@@ -3120,16 +3188,42 @@ Return ONLY valid JSON (no markdown, no explanation):
         # Extract binary metrics
         avg_volume = volume_result.get('avg_volume_20d', 0)
         current_price = technical_result.get('current_price', 0)
+        market_cap = technical_result.get('market_cap', 0)
+
+        # Calculate RS for near-miss logging (but don't fetch news yet if we're going to reject)
+        # We need RS for the features snapshot, so calculate it early
+        rs_result = self.calculate_relative_strength(ticker, sector)
+        rs_pct = rs_result.get('rs_pct', 0) if rs_result else 0
 
         # BINARY GATE #1: Price ≥ $10
         if current_price < MIN_PRICE:
+            # v10.3: Log near-miss if price is close to threshold (within 15%)
+            features = {
+                'price': current_price,
+                'market_cap': market_cap,
+                'volume_20d': avg_volume,
+                'rs_pct': rs_pct,
+                'sector': sector
+            }
+            self.log_near_miss(ticker, 'price', MIN_PRICE, current_price, features)
+
             self.rejection_reasons['price_too_low'] += 1
             return None  # REJECT: Price below $10 threshold
 
-        # BINARY GATE #2: Daily Dollar Volume ≥ $50M
+        # BINARY GATE #2: Daily Dollar Volume ≥ regime-aware threshold
         if avg_volume > 0 and current_price > 0:
             avg_dollar_volume = avg_volume * current_price
-            if avg_dollar_volume < MIN_DAILY_VOLUME_USD:  # $50M minimum
+            if avg_dollar_volume < MIN_DAILY_VOLUME_USD:
+                # v10.3: Log near-miss if volume is close to threshold (within 15%)
+                features = {
+                    'price': current_price,
+                    'market_cap': market_cap,
+                    'volume_20d': avg_volume,
+                    'rs_pct': rs_pct,
+                    'sector': sector
+                }
+                self.log_near_miss(ticker, 'volume', MIN_DAILY_VOLUME_USD, avg_dollar_volume, features)
+
                 self.rejection_reasons['volume_too_low'] += 1
                 return None  # REJECT: Insufficient liquidity
 
@@ -3139,9 +3233,6 @@ Return ONLY valid JSON (no markdown, no explanation):
         # STEP 2: Fetch news for Claude analysis (NO keyword filtering)
         time.sleep(0.1)  # Rate limit
         news_result = self.get_news_score(ticker)
-
-        # STEP 3: Calculate relative strength (for Claude context, not filtering)
-        rs_result = self.calculate_relative_strength(ticker, sector)
 
         # Return basic data + news for Claude to analyze
         return {
@@ -3836,7 +3927,7 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     def run_scan(self):
         """
-        Execute full market scan (v10.2 - Regime-Aware Liquidity)
+        Execute full market scan (v10.3 - Near-Miss Learning)
 
         Returns: Dict with scan results
         """
@@ -3846,13 +3937,14 @@ Return ONLY valid JSON (no markdown, no explanation):
         MIN_DAILY_VOLUME_USD = liquidity_threshold
 
         print("=" * 60)
-        print("MARKET SCREENER - S&P 1500 Scan (v10.2)")
+        print("MARKET SCREENER - S&P 1500 Scan (v10.3)")
         print("=" * 60)
         print(f"Date: {self.today}")
         print(f"Time: {datetime.now(ET).strftime('%H:%M:%S')} ET")
         print(f"Market Regime: {regime_description}")
         print(f"Filters: Price ≥${MIN_PRICE}, Liquidity ≥${liquidity_threshold/1e6:.0f}M")
-        print(f"         (RS used for scoring, not filtering)\n")
+        print(f"         (RS used for scoring, not filtering)")
+        print(f"         (Near-miss logging: ±{NEAR_MISS_MARGIN*100:.0f}% margin)\n")
 
         # Load Finnhub earnings calendar (TIER 1 CATALYST DATA)
         if self.finnhub_key:
