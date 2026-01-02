@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """
-MARKET SCREENER - S&P 1500 Universe Scanner
-============================================
+MARKET SCREENER - S&P 1500 Universe Scanner (v10.2)
+====================================================
 
-Scans the S&P 1500 daily to find stocks with:
-- Relative Strength calculation (used as scoring factor, not filter)
-- Recent catalysts (news, volume, technical)
-- Composite scoring and ranking
+Hybrid Screener: Binary Gates + Claude AI Analysis
 
-Output: Top 50 candidates for Claude to select from
+Philosophy: "If it's not binary, Claude decides"
+
+Process:
+- Phase 1: Binary hard gates (price, volume, freshness)
+- Phase 2: Claude AI analyzes ALL passing stocks (catalyst detection)
+- Phase 3: Composite scoring and top 40 selection
+
+Output: Top 40 candidates for GO command analysis
 
 Author: Paper Trading Lab
-Version: 1.0.0
-Created: 2025-11-10
+Version: 10.2 (Regime-Aware Liquidity)
+Updated: 2026-01-01
 """
 
 import os
