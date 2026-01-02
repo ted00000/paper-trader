@@ -3354,7 +3354,9 @@ POSITION {i}: {ticker}
         # REQUIRED FILTERS (auto-reject if failed)
         # NOTE: RS filter removed in v7.0 - RS now used for scoring only
 
-        if catalyst_tier != 'Tier1':
+        # BUG FIX (Jan 2, 2026): Screener returns "Tier 1" (with space), not "Tier1"
+        # Accept both formats for compatibility
+        if catalyst_tier not in ['Tier1', 'Tier 1']:
             return {
                 'conviction': 'SKIP',
                 'position_size_pct': 0.0,
