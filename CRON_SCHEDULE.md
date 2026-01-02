@@ -67,18 +67,17 @@ Compare near-miss performance to accepted candidates to determine if gates are:
 
 ---
 
-## Installation Instructions
+## Installation Status
 
-To add the near-miss updater to cron:
+✅ **Near-miss updater is ACTIVE in cron** (added 2026-01-01)
 
+Current cron entry:
 ```bash
-# Edit crontab
-crontab -e
-
-# Add this line:
 0 20 * * * /root/paper_trading_lab/run_near_miss_updater.sh
+```
 
-# Verify cron entry
+To verify:
+```bash
 crontab -l | grep near_miss
 ```
 
