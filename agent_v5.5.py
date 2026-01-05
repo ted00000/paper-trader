@@ -939,8 +939,8 @@ POSITION {i}: {ticker}
         """
         try:
             # Fetch 30 days of data (20-day MA + buffer)
-            end_date = datetime.datetime.now().strftime('%Y-%m-%d')
-            start_date = (datetime.datetime.now() - datetime.timedelta(days=45)).strftime('%Y-%m-%d')
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=45)).strftime('%Y-%m-%d')
 
             response = requests.get(
                 f'https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}',
