@@ -6244,7 +6244,7 @@ RECENT LESSONS LEARNED:
                     # v7.1: Calculate slippage (execution cost beyond spread)
                     # Slippage = (fill_price - mid_price) / mid_price * 10000 bps
                     # Positive = paid more than mid, negative = paid less than mid
-                    if entry_mid_price > 0:
+                    if entry_mid_price is not None and entry_mid_price > 0:
                         slippage_bps = ((entry_price - entry_mid_price) / entry_mid_price) * 10000
                         pos['entry_bid'] = entry_bid
                         pos['entry_ask'] = entry_ask
