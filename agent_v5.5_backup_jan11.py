@@ -1,15 +1,7 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.6 - SOFT GUARD RAILS (CATALYST MOMENTUM OPTIMIZED)
+Paper Trading Lab - Agent v5.6.1 - TECHNICAL INDICATORS ENABLED
 SWING TRADING SYSTEM WITH INTELLIGENT LEARNING & OPTIMIZATION
-
-**CRITICAL UPDATE (v5.6 - Jan 11, 2026):**
-- Technical guard rails converted from HARD BLOCKS to SOFT FLAGS
-- Root cause fix: Guard rails were rejecting 100% of catalyst momentum stocks
-- Technical filters (RSI, ADX, entry timing) now LOG WARNINGS instead of blocking
-- Rationale: Screener finds momentum + catalyst, guard rails were rejecting momentum
-- Risk flags stored for learning (forward return analysis will show if protective)
-- Catastrophic checks still enforced: VIX shutdown, macro blackout, halted stocks
 
 **IMPORTANT NOTE (v7.1 - Dec 2025):**
 - RS (Relative Strength) is now used for SCORING ONLY, not filtering
@@ -5188,7 +5180,6 @@ RECENT LESSONS LEARNED:
 
         print("\n" + "="*60)
         print("EXECUTING 'GO' COMMAND - PORTFOLIO REVIEW (Swing Trading)")
-        print("Agent v5.6 - SOFT GUARD RAILS (Catalyst Momentum Optimized)")
         print("="*60 + "\n")
 
         # Step 1: Load current portfolio
@@ -5613,75 +5604,58 @@ RECENT LESSONS LEARNED:
                     # NOTE: RS filter removed in v7.1 - RS now used for scoring only
 
                     # PHASE 5.6: Technical Filters (4 essential swing trading indicators)
-                    # v5.6 (Jan 11, 2026): SOFT FLAGS ONLY - Log warnings but don't block entries
-                    # Rationale: Screener finds catalyst momentum, these filters reject momentum
-                    # Solution: Convert to risk context for learning, not veto power
                     print(f"   📊 Checking technical setup for {ticker}...")
                     tech_result = self.calculate_technical_score(ticker)
 
                     # Extract current price from technical result for later use
                     current_price = tech_result.get('details', {}).get('price', 0)
 
-                    # Log technical setup as risk flag, but DON'T reject
+                    # Check if technical setup passed (must pass ALL 4 filters)
                     if not tech_result['passed']:
-                        print(f"   ⚠️  Technical risk flag: {tech_result['reason']}")
-                        # Store flag for learning but don't block entry
-                        if 'risk_flags' not in buy_pos:
-                            buy_pos['risk_flags'] = []
-                        buy_pos['risk_flags'].append(f"technical: {tech_result['reason']}")
+                        validation_passed = False
+                        rejection_reasons.append(f"Failed technical: {tech_result['reason']}")
+                        print(f"   ✗ Technical rejected: {tech_result['reason']}")
                     else:
                         print(f"   ✓ Technical passed: {tech_result['reason']}")
 
                     # Enhancement 1.5: Stage 2 Alignment Check (Minervini)
-                    # v5.6 (Jan 11, 2026): SOFT FLAGS ONLY - Stage 2 is for trend-following, not catalyst momentum
                     print(f"   📈 Checking Stage 2 alignment for {ticker}...")
                     stage2_result = self.check_stage2_alignment(ticker)
 
                     if not stage2_result['stage2']:
+                        validation_passed = False
                         if 'error' in stage2_result:
                             reason = f"Stage 2 check failed: {stage2_result['error']}"
                         else:
                             reason = f"Not in Stage 2 ({stage2_result['checks_passed']}/5 checks passed)"
-                        print(f"   ⚠️  Stage 2 risk flag: {reason}")
-                        # Store flag for learning but don't block entry
-                        if 'risk_flags' not in buy_pos:
-                            buy_pos['risk_flags'] = []
-                        buy_pos['risk_flags'].append(f"stage2: {reason}")
+                        rejection_reasons.append(reason)
+                        print(f"   ✗ Stage 2: {reason}")
                     else:
                         distance_52w = stage2_result['distance_from_52w_high_pct']
                         print(f"   ✓ Stage 2: Confirmed uptrend ({distance_52w:+.0f}% from 52W high)")
-
-                    # Always store Stage 2 data for position metadata
-                    buy_pos['stage2_data'] = stage2_result
+                        # Store Stage 2 data for position metadata
+                        buy_pos['stage2_data'] = stage2_result
 
                     # Enhancement 1.6: Entry Timing Check
-                    # v5.6 (Jan 11, 2026): SOFT FLAGS ONLY - Entry timing rejects catalyst momentum
-                    # Catalyst stocks are EXPECTED to be extended/overbought (that's the momentum from news)
                     print(f"   ⏱️  Checking entry timing for {ticker}...")
                     timing_result = self.check_entry_timing(ticker, current_price)
 
                     if timing_result['wait_for_pullback']:
-                        reason = f"Entry timing concern: {', '.join(timing_result['reasons'])}"
-                        print(f"   ⚠️  Entry Timing risk flag: {timing_result['entry_quality']}")
+                        validation_passed = False
+                        reason = f"Poor entry timing: {', '.join(timing_result['reasons'])}"
+                        rejection_reasons.append(reason)
+                        print(f"   ✗ Entry Timing: WAIT - {timing_result['entry_quality']}")
                         for timing_reason in timing_result['reasons']:
                             print(f"      - {timing_reason}")
-                        # Store flag for learning but don't block entry
-                        if 'risk_flags' not in buy_pos:
-                            buy_pos['risk_flags'] = []
-                        buy_pos['risk_flags'].append(f"entry_timing: {', '.join(timing_result['reasons'])}")
                     elif timing_result['entry_quality'] == 'CAUTION':
                         print(f"   ⚠️  Entry Timing: CAUTION - {timing_result['entry_quality']}")
                         for timing_reason in timing_result['reasons']:
                             print(f"      - {timing_reason}")
-                        # Store caution flag
-                        if 'risk_flags' not in buy_pos:
-                            buy_pos['risk_flags'] = []
-                        buy_pos['risk_flags'].append(f"entry_timing_caution: {', '.join(timing_result['reasons'])}")
+                        # Store timing data but don't reject
+                        buy_pos['timing_data'] = timing_result
                     else:
                         print(f"   ✓ Entry Timing: {timing_result['entry_quality']} (RSI: {timing_result.get('rsi', 0):.0f}, {timing_result.get('distance_from_ma20_pct', 0):+.1f}% from 20MA)")
-
-                    # Always store timing data for position metadata
-                    buy_pos['timing_data'] = timing_result
+                        buy_pos['timing_data'] = timing_result
 
                     # Enhancement 1.4: Post-Earnings Drift Check
                     print(f"   📈 Checking for post-earnings drift potential...")
