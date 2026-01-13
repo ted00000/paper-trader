@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.6 - SOFT GUARD RAILS (CATALYST MOMENTUM OPTIMIZED)
+Paper Trading Lab - Agent v5.7 - AI-FIRST HOLISTIC DECISION MAKING
 SWING TRADING SYSTEM WITH INTELLIGENT LEARNING & OPTIMIZATION
 
-**CRITICAL UPDATE (v5.6 - Jan 11, 2026):**
-- Technical guard rails converted from HARD BLOCKS to SOFT FLAGS
-- Root cause fix: Guard rails were rejecting 100% of catalyst momentum stocks
-- Technical filters (RSI, ADX, entry timing) now LOG WARNINGS instead of blocking
-- Rationale: Screener finds momentum + catalyst, guard rails were rejecting momentum
+**CRITICAL UPDATE (v5.7 - Jan 12, 2026):**
+- AI-FIRST ARCHITECTURE: Claude is primary decision authority with full technical data
+- Full technical indicators added to screener output (RSI, ADX, 20-MA dist, 3-day return, EMA cross)
+- Threshold context provided as GUIDELINES, not hard rules - Claude weighs all factors holistically
+- Position sizing as risk dial (5-13%) - Claude modulates risk based on conviction + technical setup
+- Non-catastrophic validation blocks removed (tier, conviction) - only catastrophic checks remain
+- v5.6 foundation: Technical guard rails converted from HARD BLOCKS to SOFT FLAGS
 - Risk flags stored for learning (forward return analysis will show if protective)
 - Catastrophic checks still enforced: VIX shutdown, macro blackout, halted stocks
 
@@ -322,37 +324,76 @@ def get_ruleset_version():
 5. DO NOT churn daily - let swings work (3-7 days typical)
 6. If position is working (profitable, catalyst intact), HOLD it
 
-**NEW POSITIONS: TIER 1 CATALYSTS ONLY**
-- Any new BUY recommendations MUST have Tier 1 catalysts (earnings beat + guidance, FDA, major M&A)
-- Tier 2/3 stocks will be REJECTED by validation - don't recommend them
-- Quality over quantity: Better to add 0-3 Tier 1 stocks than fill slots with Tier 2/3
+**NEW POSITIONS: AI-FIRST HOLISTIC DECISION MAKING**
 
-**TECHNICAL FILTERS (4 REQUIRED - ALL MUST PASS):**
-- Stock must be above 50-day moving average (uptrend confirmation)
-- 5 EMA must be above 20 EMA (momentum acceleration)
-- ADX must be >20 (strong trend, not choppy)
-- Volume must be >1.5x average (institutional participation)
-- Stocks failing ANY technical filter will be REJECTED automatically"""
+You have full authority to decide which stocks to BUY based on holistic analysis of ALL factors.
+The only hard blocks are catastrophic checks (VIX ≥35, macro blackout, halted/delisted stocks).
 
-        go_prompt_initial_build = """**CRITICAL: TIER 1 CATALYSTS ONLY - NO EXCEPTIONS**
+**TECHNICAL INDICATOR REFERENCE (Guidelines, NOT Hard Rules):**
+Each candidate includes full technical indicators. Our model typically looks for these characteristics
+when multiple factors co-exist, but you should weigh ALL factors holistically:
 
-We ONLY trade stocks with Tier 1 catalysts. This is non-negotiable:
-- ✅ Tier 1: Earnings beats with raised guidance, FDA approvals, major M&A, multi-catalyst events
-- ❌ Tier 2: Analyst upgrades, sector momentum alone, technical breakouts - REJECT THESE
-- ❌ Tier 3: Minor news, earnings meets (no beat), guidance in-line - REJECT THESE
+- RSI <70: Momentum not overextended (values >70 suggest overbought, but catalyst breakouts often run hot)
+- ADX >20: Strong trend vs choppy action (values >25 indicate powerful trend)
+- Volume >1.5x: Institutional participation (higher = stronger conviction)
+- Above 50-MA: Uptrend confirmation (distance from MA shows extension level)
+- 5 EMA > 20 EMA: Short-term momentum accelerating
+- Distance from 20-MA <10%: Not overextended (values >15% may indicate parabolic move)
+- 3-Day Return <15%: Sustainable momentum (values >20% may indicate exhaustion)
 
-QUALITY OVER QUANTITY:
-- Better to recommend 0-5 Tier 1 stocks than 10 mediocre Tier 2/3 stocks
-- If fewer than 10 Tier 1 opportunities exist today, that's OK - only recommend what qualifies
-- Every recommendation must have a clear, specific Tier 1 catalyst you can articulate
-- Validation will reject any non-Tier 1 stocks, so don't waste time on them
+**HOLISTIC DECISION FRAMEWORK:**
+- One or two indicators marginally outside guidelines is ACCEPTABLE if catalyst quality is strong
+- Example: RSI 75 + strong FDA catalyst = may still be excellent entry (catalyst-driven breakout expected to run hot)
+- Example: Extended 12% above 20-MA + $2.6B contract win = momentum justified by fundamentals
+- Values DRAMATICALLY off guidelines require pause: RSI >85, extended >25%, or weak volume <1.0x
+- Use your judgment to weigh: catalyst tier + news quality + relative strength + technical setup together
 
-**TECHNICAL REQUIREMENTS (4 FILTERS - ALL MUST PASS):**
-- Stock MUST be above 50-day moving average (no downtrends)
-- 5 EMA MUST be above 20 EMA (momentum accelerating)
-- ADX MUST be >20 (strong trend, avoiding chop)
-- Volume MUST be >1.5x 20-day average (institutional participation)
-- ANY stock failing these will be auto-rejected - only recommend technically sound setups"""
+**RISK MODULATION VIA POSITION SIZING:**
+You have control over position sizing to express conviction and manage risk:
+- 10-13%: High conviction Tier 1 catalyst + strong technicals align
+- 7-10%: Good catalyst but some technical concerns (high RSI, extended, etc.)
+- 5-7%: Solid opportunity but multiple risk indicators (use as starter position)
+- 3-5%: Speculative / watchlist level (catalyst intriguing but setup imperfect)
+
+This gives you power to enter stocks that may have 1-2 risk flags but strong catalysts, while sizing appropriately."""
+
+        go_prompt_initial_build = """**CATALYST-DRIVEN TRADING WITH HOLISTIC ANALYSIS**
+
+You are the primary decision authority. Focus on finding stocks with strong catalysts and use all available
+data to make holistic decisions. Only catastrophic checks will hard-block entries (VIX ≥35, macro blackout, halted stocks).
+
+**CATALYST PRIORITY (Quality Over Quantity):**
+- Prefer Tier 1 catalysts: Earnings beats + guidance, FDA approvals, major M&A, multi-catalyst events
+- Tier 2 acceptable with strong technical setup: Analyst upgrades, sector momentum, product launches
+- Better to recommend 5-7 high-quality stocks than force 10 mediocre picks
+- Every recommendation needs a clear, specific catalyst you can articulate
+
+**TECHNICAL INDICATOR GUIDELINES (Reference, NOT Hard Rules):**
+Each candidate includes comprehensive technical data. Our model typically looks for these characteristics
+when factors co-exist, but you should weigh ALL factors together:
+
+- RSI <70: Momentum sustainable (>70 is overbought, but catalyst breakouts can run hot to RSI 75-80)
+- ADX >20: Strong trend vs chop (>25 = powerful trend)
+- Volume >1.5x: Institutional buying (higher = stronger)
+- Above 50-MA: Uptrend intact (distance shows extension level)
+- 5 EMA > 20 EMA: Short-term momentum positive
+- Distance from 20-MA <10%: Not overextended (>15% may indicate parabolic)
+- 3-Day Return <15%: Sustainable pace (>20% may signal exhaustion)
+
+**HOLISTIC DECISION FRAMEWORK:**
+- Marginally outside guidelines (RSI 72, extended 11%) is FINE if catalyst is strong
+- Catalyst-driven breakouts EXPECT hot technicals - don't penalize FDA/M&A/contract wins for momentum
+- Dramatically off requires caution: RSI >85, extended >25%, volume <1.0x, or multiple red flags
+- Weigh catalyst quality + news score + RS + volume + technical setup together
+
+**POSITION SIZING = RISK DIAL:**
+Express your conviction through position sizing:
+- 10-13%: High conviction - strong catalyst + aligned technicals
+- 7-10%: Good opportunity - catalyst strong, some technical heat (high RSI, extended)
+- 5-7%: Starter position - solid catalyst, multiple risk flags
+- 3-5%: Speculative - intriguing setup but imperfect
+
+Use sizing to manage risk on stocks that have good catalysts but concerning technicals."""
 
         combined_content += go_prompt_portfolio_review + "\n" + go_prompt_initial_build
 
@@ -3359,20 +3400,9 @@ POSITION {i}: {ticker}
         if market_parts:
             reasoning_parts.append(f"Market: {', '.join(market_parts)}")
 
-        # REQUIRED FILTERS (auto-reject if failed)
-        # NOTE: RS filter removed in v7.0 - RS now used for scoring only
-
-        # BUG FIX (Jan 2, 2026): Screener returns "Tier 1" (with space), not "Tier1"
-        # Accept both formats for compatibility
-        if catalyst_tier not in ['Tier1', 'Tier 1']:
-            return {
-                'conviction': 'SKIP',
-                'position_size_pct': 0.0,
-                'reasoning': f'Not Tier 1 ({catalyst_tier})',
-                'supporting_factors': supporting_factors
-            }
-
         # CONVICTION DETERMINATION (based on cluster-adjusted supporting factors)
+        # v5.7: Tier requirement removed - Claude decides with full context
+        # Tier now affects position sizing, not admission
         # PHASE 4.1: New thresholds based on cluster caps
         # Max possible: Momentum +3, Institutional +2, Catalyst +4, Market +2 = 11 total
         #
@@ -3909,6 +3939,59 @@ POSITION {i}: {ticker}
             output += f"({vol['yesterday_volume']:,} vs {vol['avg_volume_20d']:,})\n"
             output += f"   Technical: {tech['distance_from_52w_high_pct']:.1f}% from 52w high "
             output += f"(${tech['current_price']:.2f} vs ${tech['high_52w']:.2f})\n"
+
+            # Add full technical indicators for holistic decision making
+            output += f"   📊 Technical Indicators:\n"
+            output += f"      RSI(14): {tech.get('rsi', 'N/A')}"
+            if tech.get('rsi'):
+                if tech['rsi'] > 70:
+                    output += " (overbought)"
+                elif tech['rsi'] < 30:
+                    output += " (oversold)"
+            output += "\n"
+
+            output += f"      ADX(14): {tech.get('adx', 'N/A')}"
+            if tech.get('adx'):
+                if tech['adx'] > 25:
+                    output += " (strong trend)"
+                elif tech['adx'] < 20:
+                    output += " (weak trend)"
+            output += "\n"
+
+            output += f"      Distance from 20-MA: "
+            if tech.get('distance_from_20ma_pct') is not None:
+                dist_20ma = tech['distance_from_20ma_pct']
+                output += f"{'+' if dist_20ma > 0 else ''}{dist_20ma:.1f}%"
+                if dist_20ma > 10:
+                    output += " (extended)"
+                elif dist_20ma < -5:
+                    output += " (below MA)"
+            else:
+                output += "N/A"
+            output += "\n"
+
+            output += f"      3-Day Return: "
+            if tech.get('three_day_return_pct') is not None:
+                three_day = tech['three_day_return_pct']
+                output += f"{'+' if three_day > 0 else ''}{three_day:.1f}%"
+                if three_day > 15:
+                    output += " (hot momentum)"
+                elif three_day < -10:
+                    output += " (recent weakness)"
+            else:
+                output += "N/A"
+            output += "\n"
+
+            output += f"      EMA Cross: 5 EMA {'above' if tech.get('ema_5_above_20') else 'below'} 20 EMA"
+            if tech.get('ema_5') and tech.get('ema_20'):
+                output += f" (${tech['ema_5']:.2f} vs ${tech['ema_20']:.2f})"
+            output += "\n"
+
+            output += f"      50-MA Position: {'Above' if tech.get('above_50d_sma') else 'Below'} 50-day MA"
+            if tech.get('distance_from_50ma_pct') is not None:
+                output += f" ({'+' if tech['distance_from_50ma_pct'] > 0 else ''}{tech['distance_from_50ma_pct']:.1f}%)"
+            output += "\n"
+
             output += f"   Why: {candidate['why_selected']}\n\n"
 
         if len(candidates) > 15:
@@ -3988,17 +4071,38 @@ SWING TRADING RULES (STRICTLY ENFORCE):
 5. DO NOT churn daily - let swings work (3-7 days typical)
 6. If position is working (profitable, catalyst intact), HOLD it
 
-**NEW POSITIONS: TIER 1 CATALYSTS ONLY**
-- Any new BUY recommendations MUST have Tier 1 catalysts (earnings beat + guidance, FDA, major M&A)
-- Tier 2/3 stocks will be REJECTED by validation - don't recommend them
-- Quality over quantity: Better to add 0-3 Tier 1 stocks than fill slots with Tier 2/3
+**NEW POSITIONS: AI-FIRST HOLISTIC DECISION MAKING**
 
-**TECHNICAL FILTERS (4 REQUIRED - ALL MUST PASS):**
-- Stock must be above 50-day moving average (uptrend confirmation)
-- 5 EMA must be above 20 EMA (momentum acceleration)
-- ADX must be >20 (strong trend, not choppy)
-- Volume must be >1.5x average (institutional participation)
-- Stocks failing ANY technical filter will be REJECTED automatically
+You have full authority to decide which stocks to BUY based on holistic analysis of ALL factors.
+The only hard blocks are catastrophic checks (VIX ≥35, macro blackout, halted/delisted stocks).
+
+**TECHNICAL INDICATOR REFERENCE (Guidelines, NOT Hard Rules):**
+Each candidate includes full technical indicators. Our model typically looks for these characteristics
+when multiple factors co-exist, but you should weigh ALL factors holistically:
+
+- RSI <70: Momentum not overextended (values >70 suggest overbought, but catalyst breakouts often run hot)
+- ADX >20: Strong trend vs choppy action (values >25 indicate powerful trend)
+- Volume >1.5x: Institutional participation (higher = stronger conviction)
+- Above 50-MA: Uptrend confirmation (distance from MA shows extension level)
+- 5 EMA > 20 EMA: Short-term momentum accelerating
+- Distance from 20-MA <10%: Not overextended (values >15% may indicate parabolic move)
+- 3-Day Return <15%: Sustainable momentum (values >20% may indicate exhaustion)
+
+**HOLISTIC DECISION FRAMEWORK:**
+- One or two indicators marginally outside guidelines is ACCEPTABLE if catalyst quality is strong
+- Example: RSI 75 + strong FDA catalyst = may still be excellent entry (catalyst-driven breakout expected to run hot)
+- Example: Extended 12% above 20-MA + $2.6B contract win = momentum justified by fundamentals
+- Values DRAMATICALLY off guidelines require pause: RSI >85, extended >25%, or weak volume <1.0x
+- Use your judgment to weigh: catalyst tier + news quality + relative strength + technical setup together
+
+**RISK MODULATION VIA POSITION SIZING:**
+You have control over position sizing to express conviction and manage risk:
+- 10-13%: High conviction Tier 1 catalyst + strong technicals align
+- 7-10%: Good catalyst but some technical concerns (high RSI, extended, etc.)
+- 5-7%: Solid opportunity but multiple risk indicators (use as starter position)
+- 3-5%: Speculative / watchlist level (catalyst intriguing but setup imperfect)
+
+This gives you power to enter stocks that may have 1-2 risk flags but strong catalysts, while sizing appropriately.
 
 PREMARKET ANALYSIS:
 - Use gap_percent to gauge overnight sentiment
@@ -4045,25 +4149,43 @@ Provide full analysis of each position BEFORE the JSON. Justify all exits agains
 
 No existing positions. {instruction}
 
-**CRITICAL: TIER 1 CATALYSTS ONLY - NO EXCEPTIONS**
+**CATALYST-DRIVEN TRADING WITH HOLISTIC ANALYSIS**
 
-We ONLY trade stocks with Tier 1 catalysts. This is non-negotiable:
-- ✅ Tier 1: Earnings beats with raised guidance, FDA approvals, major M&A, multi-catalyst events
-- ❌ Tier 2: Analyst upgrades, sector momentum alone, technical breakouts - REJECT THESE
-- ❌ Tier 3: Minor news, earnings meets (no beat), guidance in-line - REJECT THESE
+You are the primary decision authority. Focus on finding stocks with strong catalysts and use all available
+data to make holistic decisions. Only catastrophic checks will hard-block entries (VIX ≥35, macro blackout, halted stocks).
 
-QUALITY OVER QUANTITY:
-- Better to recommend 0-5 Tier 1 stocks than 10 mediocre Tier 2/3 stocks
-- If fewer than 10 Tier 1 opportunities exist today, that's OK - only recommend what qualifies
-- Every recommendation must have a clear, specific Tier 1 catalyst you can articulate
-- Validation will reject any non-Tier 1 stocks, so don't waste time on them
+**CATALYST PRIORITY (Quality Over Quantity):**
+- Prefer Tier 1 catalysts: Earnings beats + guidance, FDA approvals, major M&A, multi-catalyst events
+- Tier 2 acceptable with strong technical setup: Analyst upgrades, sector momentum, product launches
+- Better to recommend 5-7 high-quality stocks than force 10 mediocre picks
+- Every recommendation needs a clear, specific catalyst you can articulate
 
-**TECHNICAL REQUIREMENTS (4 FILTERS - ALL MUST PASS):**
-- Stock MUST be above 50-day moving average (no downtrends)
-- 5 EMA MUST be above 20 EMA (momentum accelerating)
-- ADX MUST be >20 (strong trend, avoiding chop)
-- Volume MUST be >1.5x 20-day average (institutional participation)
-- ANY stock failing these will be auto-rejected - only recommend technically sound setups
+**TECHNICAL INDICATOR GUIDELINES (Reference, NOT Hard Rules):**
+Each candidate includes comprehensive technical data. Our model typically looks for these characteristics
+when factors co-exist, but you should weigh ALL factors together:
+
+- RSI <70: Momentum sustainable (>70 is overbought, but catalyst breakouts can run hot to RSI 75-80)
+- ADX >20: Strong trend vs chop (>25 = powerful trend)
+- Volume >1.5x: Institutional buying (higher = stronger)
+- Above 50-MA: Uptrend intact (distance shows extension level)
+- 5 EMA > 20 EMA: Short-term momentum positive
+- Distance from 20-MA <10%: Not overextended (>15% may indicate parabolic)
+- 3-Day Return <15%: Sustainable pace (>20% may signal exhaustion)
+
+**HOLISTIC DECISION FRAMEWORK:**
+- Marginally outside guidelines (RSI 72, extended 11%) is FINE if catalyst is strong
+- Catalyst-driven breakouts EXPECT hot technicals - don't penalize FDA/M&A/contract wins for momentum
+- Dramatically off requires caution: RSI >85, extended >25%, volume <1.0x, or multiple red flags
+- Weigh catalyst quality + news score + RS + volume + technical setup together
+
+**POSITION SIZING = RISK DIAL:**
+Express your conviction through position sizing:
+- 10-13%: High conviction - strong catalyst + aligned technicals
+- 7-10%: Good opportunity - catalyst strong, some technical heat (high RSI, extended)
+- 5-7%: Starter position - solid catalyst, multiple risk flags
+- 3-5%: Speculative - intriguing setup but imperfect
+
+Use sizing to manage risk on stocks that have good catalysts but concerning technicals.
 
 """
                 if screener_section:
@@ -5188,7 +5310,7 @@ RECENT LESSONS LEARNED:
 
         print("\n" + "="*60)
         print("EXECUTING 'GO' COMMAND - PORTFOLIO REVIEW (Swing Trading)")
-        print("Agent v5.6 - SOFT GUARD RAILS (Catalyst Momentum Optimized)")
+        print("Agent v5.7 - AI-FIRST HOLISTIC DECISION MAKING")
         print("="*60 + "\n")
 
         # Step 1: Load current portfolio
@@ -5552,10 +5674,13 @@ RECENT LESSONS LEARNED:
                     # PHASE 2: Check catalyst tier
                     tier_result = self.classify_catalyst_tier(catalyst_type, catalyst_details)
 
-                    # Auto-reject Tier 3 catalysts
+                    # v5.7: Tier 3 auto-reject removed - Claude makes holistic decision
+                    # Log tier for sizing context only
                     if tier_result['tier'] == 'Tier3':
-                        validation_passed = False
-                        rejection_reasons.append(f"Tier 3 catalyst: {tier_result['reasoning']}")
+                        print(f"   ℹ️  {ticker}: Tier 3 catalyst ({tier_result['reasoning']}) - risk flag for sizing")
+                        if 'risk_flags' not in buy_pos:
+                            buy_pos['risk_flags'] = []
+                        buy_pos['risk_flags'].append(f"tier3: {tier_result['reasoning']}")
 
                     # Check catalyst age validity
                     age_check = self.check_catalyst_age_validity(catalyst_type, catalyst_age)
@@ -5740,10 +5865,18 @@ RECENT LESSONS LEARNED:
                         revenue_beat=revenue_beat
                     )
 
-                    # Conviction may downgrade to SKIP based on factors
+                    # v5.7: Conviction SKIP no longer blocks entry - becomes sizing guidance
+                    # Claude already made the decision; we respect it and adjust risk via size
                     if conviction_result['conviction'] == 'SKIP':
-                        validation_passed = False
-                        rejection_reasons.append(f"Conviction: {conviction_result['reasoning']}")
+                        print(f"   ⚠️  {ticker}: Low conviction ({conviction_result['reasoning']}) - reducing to starter position")
+                        if 'risk_flags' not in buy_pos:
+                            buy_pos['risk_flags'] = []
+                        buy_pos['risk_flags'].append(f"low_conviction: {conviction_result['reasoning']}")
+                        # Override position size to starter level (5%)
+                        buy_pos['position_size_pct'] = 5.0
+                    elif conviction_result['conviction'] == 'LOW':
+                        print(f"   ⚠️  {ticker}: Low conviction - smaller position size")
+                        buy_pos['position_size_pct'] = 6.0
 
                     # If all validations pass, accept the position
                     if validation_passed:

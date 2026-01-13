@@ -1819,8 +1819,93 @@ Return ONLY valid JSON (no markdown, no explanation):
                 if len(results) >= 50:
                     ma_50 = sum(r['c'] for r in results[-50:]) / 50
                     above_50d_sma = current_price > ma_50
+                    distance_from_50ma_pct = ((current_price - ma_50) / ma_50) * 100
                 else:
                     above_50d_sma = False
+                    distance_from_50ma_pct = 0
+
+                # Calculate 20-day MA for extension check
+                if len(results) >= 20:
+                    ma_20 = sum(r['c'] for r in results[-20:]) / 20
+                    distance_from_20ma_pct = ((current_price - ma_20) / ma_20) * 100
+                else:
+                    distance_from_20ma_pct = 0
+
+                # Calculate 5 EMA and 20 EMA for cross check
+                if len(results) >= 20:
+                    # 5 EMA
+                    ema_5_multiplier = 2 / (5 + 1)
+                    ema_5 = results[-6]['c']  # Start with close 6 days ago
+                    for r in results[-5:]:
+                        ema_5 = (r['c'] - ema_5) * ema_5_multiplier + ema_5
+
+                    # 20 EMA
+                    ema_20_multiplier = 2 / (20 + 1)
+                    ema_20 = sum(r['c'] for r in results[-40:-20]) / 20  # SMA for seed
+                    for r in results[-20:]:
+                        ema_20 = (r['c'] - ema_20) * ema_20_multiplier + ema_20
+
+                    ema_5_above_20 = ema_5 > ema_20
+                else:
+                    ema_5 = 0
+                    ema_20 = 0
+                    ema_5_above_20 = False
+
+                # Calculate RSI (14-period)
+                if len(results) >= 15:
+                    gains = []
+                    losses = []
+                    for i in range(-14, 0):
+                        change = results[i]['c'] - results[i-1]['c']
+                        if change > 0:
+                            gains.append(change)
+                            losses.append(0)
+                        else:
+                            gains.append(0)
+                            losses.append(abs(change))
+
+                    avg_gain = sum(gains) / 14
+                    avg_loss = sum(losses) / 14
+
+                    if avg_loss == 0:
+                        rsi = 100
+                    else:
+                        rs = avg_gain / avg_loss
+                        rsi = 100 - (100 / (1 + rs))
+                else:
+                    rsi = 50  # Neutral if not enough data
+
+                # Calculate ADX (14-period) - simplified version
+                if len(results) >= 15:
+                    dx_values = []
+                    for i in range(-14, 0):
+                        high = results[i]['h']
+                        low = results[i]['l']
+                        prev_close = results[i-1]['c']
+
+                        tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+
+                        plus_dm = max(high - results[i-1]['h'], 0) if high - results[i-1]['h'] > results[i-1]['l'] - low else 0
+                        minus_dm = max(results[i-1]['l'] - low, 0) if results[i-1]['l'] - low > high - results[i-1]['h'] else 0
+
+                        if tr > 0:
+                            plus_di = (plus_dm / tr) * 100
+                            minus_di = (minus_dm / tr) * 100
+
+                            if plus_di + minus_di > 0:
+                                dx = abs(plus_di - minus_di) / (plus_di + minus_di) * 100
+                                dx_values.append(dx)
+
+                    adx = sum(dx_values) / len(dx_values) if dx_values else 0
+                else:
+                    adx = 0
+
+                # Calculate 3-day return
+                if len(results) >= 4:
+                    three_days_ago_close = results[-4]['c']
+                    three_day_return_pct = ((current_price - three_days_ago_close) / three_days_ago_close) * 100
+                else:
+                    three_day_return_pct = 0
 
                 return {
                     'distance_from_52w_high_pct': round(distance_pct, 2),
@@ -1828,13 +1913,21 @@ Return ONLY valid JSON (no markdown, no explanation):
                     'high_52w': round(high_52w, 2),
                     'current_price': round(current_price, 2),
                     'above_50d_sma': above_50d_sma,  # Required for market breadth calculation
+                    'distance_from_50ma_pct': round(distance_from_50ma_pct, 2),
+                    'distance_from_20ma_pct': round(distance_from_20ma_pct, 2),
+                    'ema_5': round(ema_5, 2),
+                    'ema_20': round(ema_20, 2),
+                    'ema_5_above_20': ema_5_above_20,
+                    'rsi': round(rsi, 2),
+                    'adx': round(adx, 2),
+                    'three_day_return_pct': round(three_day_return_pct, 2),
                     'score': max(100 - (distance_pct * 2), 0)  # Closer = higher score
                 }
 
-            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
+            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'distance_from_50ma_pct': 0, 'distance_from_20ma_pct': 0, 'ema_5': 0, 'ema_20': 0, 'ema_5_above_20': False, 'rsi': 50, 'adx': 0, 'three_day_return_pct': 0, 'score': 0}
 
         except Exception:
-            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'score': 0}
+            return {'distance_from_52w_high_pct': 100, 'is_near_high': False, 'high_52w': 0, 'current_price': 0, 'above_50d_sma': False, 'distance_from_50ma_pct': 0, 'distance_from_20ma_pct': 0, 'ema_5': 0, 'ema_20': 0, 'ema_5_above_20': False, 'rsi': 50, 'adx': 0, 'three_day_return_pct': 0, 'score': 0}
 
     def detect_52week_high_breakout(self, ticker):
         """
