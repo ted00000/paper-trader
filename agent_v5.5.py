@@ -955,45 +955,24 @@ POSITION {i}: {ticker}
             sector = new_pos.get('sector', 'Unknown')
             industry = new_pos.get('industry', 'Unknown')
 
-            # Check sector limit (with exception for top 2 leading sectors)
-            # PHASE 4.3: Allow 3 positions in top 2 leading sectors, otherwise max 2
-            sector_is_leading = sector in leading_sectors[:2] if leading_sectors else False
-            max_allowed = MAX_PER_SECTOR_LEADING if sector_is_leading else MAX_PER_SECTOR
-
-            if sector_counts.get(sector, 0) >= max_allowed:
-                rejected_positions.append({
-                    'ticker': ticker,
-                    'reason': f'Sector concentration: Already have {sector_counts[sector]} {sector} positions (max {max_allowed})',
-                    'sector': sector,
-                    'industry': industry
-                })
-                leading_note = " (leading sector)" if sector_is_leading else ""
-                print(f"   ⚠️ REJECTED {ticker}: Sector limit reached ({sector}: {sector_counts[sector]}/{max_allowed}{leading_note})")
-                continue
-
-            # Check industry limit
-            if industry_counts.get(industry, 0) >= MAX_PER_INDUSTRY:
-                rejected_positions.append({
-                    'ticker': ticker,
-                    'reason': f'Industry concentration: Already have {industry_counts[industry]} {industry} positions (max {MAX_PER_INDUSTRY})',
-                    'sector': sector,
-                    'industry': industry
-                })
-                print(f"   ⚠️ REJECTED {ticker}: Industry limit reached ({industry}: {industry_counts[industry]}/{MAX_PER_INDUSTRY})")
-                continue
+            # v5.7.1: REMOVED sector/industry concentration limits
+            # Claude is responsible for portfolio allocation decisions in GO prompt
+            # Non-catastrophic risk - allocation is optimization, not safety
+            # Claude has diversification guidelines and documents his allocation rationale
+            #
+            # Old logic: Hard-blocked positions if sector >2 or industry >2
+            # New logic: Claude decides allocation, explains reasoning in analysis
 
             # Position accepted
             accepted_positions.append(new_pos)
             sector_counts[sector] = sector_counts.get(sector, 0) + 1
             industry_counts[industry] = industry_counts.get(industry, 0) + 1
 
-            # Warn if high concentration in industry (not rejected, just flagged)
-            if industry_counts[industry] == MAX_PER_INDUSTRY:
-                print(f"   ⚠️ WARNING: {ticker} accepted, but {industry} now at max ({MAX_PER_INDUSTRY}/{MAX_PER_INDUSTRY})")
-
-        print(f"\n   Sector enforcement results:")
-        print(f"      ✓ Accepted: {len(accepted_positions)} positions")
-        print(f"      ✗ Rejected: {len(rejected_positions)} positions (concentration limits)")
+        print(f"\n   ✅ Sector diversification (Claude's allocation):")
+        for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True):
+            pct = (count / len(accepted_positions) * 100) if len(accepted_positions) > 0 else 0
+            print(f"      {sector}: {count} positions ({pct:.0f}%)")
+        print(f"      Total accepted: {len(accepted_positions)} positions")
 
         return accepted_positions, rejected_positions
 
@@ -4151,6 +4130,21 @@ For ENTER_SMALL decisions:
 
 Use the full range - variance in sizing demonstrates risk discrimination.
 
+**PORTFOLIO DIVERSIFICATION (Your Responsibility):**
+
+You have full authority to construct portfolio allocation based on current opportunities.
+Diversification is important, but balance it against opportunity quality.
+
+Guidelines:
+- Avoid concentration risk: Generally aim for <40% in any single sector
+- Temporary over-allocation acceptable: If sector has exceptional catalysts (multiple FDA approvals, policy shift), 40-50% may be justified
+- Explain your reasoning: If recommending sector concentration, articulate why opportunities warrant it
+- Quality over arbitrary limits: Better to own 4 excellent Healthcare stocks than force 2 mediocre stocks for "balance"
+- Market regime matters: In sector rotation periods, concentration in leading sectors is appropriate
+- Document allocation rationale: Include sector breakdown and justification in your analysis
+
+Your job: Analyze opportunities holistically, construct best risk-adjusted portfolio, use allocation as a tool not a constraint.
+
 PREMARKET ANALYSIS:
 - Use gap_percent to gauge overnight sentiment
 - Large gaps (>5%) may signal catalyst change
@@ -4255,13 +4249,28 @@ Use sizing to manage risk on stocks that have good catalysts but concerning tech
                     user_message += screener_section + "\n"
 
                 user_message += """
+**PORTFOLIO DIVERSIFICATION (Your Responsibility):**
+
+You have full authority to construct portfolio allocation based on current opportunities.
+Diversification is important, but balance it against opportunity quality.
+
+Guidelines:
+- Avoid concentration risk: Generally aim for <40% in any single sector
+- Temporary over-allocation acceptable: If sector has exceptional catalysts (multiple FDA approvals, policy shift), 40-50% may be justified
+- Explain your reasoning: If recommending sector concentration, articulate why opportunities warrant it
+- Quality over arbitrary limits: Better to own 4 excellent Healthcare stocks than force 2 mediocre stocks for "balance"
+- Market regime matters: In sector rotation periods, concentration in leading sectors is appropriate
+- Document allocation rationale: Include sector breakdown and justification in your analysis
+
+Your job: Analyze opportunities holistically, construct best risk-adjusted portfolio, use allocation as a tool not a constraint.
+
 SELECTION CRITERIA:
 - MUST have Tier 1 catalyst (verified from recent news/earnings)
 - Prioritize highest composite scores (if screener data available)
 - Look for multiple confirming signals (RS + news + volume)
 - Favor recent catalysts (last 3-7 days)
-- Diversify across sectors when multiple Tier 1 opportunities exist
-- All stocks will be validated through Phase 1-4 filters (Tier 1 required to pass)
+- Diversify across sectors when multiple Tier 1 opportunities exist (but prioritize quality over arbitrary balance)
+- All stocks will be validated through catastrophic checks only
 
 CRITICAL OUTPUT REQUIREMENT - JSON at end:
 ```json
