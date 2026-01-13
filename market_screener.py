@@ -4199,7 +4199,8 @@ Return ONLY valid JSON (no markdown, no explanation):
                             tier_bonus = 15 if claude_analysis['tier'] == 'Tier1' else 10
                             confidence_bonus = 5 if claude_analysis['multi_catalyst'] else 0
                             candidate['composite_score'] += tier_bonus + confidence_bonus
-                            candidate['composite_score'] = min(candidate['composite_score'], 100)  # Cap at 100
+                            # REMOVED: Score cap that caused alphabetical bias (16 stocks tied at 100)
+                            # Allow scores >100 to create natural differentiation among top candidates
 
                         filtered_candidates.append(candidate)
 
@@ -4235,11 +4236,30 @@ Return ONLY valid JSON (no markdown, no explanation):
         tier3 = [c for c in candidates if c.get('catalyst_tier', '').startswith('Tier 3')]
         no_catalyst = [c for c in candidates if c.get('catalyst_tier', '') == 'No Catalyst']
 
-        # Sort each tier by composite score (rank WITHIN tier, not across)
-        tier1.sort(key=lambda x: x['composite_score'], reverse=True)
-        tier2.sort(key=lambda x: x['composite_score'], reverse=True)
-        tier3.sort(key=lambda x: x['composite_score'], reverse=True)
-        no_catalyst.sort(key=lambda x: x['composite_score'], reverse=True)
+        # Sort each tier by composite score with tie-breakers (rank WITHIN tier, not across)
+        # Primary: composite_score (descending)
+        # Tie-breaker 1: rs_percentile (descending) - stronger relative strength wins
+        # Tie-breaker 2: avg_volume (descending) - higher liquidity wins
+        tier1.sort(key=lambda x: (
+            -x['composite_score'],
+            -x.get('relative_strength', {}).get('rs_percentile', 0),
+            -x.get('avg_volume', 0)
+        ))
+        tier2.sort(key=lambda x: (
+            -x['composite_score'],
+            -x.get('relative_strength', {}).get('rs_percentile', 0),
+            -x.get('avg_volume', 0)
+        ))
+        tier3.sort(key=lambda x: (
+            -x['composite_score'],
+            -x.get('relative_strength', {}).get('rs_percentile', 0),
+            -x.get('avg_volume', 0)
+        ))
+        no_catalyst.sort(key=lambda x: (
+            -x['composite_score'],
+            -x.get('relative_strength', {}).get('rs_percentile', 0),
+            -x.get('avg_volume', 0)
+        ))
 
         # Enforce quotas: Guarantee Tier 1 representation (IBD/Minervini approach)
         # Top 60 Tier 1, Top 50 Tier 2, Top 40 Tier 3 (prevents insider-only crowding)
