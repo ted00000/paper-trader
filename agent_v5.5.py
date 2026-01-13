@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """
-Paper Trading Lab - Agent v5.7 - AI-FIRST HOLISTIC DECISION MAKING
+Paper Trading Lab - Agent v5.7.1 - AI-FIRST WITH EXPLICIT DECISIONS
 SWING TRADING SYSTEM WITH INTELLIGENT LEARNING & OPTIMIZATION
 
-**CRITICAL UPDATE (v5.7 - Jan 12, 2026):**
+**CRITICAL UPDATE (v5.7.1 - Jan 12, 2026 - Third-Party Refinements):**
+- EXPLICIT DECISION FIELD: Claude must choose ENTER | ENTER_SMALL | PASS (prevents accidental trades)
+- TIGHTENED SIZING FOR TESTING: 6-10% range (vs 5-13%) for first 5-10 days - cleaner signal validation
+- STRUCTURED CONFIDENCE: HIGH | MEDIUM | LOW (machine-readable, auditable)
+- PASS TARGET: 30-40% of candidates to ensure selectivity (quality over quantity)
+
+**v5.7 Foundation (Jan 12, 2026):**
 - AI-FIRST ARCHITECTURE: Claude is primary decision authority with full technical data
 - Full technical indicators added to screener output (RSI, ADX, 20-MA dist, 3-day return, EMA cross)
 - Threshold context provided as GUIDELINES, not hard rules - Claude weighs all factors holistically
-- Position sizing as risk dial (5-13%) - Claude modulates risk based on conviction + technical setup
+- Position sizing as risk dial - Claude modulates risk based on conviction + technical setup
 - Non-catastrophic validation blocks removed (tier, conviction) - only catastrophic checks remain
-- v5.6 foundation: Technical guard rails converted from HARD BLOCKS to SOFT FLAGS
 - Risk flags stored for learning (forward return analysis will show if protective)
 - Catastrophic checks still enforced: VIX shutdown, macro blackout, halted stocks
 
@@ -348,14 +353,35 @@ when multiple factors co-exist, but you should weigh ALL factors holistically:
 - Values DRAMATICALLY off guidelines require pause: RSI >85, extended >25%, or weak volume <1.0x
 - Use your judgment to weigh: catalyst tier + news quality + relative strength + technical setup together
 
-**RISK MODULATION VIA POSITION SIZING:**
-You have control over position sizing to express conviction and manage risk:
-- 10-13%: High conviction Tier 1 catalyst + strong technicals align
-- 7-10%: Good catalyst but some technical concerns (high RSI, extended, etc.)
-- 5-7%: Solid opportunity but multiple risk indicators (use as starter position)
-- 3-5%: Speculative / watchlist level (catalyst intriguing but setup imperfect)
+**DECISION TYPES (Required - Choose One Per Candidate):**
 
-This gives you power to enter stocks that may have 1-2 risk flags but strong catalysts, while sizing appropriately."""
+You must classify each recommendation with an explicit decision:
+- ENTER: Standard entry, normal position sizing (6-10%)
+- ENTER_SMALL: Reduced entry for speculative/uncertain setups (5-6% max)
+- PASS: Do not enter - catalyst interesting but insufficient conviction or excessive risk
+
+PASS is expected on 30-40% of candidates. Do not force trades on marginal setups.
+Quality over quantity is critical for system success.
+
+Examples:
+- Strong FDA catalyst + RSI 72 + good volume = ENTER at 9%
+- Contract win + RSI 85 + extended 18% = ENTER_SMALL at 6%
+- Analyst upgrade + weak volume + Tier 3 = PASS (don't recommend)
+
+**POSITION SIZING = RISK DIAL (TESTING PHASE):**
+
+⚠️  TESTING MODE: Using tightened range (6-10%) for initial validation (5-10 days).
+Range will widen to 5-13% after 15-20 successful trades.
+
+For ENTER decisions:
+- 9-10%: HIGH conviction - Tier 1 catalyst + strong technicals + HIGH confidence
+- 7-8%: MEDIUM conviction - Strong catalyst, some technical heat + MEDIUM confidence
+- 6-7%: MEDIUM/LOW conviction - Solid catalyst, multiple risk flags
+
+For ENTER_SMALL decisions:
+- 5-6%: LOW conviction - Speculative setup, concerning risk indicators
+
+Use the full range - variance in sizing demonstrates risk discrimination."""
 
         go_prompt_initial_build = """**CATALYST-DRIVEN TRADING WITH HOLISTIC ANALYSIS**
 
@@ -4095,14 +4121,35 @@ when multiple factors co-exist, but you should weigh ALL factors holistically:
 - Values DRAMATICALLY off guidelines require pause: RSI >85, extended >25%, or weak volume <1.0x
 - Use your judgment to weigh: catalyst tier + news quality + relative strength + technical setup together
 
-**RISK MODULATION VIA POSITION SIZING:**
-You have control over position sizing to express conviction and manage risk:
-- 10-13%: High conviction Tier 1 catalyst + strong technicals align
-- 7-10%: Good catalyst but some technical concerns (high RSI, extended, etc.)
-- 5-7%: Solid opportunity but multiple risk indicators (use as starter position)
-- 3-5%: Speculative / watchlist level (catalyst intriguing but setup imperfect)
+**DECISION TYPES (Required - Choose One Per Candidate):**
 
-This gives you power to enter stocks that may have 1-2 risk flags but strong catalysts, while sizing appropriately.
+You must classify each recommendation with an explicit decision:
+- ENTER: Standard entry, normal position sizing (6-10%)
+- ENTER_SMALL: Reduced entry for speculative/uncertain setups (5-6% max)
+- PASS: Do not enter - catalyst interesting but insufficient conviction or excessive risk
+
+PASS is expected on 30-40% of candidates. Do not force trades on marginal setups.
+Quality over quantity is critical for system success.
+
+Examples:
+- Strong FDA catalyst + RSI 72 + good volume = ENTER at 9%
+- Contract win + RSI 85 + extended 18% = ENTER_SMALL at 6%
+- Analyst upgrade + weak volume + Tier 3 = PASS (don't recommend)
+
+**POSITION SIZING = RISK DIAL (TESTING PHASE):**
+
+⚠️  TESTING MODE: Using tightened range (6-10%) for initial validation (5-10 days).
+Range will widen to 5-13% after 15-20 successful trades.
+
+For ENTER decisions:
+- 9-10%: HIGH conviction - Tier 1 catalyst + strong technicals + HIGH confidence
+- 7-8%: MEDIUM conviction - Strong catalyst, some technical heat + MEDIUM confidence
+- 6-7%: MEDIUM/LOW conviction - Solid catalyst, multiple risk flags
+
+For ENTER_SMALL decisions:
+- 5-6%: LOW conviction - Speculative setup, concerning risk indicators
+
+Use the full range - variance in sizing demonstrates risk discrimination.
 
 PREMARKET ANALYSIS:
 - Use gap_percent to gauge overnight sentiment
@@ -4119,17 +4166,33 @@ CRITICAL OUTPUT REQUIREMENT - JSON at end:
   "buy": [
     {{
       "ticker": "NVDA",
-      "position_size": 100.00,
+      "decision": "ENTER",
+      "confidence_level": "HIGH",
+      "position_size_pct": 9.0,
       "catalyst": "Earnings_Beat",
       "sector": "Technology",
-      "confidence": "High",
+      "thesis": "One sentence thesis"
+    }},
+    {{
+      "ticker": "AXSM",
+      "decision": "ENTER_SMALL",
+      "confidence_level": "MEDIUM",
+      "position_size_pct": 6.0,
+      "catalyst": "FDA_Approval",
+      "sector": "Healthcare",
       "thesis": "One sentence thesis"
     }}
   ]
 }}
 ```
 
+**NEW REQUIRED FIELDS (v5.7.1):**
+- decision: Must be "ENTER" or "ENTER_SMALL" (do NOT include PASS stocks in buy array)
+- confidence_level: Must be "HIGH", "MEDIUM", or "LOW"
+- position_size_pct: Use decimal (9.0, not 100.00)
+
 **CRITICAL:** A ticker can ONLY appear in ONE array (hold, exit, or buy). Never put the same ticker in multiple arrays.
+Do not include tickers you are PASSing on in the buy array - simply omit them.
 
 Provide full analysis of each position BEFORE the JSON. Justify all exits against the rules above."""
 
@@ -5310,7 +5373,7 @@ RECENT LESSONS LEARNED:
 
         print("\n" + "="*60)
         print("EXECUTING 'GO' COMMAND - PORTFOLIO REVIEW (Swing Trading)")
-        print("Agent v5.7 - AI-FIRST HOLISTIC DECISION MAKING")
+        print("Agent v5.7.1 - AI-FIRST WITH EXPLICIT DECISIONS (Testing Phase)")
         print("="*60 + "\n")
 
         # Step 1: Load current portfolio
@@ -5612,6 +5675,16 @@ RECENT LESSONS LEARNED:
                 catalyst_age = buy_pos.get('catalyst_age_days', 0)
                 catalyst_details = buy_pos.get('catalyst_details', {})
                 sector = buy_pos.get('sector', 'Unknown')
+
+                # v5.7.1: Handle explicit decision and confidence fields
+                decision = buy_pos.get('decision', 'ENTER')  # Default to ENTER for backward compatibility
+                confidence_level = buy_pos.get('confidence_level', 'MEDIUM')
+
+                # ENTER_SMALL: Cap position sizing
+                if decision == 'ENTER_SMALL':
+                    original_size = buy_pos.get('position_size_pct', 6.0)
+                    buy_pos['position_size_pct'] = min(original_size, 6.0)
+                    print(f"   ℹ️  {ticker}: ENTER_SMALL decision - capping position at 6% (Claude requested {original_size:.1f}%)")
 
                 validation_passed = True
                 rejection_reasons = []
