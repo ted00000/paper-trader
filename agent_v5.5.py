@@ -932,19 +932,10 @@ POSITION {i}: {ticker}
             print(f"\n   Top 2 Leading Sectors (allowed 3 positions): {', '.join(leading_sectors[:2])}")
 
         # Count current holdings by sector and industry
+        # v5.7.1: current_portfolio may contain ticker strings (from hold_positions) or dicts (from existing_positions)
+        # Since we removed enforcement, just count new positions for display
         sector_counts = {}
         industry_counts = {}
-
-        for position in current_portfolio:
-            sector = position.get('sector', 'Unknown')
-            industry = position.get('industry', 'Unknown')
-
-            sector_counts[sector] = sector_counts.get(sector, 0) + 1
-            industry_counts[industry] = industry_counts.get(industry, 0) + 1
-
-        print(f"\n   Current sector distribution:")
-        for sector, count in sorted(sector_counts.items(), key=lambda x: x[1], reverse=True):
-            print(f"      {sector}: {count} positions ({count*10}%)")
 
         # Validate new positions
         accepted_positions = []
