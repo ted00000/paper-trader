@@ -1184,10 +1184,13 @@ POSITION {i}: {ticker}
         pnl_dollars = (exit_price - entry_price) * shares
         pnl_percent = ((exit_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
 
-        # Calculate actual hold days from entry date to now
+        # Calculate actual hold days from entry date to now (handle both YYYY-MM-DD and ISO format)
         entry_date_str = position.get('entry_date', '')
         if entry_date_str:
-            entry_date = datetime.strptime(entry_date_str, '%Y-%m-%d')
+            if 'T' in entry_date_str:
+                entry_date = datetime.fromisoformat(entry_date_str.replace('Z', '+00:00')).replace(tzinfo=None)
+            else:
+                entry_date = datetime.strptime(entry_date_str, '%Y-%m-%d')
             days_held = (datetime.now() - entry_date).days
         else:
             days_held = position.get('days_held', 0)
@@ -4794,7 +4797,8 @@ RECENT LESSONS LEARNED:
             return False, 'Hold (trailing)', return_pct
 
         # PRIORITY 4: Check time stop (21 days standard, 90 days for PED)
-        entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
+        entry_date_str = position['entry_date']
+        entry_date = datetime.fromisoformat(entry_date_str.replace('Z', '+00:00')).replace(tzinfo=None) if 'T' in entry_date_str else datetime.strptime(entry_date_str, '%Y-%m-%d')
         days_held = (datetime.now() - entry_date).days
 
         # Enhancement 1.4: Extended hold period for PED positions
@@ -4819,7 +4823,8 @@ RECENT LESSONS LEARNED:
         return_pct = ((exit_price - entry_price) / entry_price) * 100
         return_dollars = (exit_price - entry_price) * shares
 
-        entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
+        entry_date_str = position['entry_date']
+        entry_date = datetime.fromisoformat(entry_date_str.replace('Z', '+00:00')).replace(tzinfo=None) if 'T' in entry_date_str else datetime.strptime(entry_date_str, '%Y-%m-%d')
         exit_date = datetime.now()
         hold_days = (exit_date - entry_date).days
 
@@ -5053,8 +5058,12 @@ RECENT LESSONS LEARNED:
             position['unrealized_gain_pct'] = round(unrealized_gain_pct, 2)
             position['unrealized_gain_dollars'] = round(unrealized_gain_dollars, 2)
             
-            # Update days held
-            entry_date = datetime.strptime(position['entry_date'], '%Y-%m-%d')
+            # Update days held (handle both YYYY-MM-DD and ISO format with time)
+            entry_date_str = position['entry_date']
+            if 'T' in entry_date_str:
+                entry_date = datetime.fromisoformat(entry_date_str.replace('Z', '+00:00')).replace(tzinfo=None)
+            else:
+                entry_date = datetime.strptime(entry_date_str, '%Y-%m-%d')
             position['days_held'] = (datetime.now() - entry_date).days
             
             # Check if position should be closed
@@ -6547,6 +6556,23 @@ RECENT LESSONS LEARNED:
         print("9. Creating daily activity summary...")
         self.create_daily_activity_summary(closed_trades)
         print()
+
+        # Save execute response for dashboard tracking
+        print("10. Saving execute summary...")
+        execute_summary = {
+            "command": "execute",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "summary": {
+                "closed": len(closed_trades),
+                "holding": len(updated_positions) - len(buy_positions),
+                "entered": len(buy_positions),
+                "total_active": len(updated_positions)
+            },
+            "closed_trades": [{"ticker": t.get("ticker"), "return_pct": t.get("return_pct")} for t in closed_trades],
+            "new_entries": [{"ticker": b.get("ticker"), "entry_price": b.get("entry_price")} for b in buy_positions if b.get("entry_price")]
+        }
+        self.save_response("execute", execute_summary)
+        print("   ✓ Execute summary saved\n")
 
         # Clean up pending file
         self.pending_file.unlink()
