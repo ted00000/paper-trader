@@ -862,8 +862,53 @@ def get_operation_log(operation):
         with open(latest_file) as f:
             data = json.load(f)
 
-        # Extract text content from Claude response
-        content = data.get('content', [{}])[0].get('text', '')
+        # Handle different log formats
+        if 'content' in data and isinstance(data['content'], list):
+            # GO/ANALYZE format: content is a list with text
+            content = data.get('content', [{}])[0].get('text', '')
+        elif 'summary' in data:
+            # EXECUTE format: structured JSON with summary
+            output_lines = []
+            output_lines.append("# 🚀 EXECUTE RESULTS")
+            output_lines.append("")
+            output_lines.append(f"**Timestamp:** {data.get('timestamp', 'Unknown')}")
+            output_lines.append("")
+
+            summary = data.get('summary', {})
+            output_lines.append("## 📊 Summary")
+            output_lines.append(f"- **Positions Entered:** {summary.get('entered', 0)}")
+            output_lines.append(f"- **Positions Closed:** {summary.get('closed', 0)}")
+            output_lines.append(f"- **Positions Holding:** {summary.get('holding', 0)}")
+            output_lines.append(f"- **Total Active:** {summary.get('total_active', 0)}")
+            output_lines.append("")
+
+            # New entries
+            new_entries = data.get('new_entries', [])
+            if new_entries:
+                output_lines.append("## ✅ New Positions Entered")
+                for entry in new_entries:
+                    ticker = entry.get('ticker', 'N/A')
+                    price = entry.get('entry_price', 0)
+                    output_lines.append(f"- **{ticker}** @ ${price:.2f}")
+                output_lines.append("")
+
+            # Closed trades
+            closed_trades = data.get('closed_trades', [])
+            if closed_trades:
+                output_lines.append("## 🔴 Positions Closed")
+                for trade in closed_trades:
+                    ticker = trade.get('ticker', 'N/A')
+                    ret = trade.get('return_pct')
+                    if ret is not None:
+                        color = '#00ff41' if ret >= 0 else '#ff0033'
+                        output_lines.append(f"- **{ticker}** <span style='color: {color}'>{ret:+.1f}%</span>")
+                    else:
+                        output_lines.append(f"- **{ticker}** (return pending)")
+                output_lines.append("")
+
+            content = "\n".join(output_lines)
+        else:
+            content = str(data)
 
         # Extract date and timestamp from filename (e.g., go_20251218_153944.json)
         filename = latest_file.name
