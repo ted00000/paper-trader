@@ -20,7 +20,7 @@ import secrets
 import hashlib
 
 # Project setup
-PROJECT_DIR = Path(__file__).parent.parent.parent
+PROJECT_DIR = Path(__file__).parent  # Fixed: was .parent.parent.parent which went to wrong directory
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 

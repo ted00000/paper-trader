@@ -711,147 +711,75 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     def get_sp1500_tickers(self):
         """
-        Load S&P 1500 ticker list from Polygon API
+        Load S&P 1500 ticker list from sp1500_constituents.json
 
-        Fetches all US stocks meeting our criteria:
-        - Listed on major exchanges (NYSE, NASDAQ, AMEX)
-        - Common stock type (CS)
-        - Active and primary listings
-        - Filters out ETFs, ADRs, preferred shares
+        The S&P 1500 = S&P 500 + S&P MidCap 400 + S&P SmallCap 600
+        This file is updated quarterly by update_sp1500_constituents.py
 
-        Returns: List of ticker symbols (~1500 stocks)
+        Returns: List of ~1500 ticker symbols
         """
+        import json
+        from pathlib import Path
+
+        constituents_file = Path(__file__).parent / 'sp1500_constituents.json'
+
         try:
-            print("   Fetching S&P 1500 universe from Polygon API...")
+            with open(constituents_file, 'r') as f:
+                data = json.load(f)
 
-            # Get all US stock tickers
-            url = f'https://api.polygon.io/v3/reference/tickers'
-            params = {
-                'market': 'stocks',
-                'active': 'true',
-                'type': 'CS',  # Common stock only
-                'limit': 1000,  # Max per page
-                'apiKey': self.api_key
-            }
+            tickers = data.get('tickers', [])
+            last_updated = data.get('last_updated', 'unknown')
+            counts = data.get('counts', {})
 
-            all_tickers = []
-            next_url = url
+            print(f"   Loaded S&P 1500 constituents from {constituents_file.name}")
+            print(f"   Last updated: {last_updated}")
+            print(f"   S&P 500: {counts.get('sp500', '?')}, S&P 400: {counts.get('sp400', '?')}, S&P 600: {counts.get('sp600', '?')}")
+            print(f"   Total tickers: {len(tickers)}\n")
 
-            # Paginate through results (need ~2 calls for 1500+ stocks)
-            for page in range(3):  # Max 3 pages = 3000 stocks
-                if next_url == url:
-                    response = requests.get(url, params=params, timeout=30)
-                else:
-                    response = requests.get(next_url, timeout=30)
+            return tickers
 
-                data = response.json()
-
-                if data.get('status') in ['OK', 'DELAYED'] and 'results' in data:
-                    for ticker_data in data['results']:
-                        ticker = ticker_data.get('ticker', '')
-                        ticker_type = ticker_data.get('type', '')
-                        primary_exchange = ticker_data.get('primary_exchange', '')
-
-                        # Filter criteria:
-                        # 1. Must be on major exchange
-                        # 2. Must be common stock (type = CS)
-                        # 3. Clean ticker format
-                        if ticker and ticker_type == 'CS':
-                            # Exclude ETFs, ADRs, preferred shares, warrants, units
-                            if (not any(x in ticker for x in ['.', '-', '^', '=', '/']) and
-                                len(ticker) <= 5 and  # Most stocks are 1-5 characters
-                                ticker.isalpha() and  # Only letters, no numbers
-                                ticker.isupper()):  # All uppercase
-                                all_tickers.append(ticker)
-
-                    # Check for next page
-                    next_url = data.get('next_url', None)
-
-                    # Stop if we have enough or no more pages
-                    if len(all_tickers) >= 1500 or not next_url:
-                        break
-                else:
-                    break
-
-                time.sleep(0.2)  # Rate limit protection
-
-            # Limit to 1500 stocks
-            all_tickers = all_tickers[:1500]
-
-            # Sort alphabetically for consistency
-            all_tickers.sort()
-
-            print(f"   Loaded {len(all_tickers)} tickers from Polygon API")
-            print(f"   (US common stocks, active on major exchanges)\n")
-
-            # If we got fewer than 500, fall back to curated list
-            if len(all_tickers) < 500:
-                raise Exception(f"Only got {len(all_tickers)} tickers, using fallback")
-
-            return all_tickers
+        except FileNotFoundError:
+            print(f"   ⚠️ {constituents_file} not found!")
+            print(f"   Run: python update_sp1500_constituents.py")
+            print(f"   Falling back to hardcoded list of major stocks\n")
+            return self._get_fallback_tickers()
 
         except Exception as e:
-            print(f"   ⚠️ Error fetching tickers from Polygon: {e}")
-            print(f"   Falling back to curated list of 500 major stocks\n")
+            print(f"   ⚠️ Error loading constituents: {e}")
+            print(f"   Falling back to hardcoded list of major stocks\n")
+            return self._get_fallback_tickers()
 
-            # Fallback: Return curated list of 500 major stocks
-            fallback_list = [
-                # Technology (XLK)
-                'AAPL', 'MSFT', 'NVDA', 'AVGO', 'ORCL', 'CRM', 'CSCO', 'ADBE', 'ACN', 'AMD',
-                'INTC', 'IBM', 'TXN', 'QCOM', 'AMAT', 'MU', 'LRCX', 'KLAC', 'SNPS', 'CDNS',
-                'PLTR', 'NOW', 'PANW', 'FTNT', 'CRWD', 'WDAY', 'TEAM', 'DDOG', 'NET', 'ZS',
-                'ANET', 'SMCI', 'MRVL', 'ARM', 'SNOW', 'SPLK', 'OKTA', 'ZM', 'DOCU', 'MDB',
-
-                # Healthcare (XLV)
-                'LLY', 'UNH', 'JNJ', 'ABBV', 'MRK', 'TMO', 'ABT', 'DHR', 'PFE', 'BMY',
-                'AMGN', 'GILD', 'CVS', 'CI', 'VRTX', 'REGN', 'HUM', 'ISRG', 'SYK', 'BSX',
-                'MDLZ', 'MDT', 'BDX', 'ELV', 'ZTS', 'IDXX', 'EW', 'RMD', 'DXCM', 'ALGN',
-
-                # Financials (XLF)
-                'JPM', 'BAC', 'WFC', 'GS', 'MS', 'C', 'BLK', 'SPGI', 'AXP', 'USB',
-                'PNC', 'TFC', 'SCHW', 'BK', 'COF', 'CME', 'ICE', 'AON', 'MMC', 'MCO',
-                'CB', 'PGR', 'TRV', 'ALL', 'AIG', 'MET', 'PRU', 'AFL', 'COIN', 'SOFI', 'HOOD',
-
-                # Consumer Discretionary (XLY)
-                'AMZN', 'TSLA', 'HD', 'MCD', 'NKE', 'LOW', 'SBUX', 'TJX', 'BKNG', 'ABNB',
-                'CMG', 'ORLY', 'AZO', 'GM', 'F', 'MAR', 'HLT', 'YUM', 'DRI', 'ULTA',
-                'SHOP', 'UBER', 'DASH', 'RIVN', 'LCID', 'NIO', 'XPEV', 'LI', 'RBLX', 'ETSY',
-
-                # Communication Services (XLC)
-                'META', 'GOOGL', 'GOOG', 'NFLX', 'DIS', 'CMCSA', 'VZ', 'T', 'TMUS', 'CHTR',
-                'EA', 'TTWO', 'ATVI', 'SNAP', 'PINS', 'MTCH', 'SPOT', 'ROKU',
-
-                # Industrials (XLI)
-                'CAT', 'BA', 'UNP', 'HON', 'UPS', 'RTX', 'LMT', 'DE', 'GE', 'MMM',
-                'GD', 'NOC', 'ETN', 'EMR', 'ITW', 'PH', 'CSX', 'NSC', 'FDX', 'WM',
-                'RSG', 'CARR', 'OTIS', 'PCAR', 'CMI', 'AME', 'FAST', 'PAYX', 'VRSK', 'IEX',
-
-                # Consumer Staples (XLP)
-                'WMT', 'PG', 'COST', 'KO', 'PEP', 'PM', 'MO', 'MDLZ', 'CL', 'KMB',
-                'GIS', 'K', 'HSY', 'SYY', 'KHC', 'CAG', 'CPB', 'STZ', 'TAP', 'TSN',
-                'CHD', 'CLX', 'MKC', 'SJM', 'HRL', 'LW', 'BG', 'ADM', 'MNST', 'KDP',
-
-                # Energy (XLE)
-                'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO', 'OXY', 'HES',
-                'HAL', 'BKR', 'FANG', 'DVN', 'MRO', 'APA', 'CTRA', 'OVV', 'EQT', 'PR',
-
-                # Materials (XLB)
-                'LIN', 'APD', 'ECL', 'SHW', 'FCX', 'NEM', 'DD', 'DOW', 'PPG', 'VMC',
-                'MLM', 'NUE', 'STLD', 'IP', 'PKG', 'BALL', 'AVY', 'ALB', 'CE', 'EMN',
-
-                # Utilities (XLU)
-                'NEE', 'DUK', 'SO', 'D', 'AEP', 'EXC', 'SRE', 'XEL', 'ED', 'PEG',
-                'ES', 'AWK', 'DTE', 'PCG', 'EIX', 'WEC', 'PPL', 'CNP', 'AEE', 'CMS',
-
-                # Real Estate (XLRE)
-                'PLD', 'AMT', 'EQIX', 'PSA', 'WELL', 'DLR', 'O', 'CBRE', 'SPG', 'AVB',
-                'EQR', 'VTR', 'BXP', 'ARE', 'ESS', 'MAA', 'UDR', 'HST', 'REG', 'KIM'
-            ]
-
-            # Add more mid/small caps to reach closer to 500
-            # ... (would add more here but keeping it reasonable for fallback)
-
-            return fallback_list[:500]
+    def _get_fallback_tickers(self):
+        """Fallback list of major stocks if sp1500_constituents.json is unavailable"""
+        return [
+            # Technology
+            'AAPL', 'MSFT', 'NVDA', 'AVGO', 'ORCL', 'CRM', 'CSCO', 'ADBE', 'ACN', 'AMD',
+            'INTC', 'IBM', 'TXN', 'QCOM', 'AMAT', 'MU', 'LRCX', 'KLAC', 'SNPS', 'CDNS',
+            # Healthcare
+            'LLY', 'UNH', 'JNJ', 'ABBV', 'MRK', 'TMO', 'ABT', 'DHR', 'PFE', 'BMY',
+            'AMGN', 'GILD', 'CVS', 'CI', 'VRTX', 'REGN', 'ISRG', 'SYK', 'BSX', 'MDT',
+            # Financials
+            'JPM', 'BAC', 'WFC', 'GS', 'MS', 'C', 'BLK', 'SPGI', 'AXP', 'USB',
+            'PNC', 'SCHW', 'COF', 'CME', 'ICE', 'AON', 'MMC', 'PGR', 'TRV', 'MET',
+            # Consumer Discretionary
+            'AMZN', 'TSLA', 'HD', 'MCD', 'NKE', 'LOW', 'SBUX', 'TJX', 'BKNG', 'ABNB',
+            'CMG', 'ORLY', 'GM', 'F', 'MAR', 'HLT', 'YUM', 'UBER', 'DASH', 'RIVN',
+            # Communication Services
+            'META', 'GOOGL', 'GOOG', 'NFLX', 'DIS', 'CMCSA', 'VZ', 'T', 'TMUS', 'CHTR',
+            # Industrials
+            'CAT', 'BA', 'UNP', 'HON', 'UPS', 'RTX', 'LMT', 'DE', 'GE', 'MMM',
+            'GD', 'NOC', 'ETN', 'EMR', 'ITW', 'PH', 'CSX', 'NSC', 'FDX', 'WM',
+            # Consumer Staples
+            'WMT', 'PG', 'COST', 'KO', 'PEP', 'PM', 'MO', 'CL', 'KMB', 'GIS',
+            # Energy
+            'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX', 'VLO', 'OXY', 'HES',
+            # Materials
+            'LIN', 'APD', 'ECL', 'SHW', 'FCX', 'NEM', 'DD', 'DOW', 'PPG', 'VMC',
+            # Utilities
+            'NEE', 'DUK', 'SO', 'D', 'AEP', 'EXC', 'SRE', 'XEL', 'ED', 'PEG',
+            # Real Estate
+            'PLD', 'AMT', 'EQIX', 'PSA', 'WELL', 'DLR', 'O', 'CBRE', 'SPG', 'AVB'
+        ]
 
     def get_stock_sector(self, ticker):
         """
@@ -4188,19 +4116,35 @@ Return ONLY valid JSON (no markdown, no explanation):
                         candidate['catalyst_tier'] = tier_map.get(claude_analysis['tier'], 'No Catalyst')
                         candidate['why_selected'] = f"{claude_analysis['catalyst_type']}: {claude_analysis['reasoning']}"
 
-                        # Initialize composite score if not present
-                        if 'composite_score' not in candidate:
-                            # Base score from RS and technical setup
-                            rs_score = candidate.get('relative_strength', {}).get('score', 0)
-                            candidate['composite_score'] = rs_score
+                        # Build composite score from MULTIPLE unique metrics to eliminate ties
+                        # Previously used rs_score which was capped at 100, causing many ties
+                        # Now we use rs_percentile, technical_score, and volume_ratio which are all unique per stock
 
-                        # Boost composite score for high-confidence Tier 1/2
-                        if claude_analysis['tier'] in ['Tier1', 'Tier2'] and claude_analysis['confidence'] == 'High':
-                            tier_bonus = 15 if claude_analysis['tier'] == 'Tier1' else 10
-                            confidence_bonus = 5 if claude_analysis['multi_catalyst'] else 0
-                            candidate['composite_score'] += tier_bonus + confidence_bonus
-                            # REMOVED: Score cap that caused alphabetical bias (16 stocks tied at 100)
-                            # Allow scores >100 to create natural differentiation among top candidates
+                        # Handle None values explicitly (some stocks may have None in their data)
+                        rs_percentile = candidate.get('relative_strength', {}).get('rs_percentile') or 50
+                        technical_score = candidate.get('technical_setup', {}).get('score') or 50
+                        volume_ratio = candidate.get('volume_analysis', {}).get('volume_ratio') or 1.0
+
+                        # Normalize volume (cap at 5x to prevent outliers dominating)
+                        volume_score = min(volume_ratio, 5.0) * 10  # 0-50 range
+
+                        # Base composite: weighted combination of all factors
+                        # RS Percentile: 40% weight (0-40 points)
+                        # Technical Score: 30% weight (0-30 points)
+                        # Volume Score: 10% weight (0-5 points)
+                        base_score = (rs_percentile * 0.4) + (technical_score * 0.3) + (volume_score * 0.1)
+
+                        # Add tier bonus based on Claude's analysis
+                        tier_bonus = 0
+                        if claude_analysis['tier'] == 'Tier1':
+                            tier_bonus = 20 if claude_analysis['confidence'] == 'High' else 10
+                        elif claude_analysis['tier'] == 'Tier2':
+                            tier_bonus = 10 if claude_analysis['confidence'] == 'High' else 5
+
+                        confidence_bonus = 5 if claude_analysis.get('multi_catalyst') else 0
+
+                        # Final score: unique per stock due to unique inputs
+                        candidate['composite_score'] = round(base_score + tier_bonus + confidence_bonus, 2)
 
                         filtered_candidates.append(candidate)
 
@@ -4222,6 +4166,29 @@ Return ONLY valid JSON (no markdown, no explanation):
         print("CALCULATING RS PERCENTILES")
         print("=" * 60)
         self.calculate_rs_percentiles(candidates)
+
+        # RECALCULATE composite scores now that rs_percentile is available
+        # During Claude analysis, rs_percentile was None - now we have real values
+        print("\n   Recalculating composite scores with RS percentiles...")
+        for candidate in candidates:
+            rs_percentile = candidate.get('relative_strength', {}).get('rs_percentile') or 50
+            technical_score = candidate.get('technical_setup', {}).get('score') or 50
+            volume_ratio = candidate.get('volume_analysis', {}).get('volume_ratio') or 1.0
+            volume_score = min(volume_ratio, 5.0) * 10
+
+            # Base score from all factors (now with real rs_percentile)
+            base_score = (rs_percentile * 0.4) + (technical_score * 0.3) + (volume_score * 0.1)
+
+            # Preserve tier bonuses from Claude analysis
+            catalyst_tier = candidate.get('catalyst_tier', '')
+            tier_bonus = 0
+            if catalyst_tier.startswith('Tier 1'):
+                tier_bonus = 20  # High confidence Tier 1
+            elif catalyst_tier.startswith('Tier 2'):
+                tier_bonus = 10  # Tier 2
+
+            candidate['composite_score'] = round(base_score + tier_bonus, 2)
+        print(f"   ✓ Recalculated scores for {len(candidates)} candidates")
 
         # PHASE 3.2: Detect sector rotation
         print("\n" + "=" * 60)
