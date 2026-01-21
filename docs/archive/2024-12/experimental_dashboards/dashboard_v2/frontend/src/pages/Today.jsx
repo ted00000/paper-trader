@@ -31,12 +31,12 @@ function Today() {
     )
   }
 
-  // Calculate today's metrics (placeholder - will be replaced with real API)
-  const todayPnL = 0 // TODO: Get from API
-  const todayReturn = 0 // TODO: Get from API
-  const todayTrades = 0 // TODO: Get from API
-  const todayWins = 0 // TODO: Get from API
-  const todayLosses = 0 // TODO: Get from API
+  // Get today's metrics from API response
+  const todayPnL = todayData?.today?.pnl || 0
+  const todayReturn = todayData?.today?.pnl || 0  // pnl is already in percent
+  const todayTrades = todayData?.today?.trades || 0
+  const todayWins = todayData?.today?.wins || 0
+  const todayLosses = todayData?.today?.losses || 0
 
   return (
     <div className="space-y-6">
