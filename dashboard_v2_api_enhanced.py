@@ -272,26 +272,38 @@ def get_overview():
     else:
         sharpe = 0
 
-    # Max drawdown
-    equity_curve = []
-    cumulative = 1000.00
-    for t in reversed(trades):  # Chronological order
-        cumulative += float(t.get('Return_Dollars', 0))
+    # Max drawdown - track equity curve from starting capital through all trades
+    starting_capital = 1000.00
+    equity_curve = [starting_capital]  # Start with initial capital
+    cumulative = starting_capital
+
+    # Build equity curve chronologically
+    sorted_trades = sorted(trades, key=lambda t: t.get('Exit_Date', ''))
+    for t in sorted_trades:
+        return_dollars = float(t.get('Return_Dollars', 0))
+        cumulative += return_dollars
         equity_curve.append(cumulative)
 
-    peak = cumulative
+    # Add current account value (includes unrealized P&L)
+    current_value = account.get('account_value', cumulative)
+    if current_value != cumulative:
+        equity_curve.append(current_value)
+
+    # Calculate max drawdown from peak
+    peak = starting_capital
     max_dd = 0
     for value in equity_curve:
         if value > peak:
             peak = value
-        dd = ((peak - value) / peak) * 100
-        if dd > max_dd:
-            max_dd = dd
+        if peak > 0:
+            dd = ((peak - value) / peak) * 100
+            if dd > max_dd:
+                max_dd = dd
 
     return jsonify({
         'account': {
             'value': account.get('account_value', 1000.00),
-            'cash': account.get('cash_balance', 1000.00),
+            'cash': account.get('cash_available', 1000.00),
             'invested': account.get('positions_value', 0.00),
             'total_return_pct': account.get('total_return_percent', 0.00),
             'total_return_usd': account.get('total_return_dollars', 0.00)
