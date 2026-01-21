@@ -300,6 +300,14 @@ def get_overview():
             if dd > max_dd:
                 max_dd = dd
 
+    # Today's performance (from closed trades today)
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    today_trades = [t for t in trades if t.get('Exit_Date', '').startswith(today_str)]
+    today_returns = [float(t.get('Return_Percent', 0)) for t in today_trades]
+    today_pnl = sum(today_returns) if today_returns else 0
+    today_wins = sum(1 for r in today_returns if r > 0)
+    today_losses = sum(1 for r in today_returns if r < 0)
+
     return jsonify({
         'account': {
             'value': account.get('account_value', 1000.00),
@@ -318,6 +326,12 @@ def get_overview():
             'mtd_return': round(mtd_return, 2),
             'sharpe_ratio': round(sharpe, 2),
             'max_drawdown': round(max_dd, 2)
+        },
+        'today': {
+            'trades': len(today_trades),
+            'wins': today_wins,
+            'losses': today_losses,
+            'pnl': round(today_pnl, 2)
         },
         'recent_trades': [
             {
