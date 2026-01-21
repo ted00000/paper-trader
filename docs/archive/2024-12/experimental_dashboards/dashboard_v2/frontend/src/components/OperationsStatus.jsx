@@ -11,6 +11,33 @@ function OperationsStatus({ isSuperUser = false }) {
   const [logContent, setLogContent] = useState(null)
   const [logLoading, setLogLoading] = useState(false)
 
+  // Format GO output for better readability
+  const formatGoOutput = (content) => {
+    if (!content) return content
+
+    let formatted = content
+
+    // Style ENTER decisions - pattern: **TICKER (Sector) - ENTER**
+    formatted = formatted.replace(
+      /\*\*([A-Z]+)\s*\(([^)]+)\)\s*-\s*ENTER\*\*/g,
+      '<span class="ticker-name">$1</span> ($2) - <span class="decision-enter">ENTER</span>'
+    )
+
+    // Style PASS decisions - pattern: **TICKER (Sector) - PASS**
+    formatted = formatted.replace(
+      /\*\*([A-Z]+)\s*\(([^)]+)\)\s*-\s*PASS\*\*/g,
+      '<span class="ticker-name">$1</span> ($2) - <span class="decision-pass">PASS</span>'
+    )
+
+    // Also handle PASS in "Other Candidates" section
+    formatted = formatted.replace(
+      /\*\*Other Candidates.*?PASS\*\*/g,
+      (match) => match.replace('PASS', '<span class="decision-pass">PASS</span>')
+    )
+
+    return formatted
+  }
+
   const fetchOperations = async () => {
     try {
       const response = await axios.get('/api/v2/operations/status')
@@ -238,8 +265,10 @@ function OperationsStatus({ isSuperUser = false }) {
                   <p className="text-loss">{logContent.error}</p>
                 </div>
               ) : logContent?.content ? (
-                <div className="bg-tedbot-darker rounded-lg p-6 prose prose-invert prose-sm max-w-none overflow-x-auto">
-                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>{logContent.content}</ReactMarkdown>
+                <div className="bg-tedbot-darker rounded-lg p-6 prose prose-invert prose-sm max-w-none overflow-x-auto go-output">
+                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                    {selectedLog === 'GO' ? formatGoOutput(logContent.content) : logContent.content}
+                  </ReactMarkdown>
                 </div>
               ) : (
                 <div className="text-center py-12 text-tedbot-gray-500">

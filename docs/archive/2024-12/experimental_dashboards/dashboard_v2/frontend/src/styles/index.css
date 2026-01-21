@@ -111,3 +111,32 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Chrome, Safari and Opera */
 }
+
+/* GO Output Formatting */
+.go-output h2,
+.go-output h3 {
+  @apply text-profit font-bold mt-6 mb-3 text-lg border-b border-profit/30 pb-2;
+}
+
+.go-output h4 {
+  @apply text-tedbot-accent font-semibold mt-4 mb-2;
+}
+
+/* Styled decision badges */
+.decision-enter {
+  @apply text-profit font-bold;
+}
+
+.decision-pass {
+  @apply text-loss font-bold;
+}
+
+/* Company ticker styling */
+.ticker-name {
+  @apply font-bold text-white;
+}
+
+/* Section dividers */
+.go-output hr {
+  @apply border-tedbot-gray-700 my-4;
+}
