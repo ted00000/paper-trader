@@ -289,13 +289,13 @@ def get_overview():
         sharpe = 0
 
     # Max drawdown
-    equity_curve = []
+    equity_curve = [1000.00]  # Start with initial capital
     cumulative = 1000.00
     for t in reversed(trades):  # Chronological order
         cumulative += float(t.get('Return_Dollars', 0))
         equity_curve.append(cumulative)
 
-    peak = cumulative
+    peak = 1000.00  # Peak starts at initial capital
     max_dd = 0
     for value in equity_curve:
         if value > peak:
@@ -407,13 +407,13 @@ def get_performance():
         sharpe_ratio = 0
 
     # Max drawdown
-    equity_curve = []
+    equity_curve = [1000.00]  # Start with initial capital
     cumulative = 1000.00
     for t in reversed(trades):  # Chronological order
         cumulative += float(t.get('Return_Dollars', 0))
         equity_curve.append(cumulative)
 
-    peak = cumulative
+    peak = 1000.00  # Peak starts at initial capital
     max_drawdown = 0
     for value in equity_curve:
         if value > peak:
@@ -480,7 +480,7 @@ def get_equity_curve():
         cumulative += float(trade.get('Return_Dollars', 0))
 
         if cumulative > peak:
-            peak = cumulative
+            peak = 1000.00  # Peak starts at initial capital
 
         drawdown_pct = ((peak - cumulative) / peak) * 100 if peak > 0 else 0
 
