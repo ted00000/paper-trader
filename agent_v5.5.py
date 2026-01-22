@@ -5715,6 +5715,26 @@ RECENT LESSONS LEARNED:
         exit_positions = decisions.get('exit', [])
         buy_positions = decisions.get('buy', [])
 
+        # VALIDATION: Filter HOLD/EXIT to only include tickers that actually exist in portfolio
+        # This prevents Claude from hallucinating positions that don't exist
+        actual_portfolio = self.load_current_portfolio()
+        actual_tickers = set(p.get('ticker', '') for p in actual_portfolio.get('positions', []))
+
+        if hold_positions and not actual_tickers:
+            print(f"   ⚠️ Claude returned {len(hold_positions)} HOLD positions but portfolio is empty!")
+            print(f"      Clearing phantom HOLD positions: {hold_positions}")
+            hold_positions = []
+        elif hold_positions:
+            phantom_holds = [t for t in hold_positions if t not in actual_tickers]
+            if phantom_holds:
+                print(f"   ⚠️ Removing phantom HOLD tickers not in portfolio: {phantom_holds}")
+                hold_positions = [t for t in hold_positions if t in actual_tickers]
+
+        if exit_positions and not actual_tickers:
+            phantom_exits = [e.get('ticker') if isinstance(e, dict) else e for e in exit_positions]
+            print(f"   ⚠️ Claude returned EXIT positions but portfolio is empty: {phantom_exits}")
+            exit_positions = []
+
         # VALIDATION: Check for ticker exclusivity (Bug #1 fix)
         hold_tickers = set(hold_positions)
         exit_tickers = set([e['ticker'] if isinstance(e, dict) else e for e in exit_positions])
