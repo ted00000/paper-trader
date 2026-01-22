@@ -4545,7 +4545,7 @@ RECENT LESSONS LEARNED:
         """
 
         # Starting capital (constant)
-        STARTING_CAPITAL = 1000.00
+        STARTING_CAPITAL = 10000.00
 
         # Calculate current portfolio value (sum of all position sizes)
         portfolio_value = 0.00
@@ -6369,7 +6369,7 @@ RECENT LESSONS LEARNED:
         print("\n5. Entering NEW positions...")
         if buy_positions:
             # Calculate current account value for position sizing (COMPOUND GROWTH)
-            STARTING_CAPITAL = 1000.00
+            STARTING_CAPITAL = 10000.00
             portfolio_value = sum(p.get('position_size', 0) for p in updated_positions)
 
             # Calculate realized P&L from completed trades
