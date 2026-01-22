@@ -5992,11 +5992,23 @@ RECENT LESSONS LEARNED:
                         buy_pos['conviction_level'] = conviction_result['conviction']
 
                         # PHASE 4.2: Apply market breadth adjustment to position size
-                        base_position_size = conviction_result['position_size_pct']
+                        # BUG FIX (Jan 21, 2026): Don't override position_size_pct if already set by SKIP/LOW logic
+                        # The v5.7 SKIP handling at lines 5950-5961 sets position_size_pct to 5.0 or 6.0
+                        # We should NOT overwrite that with 0.0 from conviction_result
+                        existing_size = buy_pos.get('position_size_pct', 0)
+                        if existing_size > 0:
+                            # Position size was already set (e.g., by Claude's recommendation or SKIP override)
+                            # Apply breadth adjustment to the existing size, not conviction's 0
+                            base_position_size = existing_size
+                        else:
+                            base_position_size = conviction_result['position_size_pct']
+
                         breadth_adjustment = breadth_result['position_size_adjustment']
                         adjusted_position_size = base_position_size * breadth_adjustment
 
-                        buy_pos['position_size_pct'] = adjusted_position_size  # Phase 4 overrides Phase 2
+                        # Only update if we have a valid size (don't set to 0)
+                        if adjusted_position_size > 0:
+                            buy_pos['position_size_pct'] = adjusted_position_size
                         buy_pos['position_size_base'] = base_position_size  # Store original for reference
                         buy_pos['market_breadth_adjustment'] = breadth_adjustment  # Store adjustment factor
                         buy_pos['market_breadth_regime'] = breadth_result['regime']  # Store regime
