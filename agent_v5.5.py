@@ -6572,6 +6572,9 @@ RECENT LESSONS LEARNED:
 
         # Process BUYS
         print("\n5. Entering NEW positions...")
+        # Track held positions count BEFORE adding new buys (for accurate reporting)
+        held_positions_count = len(updated_positions)
+
         if buy_positions:
             # Calculate current account value for position sizing (COMPOUND GROWTH)
             STARTING_CAPITAL = 10000.00
@@ -6781,8 +6784,8 @@ RECENT LESSONS LEARNED:
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
                 "closed": len(closed_trades),
-                "holding": len(updated_positions) - len(buy_positions),
-                "entered": len(buy_positions),
+                "holding": held_positions_count,
+                "entered": len(updated_positions) - held_positions_count,
                 "total_active": len(updated_positions)
             },
             "closed_trades": [{"ticker": t.get("ticker"), "return_pct": t.get("return_pct")} for t in closed_trades],
@@ -6799,8 +6802,8 @@ RECENT LESSONS LEARNED:
         print("="*60)
         print(f"\n✓ Portfolio Updated:")
         print(f"  - Closed: {len(closed_trades)} positions")
-        print(f"  - Holding: {len(updated_positions) - len(buy_positions)} positions")
-        print(f"  - Entered: {len(buy_positions)} new positions")
+        print(f"  - Holding: {held_positions_count} positions")
+        print(f"  - Entered: {len(updated_positions) - held_positions_count} new positions")
         print(f"  - Total Active: {len(updated_positions)} positions\n")
 
         return True
