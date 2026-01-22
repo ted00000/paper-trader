@@ -4366,6 +4366,9 @@ CRITICAL: When executing 'go' command, you MUST include a properly formatted JSO
             ])
         else:
             context['exclusions'] = 'None (all catalysts available)'
+
+        # Load catalyst performance for data-driven decisions (Learning System Enhancement Jan 2026)
+        context['catalyst_performance'] = self.get_catalyst_performance_summary()
         
         # Load portfolio
         if self.portfolio_file.exists():
@@ -4387,11 +4390,14 @@ PROJECT INSTRUCTIONS:
 STRATEGY RULES (AUTO-UPDATED BY LEARNING):
 {context.get('strategy', 'Not found')}
 
-⚠️  HISTORICALLY UNDERPERFORMING CATALYSTS:
+📊 HISTORICAL CATALYST PERFORMANCE (Data-Driven Guidance):
+Use this data to inform your decisions. Prioritize catalyst types with proven track records.
+{context.get('catalyst_performance', 'No data yet')}
+
+⚠️  EXCLUDED CATALYSTS:
 The following catalysts have shown poor results. You may still use them if you have strong conviction,
 but explain your reasoning and consider what makes this situation different from past failures.
 Your decisions will be tracked for accountability.
-
 {context.get('exclusions', 'None')}
 
 CURRENT PORTFOLIO:
@@ -4438,6 +4444,185 @@ RECENT LESSONS LEARNED:
 
         with open(log_file, 'a') as f:
             f.write(json.dumps(log_entry) + '\n')
+
+    def load_catalyst_performance(self):
+        """
+        Load historical catalyst performance data from catalyst_performance.csv
+
+        Returns dict with catalyst types as keys and performance metrics as values.
+        This data is used to inform Claude about which catalyst types have worked well
+        historically, enabling data-driven decision making.
+
+        Learning System Integration (Jan 2026):
+        - Updated weekly by learn_weekly.py
+        - Provides win rates, avg returns, and sample size confidence
+        - Enables Claude to prioritize proven catalyst types
+        """
+        catalyst_file = self.project_dir / 'strategy_evolution' / 'catalyst_performance.csv'
+
+        if not catalyst_file.exists():
+            return {}
+
+        performance = {}
+        try:
+            with open(catalyst_file, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    catalyst_type = row.get('Catalyst_Type', '')
+                    if not catalyst_type:
+                        continue
+
+                    total_trades = int(row.get('Total_Trades', 0))
+                    if total_trades == 0:
+                        continue  # Skip catalysts with no data
+
+                    performance[catalyst_type] = {
+                        'total_trades': total_trades,
+                        'win_rate': float(row.get('Win_Rate_Percent', 0)),
+                        'avg_return': float(row.get('Net_Avg_Return_Percent', 0)),
+                        'avg_hold_days': float(row.get('Avg_Hold_Days', 0)),
+                        'best_trade': float(row.get('Best_Trade_Percent', 0)),
+                        'worst_trade': float(row.get('Worst_Trade_Percent', 0)),
+                        'confidence': row.get('Sample_Size_Confidence', 'Low')
+                    }
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to load catalyst performance: {e}")
+            return {}
+
+        return performance
+
+    def get_catalyst_performance_summary(self):
+        """
+        Generate a human-readable summary of catalyst performance for Claude.
+
+        This is included in the GO command context so Claude can make informed
+        decisions about which catalyst types to prioritize.
+
+        Format:
+        - Top performers with high confidence
+        - Underperformers to approach with caution
+        - New/untested catalyst types
+        """
+        performance = self.load_catalyst_performance()
+
+        if not performance:
+            return "No historical catalyst performance data available yet. Focus on Tier 1 catalysts with strong news validation."
+
+        # Sort by win rate, then by sample size
+        sorted_catalysts = sorted(
+            performance.items(),
+            key=lambda x: (x[1]['win_rate'], x[1]['total_trades']),
+            reverse=True
+        )
+
+        lines = []
+
+        # Top performers (win rate > 50% with Medium/High confidence)
+        top_performers = [
+            (cat, stats) for cat, stats in sorted_catalysts
+            if stats['win_rate'] > 50 and stats['confidence'] in ['Medium', 'High']
+        ]
+        if top_performers:
+            lines.append("📈 TOP PERFORMING CATALYSTS (prioritize these):")
+            for cat, stats in top_performers[:5]:
+                lines.append(f"   • {cat}: {stats['win_rate']:.0f}% win rate, {stats['avg_return']:+.1f}% avg return ({stats['total_trades']} trades, {stats['confidence']} confidence)")
+
+        # Underperformers (win rate < 40% with at least 5 trades)
+        underperformers = [
+            (cat, stats) for cat, stats in sorted_catalysts
+            if stats['win_rate'] < 40 and stats['total_trades'] >= 5
+        ]
+        if underperformers:
+            lines.append("\n⚠️ UNDERPERFORMING CATALYSTS (approach with caution):")
+            for cat, stats in underperformers[:3]:
+                lines.append(f"   • {cat}: {stats['win_rate']:.0f}% win rate over {stats['total_trades']} trades")
+
+        # Low sample size (< 5 trades)
+        low_sample = [
+            (cat, stats) for cat, stats in sorted_catalysts
+            if stats['total_trades'] < 5
+        ]
+        if low_sample:
+            lines.append(f"\nℹ️ {len(low_sample)} catalyst types have <5 trades (insufficient data for confidence)")
+
+        return '\n'.join(lines) if lines else "Catalyst performance data is being collected. Make decisions based on catalyst tier and news quality."
+
+    def calculate_statistical_significance(self, wins, total, baseline_rate=0.50):
+        """
+        Calculate if a win rate is statistically significantly different from baseline.
+
+        Uses binomial test approximation (z-test for proportions).
+        Returns True if the result is unlikely to be due to chance.
+
+        Args:
+            wins: Number of winning trades
+            total: Total number of trades
+            baseline_rate: Expected win rate (default 50%)
+
+        Returns:
+            dict with:
+                - is_significant: Boolean
+                - p_value_approx: Approximate p-value
+                - confidence_level: 'Low' | 'Medium' | 'High'
+        """
+        import math
+
+        if total < 5:
+            return {
+                'is_significant': False,
+                'p_value_approx': 1.0,
+                'confidence_level': 'Low',
+                'reason': 'Insufficient sample size (<5 trades)'
+            }
+
+        observed_rate = wins / total
+
+        # Standard error for proportion
+        se = math.sqrt(baseline_rate * (1 - baseline_rate) / total)
+
+        if se == 0:
+            return {
+                'is_significant': False,
+                'p_value_approx': 1.0,
+                'confidence_level': 'Low',
+                'reason': 'Zero standard error'
+            }
+
+        # Z-score
+        z = (observed_rate - baseline_rate) / se
+
+        # Approximate p-value using normal distribution CDF approximation
+        # For a two-tailed test
+        abs_z = abs(z)
+
+        # P-value approximation (simplified)
+        if abs_z > 3.0:
+            p_value = 0.003  # Very significant
+        elif abs_z > 2.58:
+            p_value = 0.01   # Highly significant (99% confidence)
+        elif abs_z > 1.96:
+            p_value = 0.05   # Significant (95% confidence)
+        elif abs_z > 1.645:
+            p_value = 0.10   # Marginally significant (90% confidence)
+        else:
+            p_value = 0.5    # Not significant
+
+        # Determine confidence level based on sample size and significance
+        if total >= 25 and p_value < 0.05:
+            confidence_level = 'High'
+        elif total >= 10 and p_value < 0.10:
+            confidence_level = 'Medium'
+        else:
+            confidence_level = 'Low'
+
+        return {
+            'is_significant': p_value < 0.05,
+            'p_value_approx': p_value,
+            'z_score': z,
+            'confidence_level': confidence_level,
+            'observed_rate': observed_rate,
+            'sample_size': total
+        }
 
     # =====================================================================
     # JSON PARSING AND PORTFOLIO CREATION

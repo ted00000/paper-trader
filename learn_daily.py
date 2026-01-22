@@ -199,14 +199,17 @@ class DailyLearning:
     
     def identify_warning_catalysts(self, recent_stats, all_time_stats):
         """Identify catalysts showing concerning recent trends"""
-        
+
         warnings = []
-        
+
         for catalyst, recent in recent_stats.items():
+            # Skip internal metrics key
+            if catalyst.startswith('_'):
+                continue
             # Warning if: Recently performed poorly (last 7 days)
             if recent['total_trades'] >= 3 and recent['win_rate'] < 30:
                 all_time = all_time_stats.get(catalyst, {})
-                
+
                 warnings.append({
                     'catalyst': catalyst,
                     'recent_win_rate': recent['win_rate'],
@@ -215,8 +218,147 @@ class DailyLearning:
                     'all_time_trades': all_time.get('total_trades', 0),
                     'status': 'Watch closely - recent underperformance'
                 })
-        
+
         return warnings
+
+    def sunset_review_exclusions(self, all_time_stats):
+        """
+        Sunset Review: Re-evaluate excluded catalysts for potential reinstatement.
+
+        Learning System Enhancement (Jan 2026):
+        A catalyst should be reinstated if:
+        1. It was excluded > 30 days ago
+        2. Recent performance (last 30 days) shows improvement to > 45% win rate
+        3. At least 5 new trades since exclusion
+
+        This prevents "permanent" exclusions that may have been based on:
+        - Small sample size during initial learning
+        - Temporary market conditions
+        - Strategy improvements that changed how catalysts are used
+        """
+        if not self.exclusions_file.exists():
+            return []
+
+        try:
+            with open(self.exclusions_file, 'r') as f:
+                data = json.load(f)
+                existing_exclusions = data.get('excluded_catalysts', [])
+        except:
+            return []
+
+        if not existing_exclusions:
+            return []
+
+        reinstatements = []
+        updated_exclusions = []
+
+        for excl in existing_exclusions:
+            catalyst = excl.get('catalyst', '')
+            excluded_date_str = excl.get('excluded_date', '')
+
+            # Parse exclusion date
+            try:
+                excluded_date = datetime.strptime(excluded_date_str, '%Y-%m-%d')
+            except:
+                # If no valid date, keep the exclusion (can't evaluate age)
+                updated_exclusions.append(excl)
+                continue
+
+            days_since_exclusion = (datetime.now() - excluded_date).days
+
+            # Only review exclusions older than 30 days
+            if days_since_exclusion < 30:
+                updated_exclusions.append(excl)
+                continue
+
+            # Check current performance
+            current_stats = all_time_stats.get(catalyst, {})
+            current_win_rate = current_stats.get('win_rate', 0)
+            current_trades = current_stats.get('total_trades', 0)
+            original_trades = excl.get('total_trades', 0)
+
+            # Calculate trades since exclusion
+            trades_since_exclusion = current_trades - original_trades
+
+            # Reinstatement criteria:
+            # 1. At least 5 new trades since exclusion
+            # 2. Current win rate > 45% (improvement threshold)
+            # 3. Statistical significance check (optional enhancement)
+            if trades_since_exclusion >= 5 and current_win_rate > 45:
+                reinstatements.append({
+                    'catalyst': catalyst,
+                    'original_win_rate': excl.get('win_rate', 0),
+                    'current_win_rate': current_win_rate,
+                    'trades_since_exclusion': trades_since_exclusion,
+                    'days_excluded': days_since_exclusion,
+                    'reason': f'Improved from {excl.get("win_rate", 0):.1f}% to {current_win_rate:.1f}% win rate'
+                })
+                # Don't add to updated_exclusions - catalyst is being reinstated
+            else:
+                # Keep the exclusion but update stats
+                excl['current_win_rate'] = current_win_rate
+                excl['current_trades'] = current_trades
+                excl['last_review_date'] = datetime.now().strftime('%Y-%m-%d')
+                updated_exclusions.append(excl)
+
+        # Save updated exclusions (without reinstated catalysts)
+        if reinstatements:
+            with open(self.exclusions_file, 'w') as f:
+                json.dump({
+                    'excluded_catalysts': updated_exclusions,
+                    'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'last_sunset_review': datetime.now().strftime('%Y-%m-%d'),
+                    'note': 'These catalysts have been automatically excluded by the learning engine'
+                }, f, indent=2)
+
+        return reinstatements
+
+    def calculate_statistical_significance(self, wins, total, baseline_rate=0.50):
+        """
+        Calculate if a win rate is statistically significantly different from baseline.
+
+        Uses z-test approximation for proportions.
+        Returns True if result is unlikely due to chance alone.
+
+        Used for:
+        - Exclusion decisions (require statistically significant underperformance)
+        - Reinstatement decisions (require statistically significant improvement)
+        """
+        import math
+
+        if total < 5:
+            return {
+                'is_significant': False,
+                'confidence_level': 'Low',
+                'reason': 'Insufficient sample size (<5 trades)'
+            }
+
+        observed_rate = wins / total
+        se = math.sqrt(baseline_rate * (1 - baseline_rate) / total)
+
+        if se == 0:
+            return {'is_significant': False, 'confidence_level': 'Low', 'reason': 'Zero SE'}
+
+        z = (observed_rate - baseline_rate) / se
+        abs_z = abs(z)
+
+        # P-value thresholds
+        if abs_z > 2.58:
+            p_value = 0.01
+            confidence_level = 'High'
+        elif abs_z > 1.96:
+            p_value = 0.05
+            confidence_level = 'Medium'
+        else:
+            p_value = 0.5
+            confidence_level = 'Low'
+
+        return {
+            'is_significant': p_value < 0.05,
+            'z_score': z,
+            'confidence_level': confidence_level,
+            'observed_rate': observed_rate
+        }
     
     def update_exclusions_file(self, exclusions):
         """Update the catalyst exclusions JSON file"""
@@ -285,8 +427,8 @@ class DailyLearning:
         
         print(f"   ✓ Updated strategy_rules.md with {len(exclusions)} exclusions")
     
-    def append_learning_insights(self, all_time_stats, exclusions, warnings, recent_stats=None):
-        """Append insights to lessons_learned.md (PHASE 5 ENHANCED)"""
+    def append_learning_insights(self, all_time_stats, exclusions, warnings, recent_stats=None, reinstatements=None):
+        """Append insights to lessons_learned.md (PHASE 5 ENHANCED + Sunset Review Jan 2026)"""
 
         insights = []
         insights.append(f"\n\n{'='*80}\n")
@@ -296,6 +438,16 @@ class DailyLearning:
             insights.append("## 🚫 NEW EXCLUSIONS\n\n")
             for ex in exclusions:
                 insights.append(f"- **{ex['catalyst']}** excluded: {ex['win_rate']:.1f}% win rate over {ex['total_trades']} trades\n")
+
+        # Sunset Review: Document reinstatements (Learning Enhancement Jan 2026)
+        if reinstatements:
+            insights.append("\n## 🔄 CATALYSTS REINSTATED (Sunset Review)\n\n")
+            for r in reinstatements:
+                insights.append(
+                    f"- **{r['catalyst']}** reinstated after {r['days_excluded']} days: "
+                    f"Improved from {r['original_win_rate']:.1f}% to {r['current_win_rate']:.1f}% "
+                    f"({r['trades_since_exclusion']} new trades)\n"
+                )
 
         if warnings:
             insights.append("\n## ⚠️ PERFORMANCE WARNINGS\n\n")
@@ -384,37 +536,55 @@ class DailyLearning:
         # Identify warnings
         print("5. Checking for performance warnings...")
         warnings = self.identify_warning_catalysts(recent_stats, all_time_stats)
-        
+
         if warnings:
             print(f"   ⚠ {len(warnings)} catalysts showing concerning trends")
         else:
             print("   ✓ No immediate concerns")
         print()
-        
+
+        # Sunset Review: Re-evaluate old exclusions (Learning Enhancement Jan 2026)
+        print("6. Running sunset review for old exclusions...")
+        reinstatements = self.sunset_review_exclusions(all_time_stats)
+
+        if reinstatements:
+            print(f"   🔄 {len(reinstatements)} catalysts eligible for reinstatement:")
+            for r in reinstatements:
+                print(f"      - {r['catalyst']}: Improved from {r['original_win_rate']:.1f}% to {r['current_win_rate']:.1f}%")
+        else:
+            print("   ✓ No catalysts eligible for reinstatement")
+        print()
+
         # Update files
-        print("6. Updating strategy files...")
+        print("7. Updating strategy files...")
         self.update_exclusions_file(exclusions)
         self.update_strategy_rules(exclusions)
         print()
-        
-        # Append insights (PHASE 5: pass recent_stats)
-        print("7. Documenting learning insights...")
-        self.append_learning_insights(all_time_stats, exclusions, warnings, recent_stats)
+
+        # Append insights (PHASE 5: pass recent_stats + reinstatements)
+        print("8. Documenting learning insights...")
+        self.append_learning_insights(all_time_stats, exclusions, warnings, recent_stats, reinstatements)
         print()
-        
+
         # Summary
         print("="*60)
         print("DAILY LEARNING COMPLETE")
         print("="*60)
         print(f"\nTotal trades analyzed: {len(trades)}")
-        print(f"Catalysts excluded: {len(exclusions)}")
+        print(f"New catalysts excluded: {len(exclusions)}")
+        print(f"Catalysts reinstated: {len(reinstatements)}")
         print(f"Performance warnings: {len(warnings)}")
-        
+
         if exclusions:
             print("\n⚠️ STRATEGY UPDATED: The following catalysts are now excluded:")
             for ex in exclusions:
                 print(f"   - {ex['catalyst']}")
-        
+
+        if reinstatements:
+            print("\n🔄 STRATEGY UPDATED: The following catalysts have been reinstated:")
+            for r in reinstatements:
+                print(f"   - {r['catalyst']} ({r['reason']})")
+
         print("\n" + "="*60 + "\n")
 
 def main():
