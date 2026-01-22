@@ -5877,6 +5877,31 @@ RECENT LESSONS LEARNED:
             sector_rotation = screener_data.get('sector_rotation', {})
             leading_sectors = sector_rotation.get('leading_sectors', [])
             print(f"   ℹ️  Loaded screener data: {len(screener_lookup)} candidates, Leading sectors: {', '.join(leading_sectors) if leading_sectors else 'None'}")
+
+            # Track ALL top 15 candidates shown to Claude - mark PASSed ones as REJECTED
+            # This ensures daily_picks shows the full picture of what Claude analyzed
+            candidates_shown_to_claude = screener_data.get('candidates', [])[:15]
+            buy_tickers_from_claude = set(bp.get('ticker') for bp in original_buy_positions)
+
+            for candidate in candidates_shown_to_claude:
+                ticker = candidate.get('ticker', '')
+                if ticker and ticker not in buy_tickers_from_claude:
+                    # Claude PASSed on this candidate - track as REJECTED
+                    all_picks.append({
+                        'ticker': ticker,
+                        'status': 'REJECTED',
+                        'conviction': 'PASS',
+                        'position_size_pct': 0,
+                        'catalyst': candidate.get('claude_analysis', {}).get('catalyst', 'Unknown'),
+                        'catalyst_tier': candidate.get('claude_analysis', {}).get('tier', 'Unknown'),
+                        'tier_name': f"Screener Validated - {candidate.get('claude_analysis', {}).get('tier', 'Unknown')}",
+                        'news_score': 0,
+                        'relative_strength': candidate.get('relative_strength', {}).get('stock_return_3m', 0),
+                        'vix': vix_result['vix'],
+                        'supporting_factors': 0,
+                        'reasoning': 'Claude PASS - Did not meet selection criteria',
+                        'rejection_reasons': ['Claude PASS - Not selected for entry']
+                    })
         else:
             print(f"   ⚠️  No screener data available - conviction scoring will use limited factors")
 
