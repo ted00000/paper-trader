@@ -55,28 +55,18 @@ function ScreeningDecisions() {
     )
   }
 
-  const getDecisionIcon = (decision) => {
-    switch (decision) {
-      case 'Selected':
-        return <CheckCircle size={18} className="text-profit" />
-      case 'On Hold':
-        return <Clock size={18} className="text-yellow-500" />
-      case 'Passed':
-      default:
-        return <XCircle size={18} className="text-tedbot-gray-500" />
+  const getDecisionIcon = (status) => {
+    if (status === 'ACCEPTED') {
+      return <CheckCircle size={18} className="text-profit" />
     }
+    return <XCircle size={18} className="text-loss" />
   }
 
-  const getDecisionColor = (decision) => {
-    switch (decision) {
-      case 'Selected':
-        return 'bg-profit/10 border-profit/30 text-profit'
-      case 'On Hold':
-        return 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500'
-      case 'Passed':
-      default:
-        return 'bg-tedbot-gray-800/30 border-tedbot-gray-800 text-tedbot-gray-400'
+  const getDecisionColor = (status) => {
+    if (status === 'ACCEPTED') {
+      return 'bg-profit/10 border-profit/30'
     }
+    return 'bg-loss/5 border-loss/20'
   }
 
   return (
@@ -96,32 +86,35 @@ function ScreeningDecisions() {
         )}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {data.decisions.map((item, index) => (
           <div
             key={index}
-            className={`p-4 rounded-lg border ${getDecisionColor(item.decision)}`}
+            className={`p-3 rounded-lg border ${getDecisionColor(item.status)}`}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <div className="mt-1">{getDecisionIcon(item.decision)}</div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-bold text-lg">{item.ticker}</span>
-                    <span className="text-xs px-2 py-1 bg-tedbot-darker rounded">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {getDecisionIcon(item.status)}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base">{item.ticker}</span>
+                    <span className="text-xs px-2 py-0.5 bg-tedbot-darker rounded">
                       Score: {item.score?.toFixed(1)}
                     </span>
+                    {item.tier && item.tier !== 'N/A' && (
+                      <span className="text-xs px-2 py-0.5 bg-tedbot-accent/20 text-tedbot-accent rounded">
+                        {item.tier}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-sm opacity-90">{item.reason}</p>
+                  <p className="text-xs text-tedbot-gray-400 mt-1">{item.reason}</p>
                 </div>
               </div>
-              <div className="ml-4">
+              <div className="ml-4 flex-shrink-0">
                 <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                  item.decision === 'Selected' ? 'bg-profit/20' :
-                  item.decision === 'On Hold' ? 'bg-yellow-500/20' :
-                  'bg-tedbot-gray-700'
+                  item.status === 'ACCEPTED' ? 'bg-profit/20 text-profit' : 'bg-loss/10 text-loss'
                 }`}>
-                  {item.decision}
+                  {item.status === 'ACCEPTED' ? item.decision : 'Rejected'}
                 </span>
               </div>
             </div>

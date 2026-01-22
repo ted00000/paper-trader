@@ -1130,7 +1130,7 @@ def get_screening_decisions():
                     score = float(score_match.group(1)) if score_match else size_pct * 10
 
                     # Extract RS from content
-                    rs_match = re.search(rf'{ticker}.*?\|\s*\*\*RS:\*\*\s*\+?([\d.-]+)%', content, re.DOTALL)
+                    rs_match = re.search(rf'{ticker}.*?\*\*RS:\*\*.*?([+-]?[\d.]+)%', content, re.DOTALL)
                     rs = float(rs_match.group(1)) if rs_match else 0
 
                     decisions.append({
@@ -1148,7 +1148,7 @@ def get_screening_decisions():
 
         # Parse PASS decisions with detailed analysis
         # Pattern: ### N. **TICKER (Sector) - PASS**
-        pass_pattern = r'### \d+\.\s*\*\*(\w+)\s*\(([^)]+)\)\s*-\s*PASS'
+        pass_pattern = r'####? \*\*\d+\. ([A-Z]+) \(([^)]+)\) - Score [\d.]+ - PASS'
         for match in re.finditer(pass_pattern, content):
             ticker = match.group(1)
             sector = match.group(2)
