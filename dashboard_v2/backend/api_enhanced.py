@@ -97,8 +97,8 @@ def load_account():
     """Load account status"""
     if not ACCOUNT_JSON.exists():
         return {
-            'account_value': 1000.00,
-            'cash_balance': 1000.00,
+            'account_value': 10000.00,
+            'cash_balance': 10000.00,
             'total_return_percent': 0.00,
             'total_return_dollars': 0.00
         }
@@ -107,7 +107,7 @@ def load_account():
         data = json.load(f)
     
     # Calculate total return percent from account value vs starting capital
-    starting_capital = 1000.00
+    starting_capital = 10000.00
     account_value = data.get('account_value', starting_capital)
     total_return_pct = ((account_value - starting_capital) / starting_capital) * 100
     # Calculate total return dollars
@@ -289,13 +289,13 @@ def get_overview():
         sharpe = 0
 
     # Max drawdown
-    equity_curve = [1000.00]  # Start with initial capital
-    cumulative = 1000.00
+    equity_curve = [10000.00]  # Start with initial capital
+    cumulative = 10000.00
     for t in reversed(trades):  # Chronological order
         cumulative += float(t.get('Return_Dollars', 0))
         equity_curve.append(cumulative)
 
-    peak = 1000.00  # Peak starts at initial capital
+    peak = 10000.00  # Peak starts at initial capital
     max_dd = 0
     for value in equity_curve:
         if value > peak:
@@ -314,8 +314,8 @@ def get_overview():
     today_losses = sum(1 for r in today_returns if r < 0)
     return jsonify({
         'account': {
-            'value': account.get('account_value', 1000.00),
-            'cash': account.get('cash_balance', 1000.00),
+            'value': account.get('account_value', 10000.00),
+            'cash': account.get('cash_balance', 10000.00),
             'invested': account.get('positions_value', 0.00),
             'total_return_pct': account.get('total_return_percent', 0.00),
             'total_return_usd': account.get('total_return_dollars', 0.00)
@@ -407,13 +407,13 @@ def get_performance():
         sharpe_ratio = 0
 
     # Max drawdown
-    equity_curve = [1000.00]  # Start with initial capital
-    cumulative = 1000.00
+    equity_curve = [10000.00]  # Start with initial capital
+    cumulative = 10000.00
     for t in reversed(trades):  # Chronological order
         cumulative += float(t.get('Return_Dollars', 0))
         equity_curve.append(cumulative)
 
-    peak = 1000.00  # Peak starts at initial capital
+    peak = 10000.00  # Peak starts at initial capital
     max_drawdown = 0
     for value in equity_curve:
         if value > peak:
@@ -470,8 +470,8 @@ def get_equity_curve():
 
     # Build equity curve
     equity_points = []
-    cumulative = 1000.00
-    peak = 1000.00
+    cumulative = 10000.00
+    peak = 10000.00
 
     # Sort chronologically
     trades.sort(key=lambda x: x.get('Exit_Date', ''))
@@ -480,7 +480,7 @@ def get_equity_curve():
         cumulative += float(trade.get('Return_Dollars', 0))
 
         if cumulative > peak:
-            peak = 1000.00  # Peak starts at initial capital
+            peak = 10000.00  # Peak starts at initial capital
 
         drawdown_pct = ((peak - cumulative) / peak) * 100 if peak > 0 else 0
 
@@ -493,7 +493,7 @@ def get_equity_curve():
 
     return jsonify({
         'equity_curve': equity_points,
-        'starting_value': 1000.00,
+        'starting_value': 10000.00,
         'current_value': round(cumulative, 2),
         'total_return_pct': round(((cumulative - 1000) / 1000) * 100, 2)
     })
@@ -1047,16 +1047,12 @@ def get_operation_log(operation):
 @app.route('/api/v2/screening-decisions', methods=['GET'])
 def get_screening_decisions():
     """
-    Get today screening decisions from GO log
-    Returns all stocks analyzed (ENTER and REJECTED) with their details
+    Get today's screening decisions from daily_picks.json
+    Returns structured data about stocks analyzed and decisions made
     """
-    import re
+    daily_picks_file = PROJECT_DIR / 'dashboard_data' / 'daily_picks.json'
 
-    # Find most recent GO log
-    daily_reviews_dir = PROJECT_DIR / 'daily_reviews'
-    go_files = sorted(daily_reviews_dir.glob('go_*.json'), reverse=True)
-
-    if not go_files:
+    if not daily_picks_file.exists():
         return jsonify({
             'decisions': [],
             'summary': 'No screening data available - run GO command',
@@ -1065,155 +1061,73 @@ def get_screening_decisions():
             'total_reviewed': 0
         })
 
-    latest_go = go_files[0]
-
     try:
-        with open(latest_go) as f:
-            data = json.load(f)
+        with open(daily_picks_file) as f:
+            picks_data = json.load(f)
 
-        content = data.get('content', [{}])[0].get('text', '')
-
-        # Extract date from filename (go_YYYYMMDD_HHMMSS.json)
-        filename = latest_go.name
-        date_match = re.search(r'go_(\d{8})_(\d{6})', filename)
-        if date_match:
-            file_date = date_match.group(1)
-            file_time = date_match.group(2)
-            data_date = f'{file_date[:4]}-{file_date[4:6]}-{file_date[6:8]}'
-            data_time = f'{file_time[:2]}:{file_time[2:4]}:{file_time[4:6]}'
-            timestamp = f'{data_time} ET'
-        else:
-            data_date = ''
-            timestamp = ''
-
+        # Check if data is from today
+        data_date = picks_data.get('date', '')
         today = datetime.now().strftime('%Y-%m-%d')
         is_today = (data_date == today)
 
+        # Build decisions list from picks
         decisions = []
+        for pick in picks_data.get('picks', []):
+            decision_status = pick.get('status', 'UNKNOWN')
 
-        # Load screener data for scores (used as fallback for all stocks)
-        screener_file = PROJECT_DIR / 'screener_candidates.json'
-        screener_scores = {}
-        if screener_file.exists():
-            try:
-                with open(screener_file) as f:
-                    screener_data = json.load(f)
-                for c in screener_data.get('candidates', []):
-                    t = c.get('ticker')
-                    screener_scores[t] = {
-                        'score': c.get('composite_score', 0),
-                        'rs': c.get('relative_strength', {}).get('rs_pct', 0),
-                        'sector': c.get('sector', 'Unknown')
-                    }
-            except:
-                pass
+            # Map to display-friendly format
+            if decision_status == 'ACCEPTED':
+                if pick.get('position_size_pct', 0) == 0:
+                    decision = 'Accepted (Low Conviction - 0% size)'
+                else:
+                    decision = f"✓ Accepted ({pick.get('conviction', 'MEDIUM')} conviction)"
+            else:
+                decision = f"✗ Rejected"
 
-        # Parse BUY decisions from JSON block
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
-        if json_match:
-            try:
-                decisions_json = json.loads(json_match.group(1))
-                for b in decisions_json.get('buy', []):
-                    ticker = b.get('ticker', '')
-                    catalyst = b.get('catalyst', 'Unknown')
-                    confidence = b.get('confidence_level', 'MEDIUM')
-                    size_pct = b.get('position_size_pct', 0)
+            # Build reason string
+            reason_parts = []
+            if pick.get('catalyst'):
+                reason_parts.append(f"Catalyst: {pick['catalyst']}")
+            if pick.get('catalyst_tier'):
+                reason_parts.append(f"Tier: {pick['catalyst_tier']}")
+            if pick.get('relative_strength'):
+                reason_parts.append(f"RS: {pick['relative_strength']:.1f}%")
+            if pick.get('rejection_reasons'):
+                reason_parts.extend(pick['rejection_reasons'])
 
-                    # Determine display decision
-                    if size_pct == 0:
-                        decision = 'Accepted (Low Conviction - 0% size)'
-                    else:
-                        decision = f'Accepted ({confidence} conviction)'
-
-                    # Extract score from content - look for "Score:** XX.X"
-                    score_match = re.search(rf'\*\*{ticker}.*?Score:\*\*\s*([\d.]+)', content, re.DOTALL)
-                    score = float(score_match.group(1)) if score_match else size_pct * 10
-
-                    # Extract RS from content
-                    rs_match = re.search(rf'{ticker}.*?\*\*RS:\*\*.*?([+-]?[\d.]+)%', content, re.DOTALL)
-                    rs = float(rs_match.group(1)) if rs_match else 0
-
-                    decisions.append({
-                        'ticker': ticker,
-                        'decision': decision,
-                        'status': 'ACCEPTED',
-                        'reason': f'Catalyst: {catalyst} | Tier: Tier1 | RS: {rs:.1f}%',
-                        'score': score,
-                        'conviction': confidence,
-                        'size_pct': size_pct,
-                        'tier': 'Tier1' if size_pct >= 8 else 'Tier2'
-                    })
-            except json.JSONDecodeError:
-                pass
-
-        # Parse PASS decisions with detailed analysis
-        # Pattern: ### N. **TICKER (Sector) - PASS**
-        pass_pattern = r'####? \*\*\d+\. ([A-Z]+) \(([^)]+)\) - Score [\d.]+ - PASS'
-        for match in re.finditer(pass_pattern, content):
-            ticker = match.group(1)
-            sector = match.group(2)
-
-            # Extract score - look for "Score:** XX.X" pattern
-            score_match = re.search(rf'\*\*{ticker}.*?Score:\*\*\s*([\d.]+)', content, re.DOTALL)
-            score = float(score_match.group(1)) if score_match else 0
-
-            # Get RS from screener (more reliable than parsing Claude's text)
-            screener_info = screener_scores.get(ticker, {})
-            rs = screener_info.get('rs', 0)
+            reason = ' | '.join(reason_parts) if reason_parts else pick.get('reasoning', 'See full analysis')
 
             decisions.append({
-                'ticker': ticker,
-                'decision': 'Rejected',
-                'status': 'REJECTED',
-                'reason': f'Sector: {sector} | RS: {rs:.1f}%',
-                'score': score,
-                'conviction': 'SKIP',
-                'size_pct': 0,
-                'tier': 'N/A'
+                'ticker': pick.get('ticker'),
+                'decision': decision,
+                'status': decision_status,
+                'reason': reason,
+                'score': pick.get('relative_strength', 0),
+                'conviction': pick.get('conviction', 'UNKNOWN'),
+                'size_pct': pick.get('position_size_pct', 0),
+                'tier': pick.get('catalyst_tier', 'Unknown')
             })
 
-        # Parse "Other Candidates" brief rejects - get scores from screener
-        other_match = re.search(r'\*\*Other Candidates \(([^)]+)\).*?PASS', content)
-        if other_match:
-            other_tickers = [t.strip() for t in other_match.group(1).split(',')]
-            for ticker in other_tickers:
-                screener_info = screener_scores.get(ticker, {})
-                score = screener_info.get('score', 0)
-                rs = screener_info.get('rs', 0)
-                sector = screener_info.get('sector', 'Unknown')
-
-                decisions.append({
-                    'ticker': ticker,
-                    'decision': 'Rejected',
-                    'status': 'REJECTED',
-                    'reason': f'Sector: {sector} | RS: {rs:.1f}%',
-                    'score': score,
-                    'conviction': 'SKIP',
-                    'size_pct': 0,
-                    'tier': 'N/A'
-                })
-
-        # Sort: Accepted first, then by score descending
-        decisions.sort(key=lambda x: (0 if x['status'] == 'ACCEPTED' else 1, -x['score']))
-
         # Build summary
-        accepted = sum(1 for d in decisions if d['status'] == 'ACCEPTED')
-        rejected = sum(1 for d in decisions if d['status'] == 'REJECTED')
-        total = len(decisions)
+        summary_data = picks_data.get('summary', {})
+        total = summary_data.get('total_analyzed', 0)
+        accepted = summary_data.get('accepted', 0)
+        rejected = summary_data.get('rejected', 0)
 
         if total == 0:
-            summary = 'No stocks analyzed yet'
+            summary = "No stocks analyzed yet"
         elif accepted == 0:
-            summary = f'Analyzed {total} stocks - None met criteria'
+            summary = f"Analyzed {total} stocks - None met criteria"
         else:
-            summary = f'Analyzed {total} stocks - {accepted} accepted, {rejected} rejected'
+            summary = f"Analyzed {total} stocks - {accepted} accepted, {rejected} rejected"
 
         return jsonify({
             'decisions': decisions,
             'summary': summary,
-            'timestamp': timestamp,
+            'timestamp': picks_data.get('time', ''),
             'is_today': is_today,
-            'total_reviewed': total
+            'total_reviewed': total,
+            'market_conditions': picks_data.get('market_conditions', {})
         })
 
     except Exception as e:
@@ -1225,7 +1139,6 @@ def get_screening_decisions():
             'is_today': False,
             'total_reviewed': 0
         }), 500
-
 @app.route('/api/v2/health', methods=['GET'])
 def health_check():
     """API health check"""

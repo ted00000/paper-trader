@@ -1474,9 +1474,14 @@ POSITION {i}: {ticker}
 
         # Fallback to JSON file (original behavior)
         if self.portfolio_file.exists():
-            with open(self.portfolio_file, 'r') as f:
-                return json.load(f)
-        else:
+            try:
+                with open(self.portfolio_file, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, Exception) as e:
+                print(f"⚠️  Corrupted portfolio JSON: {e}")
+                print("   Returning empty portfolio")
+
+        # Return empty portfolio structure
             # Return empty portfolio structure
             return {
                 'positions': [],
@@ -5638,7 +5643,8 @@ RECENT LESSONS LEARNED:
         # AI FAILOVER: Graceful degradation if Claude API fails
         try:
             response = self.call_claude_api('go', context, premarket_data)
-            response_text = response.get('content', [{}])[0].get('text', '')
+            content_blocks = response.get('content', [])
+            response_text = content_blocks[0].get('text', '') if content_blocks else ''
             print("   ✓ Response received\n")
         except Exception as e:
             # CRITICAL: Claude API failure - enter degraded mode
@@ -5881,7 +5887,7 @@ RECENT LESSONS LEARNED:
             # Track ALL top 15 candidates shown to Claude - mark PASSed ones as REJECTED
             # This ensures daily_picks shows the full picture of what Claude analyzed
             candidates_shown_to_claude = screener_data.get('candidates', [])[:15]
-            buy_tickers_from_claude = set(bp.get('ticker') for bp in original_buy_positions)
+            buy_tickers_from_claude = set(bp.get('ticker') for bp in original_buy_positions if bp.get('ticker'))
 
             for candidate in candidates_shown_to_claude:
                 ticker = candidate.get('ticker', '')
@@ -6646,7 +6652,10 @@ RECENT LESSONS LEARNED:
                 ticker = pos['ticker']
                 if ticker in market_prices:
                     entry_price = market_prices[ticker]
-                    previous_close = previous_closes.get(ticker, entry_price * 0.98)  # Fallback estimate
+                    if not entry_price or entry_price <= 0:
+                        print(f"   ⚠️ SKIPPED {ticker}: Invalid entry price ({entry_price})")
+                        continue
+                    previous_close = previous_closes.get(ticker) or (entry_price * 0.98)  # Fallback estimate
 
                     # v7.0: Check bid-ask spread to prevent expensive execution
                     spread_check = self.check_bid_ask_spread(ticker)
