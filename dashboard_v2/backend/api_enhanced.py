@@ -1081,6 +1081,8 @@ def get_screening_decisions():
                     decision = 'Accepted (Low Conviction - 0% size)'
                 else:
                     decision = f"✓ Accepted ({pick.get('conviction', 'MEDIUM')} conviction)"
+            elif decision_status == 'SKIPPED':
+                decision = f"⏸ Skipped (Portfolio Full)"
             else:
                 decision = f"✗ Rejected"
 
@@ -1113,11 +1115,16 @@ def get_screening_decisions():
         total = summary_data.get('total_analyzed', 0)
         accepted = summary_data.get('accepted', 0)
         rejected = summary_data.get('rejected', 0)
+        skipped = summary_data.get('skipped', 0)
 
         if total == 0:
             summary = "No stocks analyzed yet"
+        elif skipped > 0 and accepted == 0 and rejected == 0:
+            summary = f"Portfolio full ({skipped} candidates not evaluated)"
         elif accepted == 0:
             summary = f"Analyzed {total} stocks - None met criteria"
+        elif skipped > 0:
+            summary = f"Analyzed {total} stocks - {accepted} accepted, {rejected} rejected, {skipped} skipped"
         else:
             summary = f"Analyzed {total} stocks - {accepted} accepted, {rejected} rejected"
 

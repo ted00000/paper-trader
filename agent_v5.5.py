@@ -1435,25 +1435,59 @@ POSITION {i}: {ticker}
                         'portfolio_status': 'Empty - No active positions'
                     }
 
-                # Convert Alpaca positions to Tedbot format
+                # Load supplementary metadata from JSON file (entry_date, catalyst, thesis, etc.)
+                json_metadata = {}
+                if self.portfolio_file.exists():
+                    try:
+                        with open(self.portfolio_file, 'r') as f:
+                            json_portfolio = json.load(f)
+                            for pos in json_portfolio.get('positions', []):
+                                ticker = pos.get('ticker')
+                                if ticker:
+                                    json_metadata[ticker] = pos
+                    except (json.JSONDecodeError, Exception):
+                        pass  # Ignore JSON errors, use Alpaca defaults
+
+                # Convert Alpaca positions to Tedbot format, merging with JSON metadata
                 portfolio_positions = []
                 for pos in positions:
+                    ticker = pos.symbol
+                    metadata = json_metadata.get(ticker, {})
+
+                    # Calculate days held from stored entry_date
+                    entry_date_str = metadata.get('entry_date', datetime.now().isoformat())
+                    try:
+                        entry_dt = datetime.fromisoformat(entry_date_str.replace('Z', '+00:00'))
+                        if entry_dt.tzinfo:
+                            entry_dt = entry_dt.replace(tzinfo=None)
+                        days_held = (datetime.now() - entry_dt).days
+                    except:
+                        days_held = 0
+
                     portfolio_positions.append({
-                        'ticker': pos.symbol,
+                        'ticker': ticker,
                         'shares': float(pos.qty),
                         'entry_price': float(pos.avg_entry_price),
                         'current_price': float(pos.current_price),
                         'position_size': float(pos.market_value),
-                        'days_held': 0,  # Will be calculated from entry_date if stored
+                        'days_held': days_held,
                         'unrealized_gain_pct': float(pos.unrealized_plpc) * 100,
                         'unrealized_gain_dollars': float(pos.unrealized_pl),
-                        # Note: Alpaca doesn't store these - we'll need to track separately
-                        # or load from JSON as supplementary data
-                        'catalyst': 'Unknown (loaded from Alpaca)',
-                        'thesis': 'Position tracking from Alpaca',
-                        'stop_loss': float(pos.avg_entry_price) * 0.93,  # Default 7% stop
-                        'price_target': float(pos.avg_entry_price) * 1.10,  # Default 10% target
-                        'entry_date': datetime.now().isoformat(),  # Placeholder
+                        # Merge from JSON metadata (preserves original entry data)
+                        'catalyst': metadata.get('catalyst', 'Unknown'),
+                        'thesis': metadata.get('thesis', 'Position tracking'),
+                        'stop_loss': metadata.get('stop_loss', float(pos.avg_entry_price) * 0.93),
+                        'price_target': metadata.get('price_target', float(pos.avg_entry_price) * 1.10),
+                        'entry_date': entry_date_str,
+                        # Preserve additional metadata if available
+                        'catalyst_tier': metadata.get('catalyst_tier'),
+                        'tier_name': metadata.get('tier_name'),
+                        'conviction_level': metadata.get('conviction_level'),
+                        'news_score': metadata.get('news_score'),
+                        'relative_strength': metadata.get('relative_strength'),
+                        'rs_rating': metadata.get('rs_rating'),
+                        'vix_at_entry': metadata.get('vix_at_entry'),
+                        'market_regime': metadata.get('market_regime'),
                     })
 
                 account = self.broker.get_account()
@@ -1464,7 +1498,7 @@ POSITION {i}: {ticker}
                     'portfolio_value': float(account.equity),
                     'cash_balance': float(account.cash),
                     'last_updated': datetime.now().isoformat(),
-                    'portfolio_status': f'{len(portfolio_positions)} active positions (loaded from Alpaca)'
+                    'portfolio_status': f'{len(portfolio_positions)} active positions'
                 }
 
             except Exception as e:
@@ -5884,30 +5918,59 @@ RECENT LESSONS LEARNED:
             leading_sectors = sector_rotation.get('leading_sectors', [])
             print(f"   ℹ️  Loaded screener data: {len(screener_lookup)} candidates, Leading sectors: {', '.join(leading_sectors) if leading_sectors else 'None'}")
 
-            # Track ALL top 15 candidates shown to Claude - mark PASSed ones as REJECTED
-            # This ensures daily_picks shows the full picture of what Claude analyzed
-            candidates_shown_to_claude = screener_data.get('candidates', [])[:15]
-            buy_tickers_from_claude = set(bp.get('ticker') for bp in original_buy_positions if bp.get('ticker'))
+            # Check if Claude was actually shown candidates (only happens when there are vacant slots)
+            # If portfolio was full, Claude wasn't asked about new entries
+            portfolio = self.load_current_portfolio()
+            current_position_count = portfolio.get('total_positions', 0)
+            vacant_slots = 10 - current_position_count
 
-            for candidate in candidates_shown_to_claude:
-                ticker = candidate.get('ticker', '')
-                if ticker and ticker not in buy_tickers_from_claude:
-                    # Claude PASSed on this candidate - track as REJECTED
-                    all_picks.append({
-                        'ticker': ticker,
-                        'status': 'REJECTED',
-                        'conviction': 'PASS',
-                        'position_size_pct': 0,
-                        'catalyst': candidate.get('claude_catalyst', {}).get('catalyst_type', 'Unknown'),
-                        'catalyst_tier': candidate.get('claude_catalyst', {}).get('tier', 'Unknown'),
-                        'tier_name': f"Screener Validated - {candidate.get('claude_catalyst', {}).get('tier', 'Unknown')}",
-                        'news_score': 0,
-                        'relative_strength': candidate.get('relative_strength', {}).get('stock_return_3m', 0),
-                        'vix': vix_result['vix'],
-                        'supporting_factors': 0,
-                        'reasoning': 'Claude PASS - Did not meet selection criteria',
-                        'rejection_reasons': ['Claude PASS - Not selected for entry']
-                    })
+            if vacant_slots > 0:
+                # Claude WAS shown candidates - mark PASSed ones as REJECTED
+                candidates_shown_to_claude = screener_data.get('candidates', [])[:15]
+                buy_tickers_from_claude = set(bp.get('ticker') for bp in original_buy_positions if bp.get('ticker'))
+
+                for candidate in candidates_shown_to_claude:
+                    ticker = candidate.get('ticker', '')
+                    if ticker and ticker not in buy_tickers_from_claude:
+                        # Claude PASSed on this candidate - track as REJECTED
+                        all_picks.append({
+                            'ticker': ticker,
+                            'status': 'REJECTED',
+                            'conviction': 'PASS',
+                            'position_size_pct': 0,
+                            'catalyst': candidate.get('claude_catalyst', {}).get('catalyst_type', 'Unknown'),
+                            'catalyst_tier': candidate.get('claude_catalyst', {}).get('tier', 'Unknown'),
+                            'tier_name': f"Screener Validated - {candidate.get('claude_catalyst', {}).get('tier', 'Unknown')}",
+                            'news_score': 0,
+                            'relative_strength': candidate.get('relative_strength', {}).get('stock_return_3m', 0),
+                            'vix': vix_result['vix'],
+                            'supporting_factors': 0,
+                            'reasoning': 'Claude PASS - Did not meet selection criteria',
+                            'rejection_reasons': ['Claude PASS - Not selected for entry']
+                        })
+            else:
+                # Portfolio was FULL - Claude wasn't asked about new entries
+                # Mark candidates as SKIPPED (not evaluated), not REJECTED
+                print(f"   ℹ️  Portfolio full ({current_position_count}/10) - candidates not shown to Claude")
+                candidates_not_evaluated = screener_data.get('candidates', [])[:15]
+                for candidate in candidates_not_evaluated:
+                    ticker = candidate.get('ticker', '')
+                    if ticker:
+                        all_picks.append({
+                            'ticker': ticker,
+                            'status': 'SKIPPED',
+                            'conviction': 'N/A',
+                            'position_size_pct': 0,
+                            'catalyst': candidate.get('claude_catalyst', {}).get('catalyst_type', 'Unknown'),
+                            'catalyst_tier': candidate.get('claude_catalyst', {}).get('tier', 'Unknown'),
+                            'tier_name': f"Screener Validated - {candidate.get('claude_catalyst', {}).get('tier', 'Unknown')}",
+                            'news_score': 0,
+                            'relative_strength': candidate.get('relative_strength', {}).get('stock_return_3m', 0),
+                            'vix': vix_result['vix'],
+                            'supporting_factors': 0,
+                            'reasoning': 'Portfolio full - not evaluated',
+                            'rejection_reasons': ['Portfolio full (10/10) - not shown to Claude']
+                        })
         else:
             print(f"   ⚠️  No screener data available - conviction scoring will use limited factors")
 
@@ -6850,9 +6913,10 @@ RECENT LESSONS LEARNED:
         et_tz = pytz.timezone('America/New_York')
         today = datetime.now(et_tz).strftime('%Y-%m-%d')
 
-        # Sort picks: ACCEPTED first (by conviction), then REJECTED
+        # Sort picks: ACCEPTED first (by conviction), then REJECTED, then SKIPPED
         accepted = [p for p in all_picks if p['status'] == 'ACCEPTED']
         rejected = [p for p in all_picks if p['status'] == 'REJECTED']
+        skipped = [p for p in all_picks if p['status'] == 'SKIPPED']
 
         # Sort accepted by conviction level (HIGH > MEDIUM-HIGH > MEDIUM)
         conviction_order = {'HIGH': 3, 'MEDIUM-HIGH': 2, 'MEDIUM': 1, 'SKIP': 0, 'N/A': 0}
@@ -6869,6 +6933,12 @@ RECENT LESSONS LEARNED:
             x['news_score']
         ), reverse=True)
 
+        # Sort skipped by tier (for visibility)
+        skipped_sorted = sorted(skipped, key=lambda x: (
+            tier_order.get(x['catalyst_tier'], 0),
+            x['relative_strength']
+        ), reverse=True)
+
         daily_picks = {
             'date': today,
             'time': datetime.now(et_tz).strftime('%H:%M:%S ET'),
@@ -6882,11 +6952,12 @@ RECENT LESSONS LEARNED:
                 'total_analyzed': len(all_picks),
                 'accepted': len(accepted),
                 'rejected': len(rejected),
+                'skipped': len(skipped),
                 'high_conviction': len([p for p in accepted if p['conviction'] == 'HIGH']),
                 'medium_high_conviction': len([p for p in accepted if p['conviction'] == 'MEDIUM-HIGH']),
                 'medium_conviction': len([p for p in accepted if p['conviction'] == 'MEDIUM'])
             },
-            'picks': accepted_sorted + rejected_sorted
+            'picks': accepted_sorted + rejected_sorted + skipped_sorted
         }
 
         # Save to dashboard_data directory
@@ -6896,7 +6967,7 @@ RECENT LESSONS LEARNED:
         with open(daily_picks_file, 'w') as f:
             json.dump(daily_picks, f, indent=2)
 
-        print(f"   ✓ Saved daily picks: {len(accepted)} accepted, {len(rejected)} rejected")
+        print(f"   ✓ Saved daily picks: {len(accepted)} accepted, {len(rejected)} rejected, {len(skipped)} skipped (portfolio full)")
 
     def create_daily_activity_summary(self, closed_trades):
         """
