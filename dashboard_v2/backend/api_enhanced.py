@@ -1135,13 +1135,36 @@ def get_screening_decisions():
         else:
             summary = f"Analyzed {total} stocks - {accepted} accepted, {rejected} rejected"
 
+        # Load today's trades from daily_activity.json
+        todays_trades = []
+        daily_activity_file = PROJECT_DIR / 'dashboard_data' / 'daily_activity.json'
+        if daily_activity_file.exists():
+            try:
+                with open(daily_activity_file) as f:
+                    activity_data = json.load(f)
+                    if activity_data.get('date') == today:
+                        for trade in activity_data.get('closed_today', []):
+                            todays_trades.append({
+                                'time': activity_data.get('time', ''),
+                                'ticker': trade.get('ticker'),
+                                'action': 'SELL',
+                                'price': trade.get('exit_price'),
+                                'shares': trade.get('shares'),
+                                'pnl': trade.get('return_dollars'),
+                                'pnl_pct': trade.get('return_percent'),
+                                'reason': trade.get('exit_reason')
+                            })
+            except Exception:
+                pass  # Ignore errors reading activity file
+
         return jsonify({
             'decisions': decisions,
             'summary': summary,
             'timestamp': picks_data.get('time', ''),
             'is_today': is_today,
             'total_reviewed': total,
-            'market_conditions': picks_data.get('market_conditions', {})
+            'market_conditions': picks_data.get('market_conditions', {}),
+            'todays_trades': todays_trades
         })
 
     except Exception as e:
