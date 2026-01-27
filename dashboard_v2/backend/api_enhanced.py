@@ -270,19 +270,21 @@ def get_overview():
     avg_gain = sum(winning_returns) / len(winning_returns) if winning_returns else 0
     avg_loss = sum(losing_returns) / len(losing_returns) if losing_returns else 0
 
-    # Calculate YTD and MTD returns
+    # Calculate YTD and MTD returns (portfolio-weighted: dollars / starting capital)
     from datetime import datetime
     current_year = datetime.now().year
     current_month = datetime.now().month
 
+    # YTD: sum Return_Dollars / starting capital = portfolio impact %
     ytd_trades = [t for t in trades if t.get('Exit_Date', '').startswith(str(current_year))]
-    ytd_returns = [float(t.get('Return_Percent', 0)) for t in ytd_trades]
-    ytd_return = sum(ytd_returns) if ytd_returns else 0
+    ytd_dollars = sum(float(t.get('Return_Dollars', 0)) for t in ytd_trades)
+    ytd_return = (ytd_dollars / STARTING_CAPITAL) * 100 if ytd_trades else 0
 
+    # MTD: same approach
     current_month_str = f"{current_year}-{current_month:02d}"
     mtd_trades = [t for t in trades if t.get('Exit_Date', '').startswith(current_month_str)]
-    mtd_returns = [float(t.get('Return_Percent', 0)) for t in mtd_trades]
-    mtd_return = sum(mtd_returns) if mtd_returns else 0
+    mtd_dollars = sum(float(t.get('Return_Dollars', 0)) for t in mtd_trades)
+    mtd_return = (mtd_dollars / STARTING_CAPITAL) * 100 if mtd_trades else 0
 
     # Calculate Sharpe ratio (simplified)
     import numpy as np
@@ -388,19 +390,21 @@ def get_performance():
     avg_gain = sum(winning_returns) / len(winning_returns) if winning_returns else 0
     avg_loss = sum(losing_returns) / len(losing_returns) if losing_returns else 0
 
-    # Calculate YTD and MTD returns
+    # Calculate YTD and MTD returns (portfolio-weighted: dollars / starting capital)
     from datetime import datetime
     current_year = datetime.now().year
     current_month = datetime.now().month
 
+    # YTD: sum Return_Dollars / starting capital = portfolio impact %
     ytd_trades = [t for t in trades if t.get('Exit_Date', '').startswith(str(current_year))]
-    ytd_returns = [float(t.get('Return_Percent', 0)) for t in ytd_trades]
-    ytd_return = sum(ytd_returns) if ytd_returns else 0
+    ytd_dollars = sum(float(t.get('Return_Dollars', 0)) for t in ytd_trades)
+    ytd_return = (ytd_dollars / STARTING_CAPITAL) * 100 if ytd_trades else 0
 
+    # MTD: same approach
     current_month_str = f"{current_year}-{current_month:02d}"
     mtd_trades = [t for t in trades if t.get('Exit_Date', '').startswith(current_month_str)]
-    mtd_returns = [float(t.get('Return_Percent', 0)) for t in mtd_trades]
-    mtd_return = sum(mtd_returns) if mtd_returns else 0
+    mtd_dollars = sum(float(t.get('Return_Dollars', 0)) for t in mtd_trades)
+    mtd_return = (mtd_dollars / STARTING_CAPITAL) * 100 if mtd_trades else 0
 
     # Calculate Sharpe ratio (simplified)
     import numpy as np
