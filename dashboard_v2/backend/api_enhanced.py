@@ -24,6 +24,9 @@ PROJECT_DIR = Path(__file__).parent.parent.parent
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 
+# Portfolio configuration
+STARTING_CAPITAL = 10000.00  # Initial paper trading capital
+
 # Authentication credentials (in production, move to environment variables)
 VALID_USERNAME = os.getenv('DASHBOARD_USERNAME', 'tedbot')
 VALID_PASSWORD_HASH = hashlib.sha256(os.getenv('DASHBOARD_PASSWORD', 'tedbot2025').encode()).hexdigest()
@@ -97,8 +100,8 @@ def load_account():
     """Load account status"""
     if not ACCOUNT_JSON.exists():
         return {
-            'account_value': 10000.00,
-            'cash_balance': 10000.00,
+            'account_value': STARTING_CAPITAL,
+            'cash_balance': STARTING_CAPITAL,
             'total_return_percent': 0.00,
             'total_return_dollars': 0.00
         }
@@ -107,7 +110,7 @@ def load_account():
         data = json.load(f)
     
     # Calculate total return percent from account value vs starting capital
-    starting_capital = 10000.00
+    starting_capital = STARTING_CAPITAL
     account_value = data.get('account_value', starting_capital)
     total_return_pct = ((account_value - starting_capital) / starting_capital) * 100
     # Calculate total return dollars
@@ -289,13 +292,13 @@ def get_overview():
         sharpe = 0
 
     # Max drawdown
-    equity_curve = [10000.00]  # Start with initial capital
-    cumulative = 10000.00
+    equity_curve = [STARTING_CAPITAL]  # Start with initial capital
+    cumulative = STARTING_CAPITAL
     for t in reversed(trades):  # Chronological order
         cumulative += float(t.get('Return_Dollars', 0))
         equity_curve.append(cumulative)
 
-    peak = 10000.00  # Peak starts at initial capital
+    peak = STARTING_CAPITAL  # Peak starts at initial capital
     max_dd = 0
     for value in equity_curve:
         if value > peak:
@@ -314,8 +317,8 @@ def get_overview():
     today_losses = sum(1 for r in today_returns if r < 0)
     return jsonify({
         'account': {
-            'value': account.get('account_value', 10000.00),
-            'cash': account.get('cash_balance', 10000.00),
+            'value': account.get('account_value', STARTING_CAPITAL),
+            'cash': account.get('cash_balance', STARTING_CAPITAL),
             'invested': account.get('positions_value', 0.00),
             'total_return_pct': account.get('total_return_percent', 0.00),
             'total_return_usd': account.get('total_return_dollars', 0.00)
@@ -407,13 +410,13 @@ def get_performance():
         sharpe_ratio = 0
 
     # Max drawdown
-    equity_curve = [10000.00]  # Start with initial capital
-    cumulative = 10000.00
+    equity_curve = [STARTING_CAPITAL]  # Start with initial capital
+    cumulative = STARTING_CAPITAL
     for t in reversed(trades):  # Chronological order
         cumulative += float(t.get('Return_Dollars', 0))
         equity_curve.append(cumulative)
 
-    peak = 10000.00  # Peak starts at initial capital
+    peak = STARTING_CAPITAL  # Peak starts at initial capital
     max_drawdown = 0
     for value in equity_curve:
         if value > peak:
@@ -470,8 +473,8 @@ def get_equity_curve():
 
     # Build equity curve
     equity_points = []
-    cumulative = 10000.00
-    peak = 10000.00
+    cumulative = STARTING_CAPITAL
+    peak = STARTING_CAPITAL
 
     # Sort chronologically
     trades.sort(key=lambda x: x.get('Exit_Date', ''))
@@ -480,7 +483,7 @@ def get_equity_curve():
         cumulative += float(trade.get('Return_Dollars', 0))
 
         if cumulative > peak:
-            peak = 10000.00  # Peak starts at initial capital
+            peak = cumulative  # Update peak to new high
 
         drawdown_pct = ((peak - cumulative) / peak) * 100 if peak > 0 else 0
 
@@ -493,9 +496,9 @@ def get_equity_curve():
 
     return jsonify({
         'equity_curve': equity_points,
-        'starting_value': 10000.00,
+        'starting_value': STARTING_CAPITAL,
         'current_value': round(cumulative, 2),
-        'total_return_pct': round(((cumulative - 1000) / 1000) * 100, 2)
+        'total_return_pct': round(((cumulative - STARTING_CAPITAL) / STARTING_CAPITAL) * 100, 2)
     })
 
 @app.route('/api/v2/catalyst-performance', methods=['GET'])
