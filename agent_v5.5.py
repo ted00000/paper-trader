@@ -4325,6 +4325,23 @@ CRITICAL OUTPUT REQUIREMENT - JSON at end:
 
 DO NOT include entry_price, stop_loss, or price_target - system will calculate from real market prices.
 Every position must have position_size: 100.00 exactly."""
+        elif command == 'analyze':
+            # ANALYZE command - include date context so Claude knows what day it is
+            today_date = datetime.now().strftime('%A, %B %d, %Y')
+            current_time = datetime.now().strftime('%I:%M %p')
+            user_message = f"""ANALYZE - Performance Review
+
+Current Date: {today_date}
+Current Time: {current_time}
+
+Review the current portfolio and provide analysis on:
+1. Overall portfolio performance
+2. Individual position status (P&L, days held, thesis intact)
+3. Any positions that should be exited tomorrow (stop loss, target, catalyst invalid, time stop)
+4. Market conditions and outlook
+
+For any recommended exits, specify "Exit at market open tomorrow" with the actual next trading day.
+"""
         else:
             user_message = command
 
