@@ -76,7 +76,7 @@ function Today() {
               <h3 className="text-sm font-semibold text-tedbot-gray-400">Today's P&L</h3>
             </div>
             <p className={`text-2xl font-bold ${todayPnL >= 0 ? 'text-profit' : 'text-loss'}`}>
-              {todayPnL >= 0 ? '+' : ''}${Math.abs(todayPnL).toFixed(2)}
+              {todayPnL >= 0 ? '+' : '-'}${Math.abs(todayPnL).toFixed(2)}
             </p>
           </div>
 
