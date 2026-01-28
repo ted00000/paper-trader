@@ -557,7 +557,9 @@ def get_catalyst_performance():
         return [
             {
                 'name': name,
+                'catalyst': name,  # Alias for CatalystPerformanceChart
                 'total_trades': stats['total'],
+                'trade_count': stats['total'],  # Alias for CatalystPerformanceChart tooltip
                 'win_rate': round((stats['wins'] / stats['total']) * 100, 1) if stats['total'] > 0 else 0,
                 'avg_return': round(sum(stats['trades']) / len(stats['trades']), 2) if stats['trades'] else 0,
                 'total_return': round(sum(stats['trades']), 2)
@@ -646,35 +648,36 @@ def get_risk_positions():
 
 @app.route('/api/v2/analytics/monthly-returns', methods=['GET'])
 def get_monthly_returns():
-    """Monthly returns for calendar heatmap"""
+    """Monthly returns for calendar heatmap - formatted for frontend"""
     trades = load_trades()
 
-    monthly_returns = defaultdict(float)
+    # Collect returns by year and month
+    monthly_data = defaultdict(lambda: defaultdict(float))
 
     for trade in trades:
         exit_date = trade.get('Exit_Date', '')
         if exit_date:
             try:
-                # Extract year-month
-                year_month = exit_date[:7]  # YYYY-MM
+                year = exit_date[:4]  # YYYY
+                month = int(exit_date[5:7]) - 1  # 0-indexed month
                 return_dollars = float(trade.get('Return_Dollars', 0))
-                monthly_returns[year_month] += return_dollars
+                monthly_data[year][month] += return_dollars
             except:
                 continue
 
-    # Format for frontend
-    result = [
-        {
-            'month': month,
-            'return_usd': round(returns, 2),
-            'return_pct': 0  # Would need starting capital per month
-        }
-        for month, returns in sorted(monthly_returns.items())
-    ]
+    # Format for frontend: { "2026": { 0: -0.61, 1: 2.3, ..., ytd: total } }
+    result = {}
+    for year, months in monthly_data.items():
+        year_returns = {}
+        ytd_total = 0
+        for month_idx, dollars in months.items():
+            return_pct = round((dollars / STARTING_CAPITAL) * 100, 2)
+            year_returns[month_idx] = return_pct
+            ytd_total += dollars
+        year_returns['ytd'] = round((ytd_total / STARTING_CAPITAL) * 100, 2)
+        result[year] = year_returns
 
-    return jsonify({
-        'monthly_returns': result
-    })
+    return jsonify({'monthly_returns': result})
 
 @app.route('/api/v2/learning/insights', methods=['GET'])
 def get_learning_insights():
