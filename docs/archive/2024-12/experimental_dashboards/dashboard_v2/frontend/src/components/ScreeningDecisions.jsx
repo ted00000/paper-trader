@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react'
+import { Search, CheckCircle, XCircle, AlertCircle, PauseCircle } from 'lucide-react'
 
 function ScreeningDecisions() {
   const [data, setData] = useState(null)
@@ -58,6 +58,8 @@ function ScreeningDecisions() {
   const getDecisionIcon = (status) => {
     if (status === 'ACCEPTED') {
       return <CheckCircle size={18} className="text-profit" />
+    } else if (status === 'SKIPPED') {
+      return <PauseCircle size={18} className="text-yellow-500" />
     }
     return <XCircle size={18} className="text-loss" />
   }
@@ -65,8 +67,28 @@ function ScreeningDecisions() {
   const getDecisionColor = (status) => {
     if (status === 'ACCEPTED') {
       return 'bg-profit/10 border-profit/30'
+    } else if (status === 'SKIPPED') {
+      return 'bg-yellow-500/10 border-yellow-500/30'
     }
     return 'bg-loss/5 border-loss/20'
+  }
+
+  const getStatusLabel = (status, decision) => {
+    if (status === 'ACCEPTED') {
+      return decision
+    } else if (status === 'SKIPPED') {
+      return 'Skipped'
+    }
+    return 'Rejected'
+  }
+
+  const getStatusStyle = (status) => {
+    if (status === 'ACCEPTED') {
+      return 'bg-profit/20 text-profit'
+    } else if (status === 'SKIPPED') {
+      return 'bg-yellow-500/20 text-yellow-500'
+    }
+    return 'bg-loss/10 text-loss'
   }
 
   return (
@@ -111,10 +133,8 @@ function ScreeningDecisions() {
                 </div>
               </div>
               <div className="ml-4 flex-shrink-0">
-                <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                  item.status === 'ACCEPTED' ? 'bg-profit/20 text-profit' : 'bg-loss/10 text-loss'
-                }`}>
-                  {item.status === 'ACCEPTED' ? item.decision : 'Rejected'}
+                <span className={`text-xs font-semibold px-2 py-1 rounded ${getStatusStyle(item.status)}`}>
+                  {getStatusLabel(item.status, item.decision)}
                 </span>
               </div>
             </div>
