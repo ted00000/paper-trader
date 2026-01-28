@@ -665,14 +665,15 @@ def get_monthly_returns():
             except:
                 continue
 
-    # Format for frontend: { "2026": { 0: -0.61, 1: 2.3, ..., ytd: total } }
+    # Format for frontend: { "2026": { "0": -0.61, "1": 2.3, ..., "ytd": total } }
+    # Note: JSON requires string keys, but JS will coerce yearData[index] lookups
     result = {}
     for year, months in monthly_data.items():
         year_returns = {}
         ytd_total = 0
         for month_idx, dollars in months.items():
             return_pct = round((dollars / STARTING_CAPITAL) * 100, 2)
-            year_returns[month_idx] = return_pct
+            year_returns[str(month_idx)] = return_pct  # Convert to string for JSON
             ytd_total += dollars
         year_returns['ytd'] = round((ytd_total / STARTING_CAPITAL) * 100, 2)
         result[year] = year_returns
