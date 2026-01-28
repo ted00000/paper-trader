@@ -313,10 +313,12 @@ def get_overview():
     # Today's performance (from closed trades today)
     today_str = datetime.now().strftime('%Y-%m-%d')
     today_trades = [t for t in trades if t.get('Exit_Date', '').startswith(today_str)]
-    today_returns = [float(t.get('Return_Percent', 0)) for t in today_trades]
-    today_pnl = sum(today_returns) if today_returns else 0
-    today_wins = sum(1 for r in today_returns if r > 0)
-    today_losses = sum(1 for r in today_returns if r < 0)
+    today_returns_pct = [float(t.get('Return_Percent', 0)) for t in today_trades]
+    today_returns_dollars = [float(t.get('Return_Dollars', 0)) for t in today_trades]
+    today_pnl_pct = sum(today_returns_pct) if today_returns_pct else 0
+    today_pnl_dollars = sum(today_returns_dollars) if today_returns_dollars else 0
+    today_wins = sum(1 for r in today_returns_pct if r > 0)
+    today_losses = sum(1 for r in today_returns_pct if r < 0)
     return jsonify({
         'account': {
             'value': account.get('account_value', STARTING_CAPITAL),
@@ -340,7 +342,8 @@ def get_overview():
             'trades': len(today_trades),
             'wins': today_wins,
             'losses': today_losses,
-            'pnl': round(today_pnl, 2)
+            'pnl': round(today_pnl_pct, 2),
+            'pnl_dollars': round(today_pnl_dollars, 2)
         },
         'recent_trades': [
             {
@@ -432,10 +435,12 @@ def get_performance():
     # Today's performance (from closed trades today)
     today_str = datetime.now().strftime('%Y-%m-%d')
     today_trades = [t for t in trades if t.get('Exit_Date', '').startswith(today_str)]
-    today_returns = [float(t.get('Return_Percent', 0)) for t in today_trades]
-    today_pnl = sum(today_returns) if today_returns else 0
-    today_wins = sum(1 for r in today_returns if r > 0)
-    today_losses = sum(1 for r in today_returns if r < 0)
+    today_returns_pct = [float(t.get('Return_Percent', 0)) for t in today_trades]
+    today_returns_dollars = [float(t.get('Return_Dollars', 0)) for t in today_trades]
+    today_pnl_pct = sum(today_returns_pct) if today_returns_pct else 0
+    today_pnl_dollars = sum(today_returns_dollars) if today_returns_dollars else 0
+    today_wins = sum(1 for r in today_returns_pct if r > 0)
+    today_losses = sum(1 for r in today_returns_pct if r < 0)
 
     return jsonify({
         'total_trades': total_trades,
@@ -451,7 +456,8 @@ def get_performance():
             'trades': len(today_trades),
             'wins': today_wins,
             'losses': today_losses,
-            'pnl': round(today_pnl, 2)
+            'pnl': round(today_pnl_pct, 2),
+            'pnl_dollars': round(today_pnl_dollars, 2)
         }
     })
 

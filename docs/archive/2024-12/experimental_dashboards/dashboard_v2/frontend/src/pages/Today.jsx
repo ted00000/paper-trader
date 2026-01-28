@@ -39,8 +39,8 @@ function Today() {
   }
 
   // Get today's metrics from API response
-  const todayPnL = todayData?.today?.pnl || 0
-  const todayReturn = todayData?.today?.pnl || 0  // pnl is already in percent
+  const todayPnL = todayData?.today?.pnl_dollars || 0  // Dollar P&L
+  const todayReturn = todayData?.today?.pnl || 0  // Percent return
   const todayTrades = todayData?.today?.trades || 0
   const todayWins = todayData?.today?.wins || 0
   const todayLosses = todayData?.today?.losses || 0
