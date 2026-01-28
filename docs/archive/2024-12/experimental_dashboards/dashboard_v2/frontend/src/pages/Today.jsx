@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Calendar, TrendingUp, TrendingDown, Activity, DollarSign } from 'lucide-react'
 import ScreeningDecisions from '../components/ScreeningDecisions'
 
 function Today() {
   const [todayData, setTodayData] = useState(null)
+  const [todaysTrades, setTodaysTrades] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -13,9 +14,15 @@ function Today() {
   const fetchTodayData = async () => {
     try {
       // Fetch today's performance data
-      const response = await fetch('/api/v2/performance')
-      const data = await response.json()
-      setTodayData(data)
+      const [perfResponse, screeningResponse] = await Promise.all([
+        fetch('/api/v2/performance'),
+        fetch('/api/v2/screening-decisions')
+      ])
+      const perfData = await perfResponse.json()
+      const screeningData = await screeningResponse.json()
+
+      setTodayData(perfData)
+      setTodaysTrades(screeningData.todays_trades || [])
     } catch (error) {
       console.error('Failed to fetch today data:', error)
     } finally {
@@ -120,7 +127,7 @@ function Today() {
       <div className="glass rounded-lg p-6">
         <h2 className="text-xl font-bold mb-4">Today's Trades</h2>
 
-        {todayTrades === 0 ? (
+        {todaysTrades.length === 0 ? (
           <div className="text-center py-12 text-tedbot-gray-500">
             <Activity className="mx-auto mb-4 opacity-50" size={48} />
             <p>No trades executed today</p>
@@ -140,7 +147,25 @@ function Today() {
                 </tr>
               </thead>
               <tbody>
-                {/* Table rows will be populated from API */}
+                {todaysTrades.map((trade, index) => (
+                  <tr key={index} className="border-b border-tedbot-gray-800/50 hover:bg-tedbot-darker/50">
+                    <td className="py-3 px-4 text-sm">{trade.time}</td>
+                    <td className="py-3 px-4 font-semibold">{trade.ticker}</td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        trade.action === 'BUY' ? 'bg-profit/20 text-profit' : 'bg-loss/20 text-loss'
+                      }`}>
+                        {trade.action}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">${trade.price?.toFixed(2)}</td>
+                    <td className="py-3 px-4 text-right">{trade.shares}</td>
+                    <td className={`py-3 px-4 text-right font-semibold ${trade.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {trade.pnl >= 0 ? '+' : ''}${trade.pnl?.toFixed(2)}
+                      <span className="text-xs ml-1">({trade.pnl_pct?.toFixed(2)}%)</span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
