@@ -6902,7 +6902,15 @@ RECENT LESSONS LEARNED:
                 "entered": len(updated_positions) - held_positions_count,
                 "total_active": len(updated_positions)
             },
-            "closed_trades": [{"ticker": t.get("ticker"), "return_pct": t.get("return_pct")} for t in closed_trades],
+            "closed_trades": [
+                {
+                    "ticker": t.get("ticker"),
+                    "exit_price": t.get("exit_price", 0),
+                    "pnl_pct": t.get("pnl_percent", 0),
+                    "reason": t.get("exit_reason", "Unknown")
+                }
+                for t in closed_trades
+            ],
             "new_entries": [{"ticker": b.get("ticker"), "entry_price": b.get("entry_price")} for b in buy_positions if b.get("entry_price")]
         }
         self.save_response("execute", execute_summary)
