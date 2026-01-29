@@ -276,6 +276,14 @@ import traceback
 import pytz
 import hashlib
 
+# SendGrid for email notifications
+try:
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+    SENDGRID_AVAILABLE = True
+except ImportError:
+    SENDGRID_AVAILABLE = False
+
 # Alpaca Integration (v7.2 - Phase 1: Paper Trading)
 try:
     from alpaca_broker import AlpacaBroker
@@ -4929,7 +4937,113 @@ RECENT LESSONS LEARNED:
         
         with open(filename, 'w') as f:
             json.dump(response, f, indent=2)
-    
+
+    def send_go_report_email(self, hold_positions, exit_positions, buy_positions, portfolio):
+        """Send daily GO report email via SendGrid"""
+        if not SENDGRID_AVAILABLE:
+            print("   ⚠️ SendGrid not available, skipping email")
+            return False
+
+        api_key = os.environ.get('SENDGRID_API_KEY')
+        from_email = os.environ.get('SENDGRID_FROM_EMAIL')
+        to_emails = os.environ.get('SENDGRID_TO_EMAILS', '').split(',')
+
+        if not api_key or not from_email or not to_emails[0]:
+            print("   ⚠️ SendGrid not configured, skipping email")
+            return False
+
+        try:
+            # Build email content
+            today = datetime.now().strftime('%b %d, %Y')
+
+            # Today's Decisions section
+            decisions_text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TODAY'S DECISIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HOLD: {len(hold_positions)} positions
+EXIT: {len(exit_positions)} positions
+BUY:  {len(buy_positions)} new positions
+"""
+            # Add new entries details
+            if buy_positions:
+                decisions_text += "\n📈 NEW ENTRIES:\n"
+                for buy in buy_positions:
+                    ticker = buy.get('ticker', 'N/A') if isinstance(buy, dict) else buy
+                    if isinstance(buy, dict):
+                        price = buy.get('entry_price', 0)
+                        catalyst = buy.get('catalyst', 'N/A')
+                        conviction = buy.get('conviction', 'MEDIUM')
+                        decisions_text += f"• {ticker} @ ~${price:.2f}\n"
+                        decisions_text += f"  Catalyst: {catalyst}\n"
+                        decisions_text += f"  Conviction: {conviction}\n"
+                    else:
+                        decisions_text += f"• {ticker}\n"
+            else:
+                decisions_text += "\n📈 NEW ENTRIES:\n• None today\n"
+
+            # Add exits details
+            if exit_positions:
+                decisions_text += "\n🚪 EXITS:\n"
+                for exit_pos in exit_positions:
+                    ticker = exit_pos.get('ticker', 'N/A') if isinstance(exit_pos, dict) else exit_pos
+                    if isinstance(exit_pos, dict):
+                        reason = exit_pos.get('reason', 'N/A')
+                        decisions_text += f"• {ticker} - {reason}\n"
+                    else:
+                        decisions_text += f"• {ticker}\n"
+            else:
+                decisions_text += "\n🚪 EXITS:\n• None today\n"
+
+            # Current Portfolio section
+            portfolio_text = """
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT PORTFOLIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+            positions = portfolio.get('positions', [])
+            # Sort by return percentage descending
+            sorted_positions = sorted(positions, key=lambda x: x.get('unrealized_gain_pct', 0), reverse=True)
+
+            for pos in sorted_positions:
+                ticker = pos.get('ticker', 'N/A')
+                pnl_pct = pos.get('unrealized_gain_pct', 0)
+                days = pos.get('days_held', 0)
+
+                # Color indicator
+                if pnl_pct > 0.5:
+                    indicator = "🟢"
+                elif pnl_pct < -0.5:
+                    indicator = "🔴"
+                else:
+                    indicator = "⚪"
+
+                portfolio_text += f"{ticker:<6} {pnl_pct:+6.1f}%  {indicator}  Day {days}\n"
+
+            # Combine email body
+            email_body = decisions_text + portfolio_text
+
+            # Create and send email
+            message = Mail(
+                from_email=from_email,
+                to_emails=to_emails,
+                subject=f"📊 TedBot GO Report - {today}",
+                plain_text_content=email_body
+            )
+
+            sg = SendGridAPIClient(api_key)
+            response = sg.send(message)
+
+            if response.status_code in [200, 201, 202]:
+                print(f"   ✓ GO report email sent to {', '.join(to_emails)}")
+                return True
+            else:
+                print(f"   ⚠️ Email send failed: {response.status_code}")
+                return False
+
+        except Exception as e:
+            print(f"   ⚠️ Email error: {str(e)}")
+            return False
+
     # =====================================================================
     # POSITION MANAGEMENT
     # =====================================================================
@@ -6547,6 +6661,11 @@ RECENT LESSONS LEARNED:
         print(f"  - EXIT: {len(exit_positions)} positions (will close at 9:30 AM)")
         print(f"  - BUY:  {len(buy_positions)} new positions (will enter at 9:30 AM)")
         print(f"\n✓ Run 'execute' command at 9:30 AM to execute these decisions\n")
+
+        # Send GO report email
+        print("8. Sending GO report email...")
+        portfolio = self.load_current_portfolio()
+        self.send_go_report_email(hold_positions, exit_positions, buy_positions, portfolio)
 
         return True
     
