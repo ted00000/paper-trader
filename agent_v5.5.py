@@ -4815,13 +4815,20 @@ RECENT LESSONS LEARNED:
         # Starting capital (constant)
         STARTING_CAPITAL = 10000.00
 
-        # Calculate current portfolio value (sum of all position sizes)
+        # Calculate current portfolio value (current market value, not cost basis)
         portfolio_value = 0.00
+        cost_basis = 0.00
         if self.portfolio_file.exists():
             with open(self.portfolio_file, 'r') as f:
                 portfolio = json.load(f)
                 for pos in portfolio.get('positions', []):
-                    portfolio_value += pos.get('position_size', 0)
+                    # Use current_price * shares for actual market value
+                    current_price = pos.get('current_price', pos.get('entry_price', 0))
+                    shares = pos.get('shares', 0)
+                    position_cost = pos.get('position_size', 0)
+
+                    portfolio_value += current_price * shares
+                    cost_basis += position_cost
 
         # Calculate realized P&L from CSV (total profit/loss)
         realized_pl = 0.00
@@ -4849,9 +4856,9 @@ RECENT LESSONS LEARNED:
                             losers.append(return_pct)
 
         # FIXED: Calculate cash properly
-        # Cash = Starting capital - Currently invested + All P&L
-        # Example: Start $1000, invest $900 (9 pos), +$11.63 profit = $111.63 cash
-        cash_available = STARTING_CAPITAL - portfolio_value + realized_pl
+        # Cash = Starting capital - Cost basis of positions + Realized P&L
+        # Note: Use cost_basis (what we spent), not portfolio_value (current market value)
+        cash_available = STARTING_CAPITAL - cost_basis + realized_pl
 
         # Account value = positions + cash
         # OR equivalently: STARTING_CAPITAL + realized_pl
@@ -4863,11 +4870,15 @@ RECENT LESSONS LEARNED:
         avg_winner = sum(winners) / len(winners) if winners else 0.0
         avg_loser = sum(losers) / len(losers) if losers else 0.0
 
+        unrealized_pl = portfolio_value - cost_basis
+
         account = {
             'account_value': round(account_value, 2),
             'cash_available': round(cash_available, 2),
-            'positions_value': round(portfolio_value, 2),
+            'positions_value': round(portfolio_value, 2),  # Current market value
+            'cost_basis': round(cost_basis, 2),  # What we paid for positions
             'realized_pl': round(realized_pl, 2),
+            'unrealized_pl': round(unrealized_pl, 2),  # Unrealized gain/loss
             'total_trades': total_trades,
             'win_rate_percent': round(win_rate, 2),
             'average_hold_time_days': round(avg_hold_time, 1),
@@ -4879,7 +4890,8 @@ RECENT LESSONS LEARNED:
         with open(self.account_file, 'w') as f:
             json.dump(account, f, indent=2)
 
-        print(f"   ✓ Updated account status: ${account_value:.2f} (Positions: ${portfolio_value:.2f} + Cash: ${cash_available:.2f}, Realized P&L: ${realized_pl:+.2f})")
+        unrealized_pl = portfolio_value - cost_basis
+        print(f"   ✓ Updated account status: ${account_value:.2f} (Positions: ${portfolio_value:.2f} + Cash: ${cash_available:.2f}, Realized P&L: ${realized_pl:+.2f}, Unrealized P&L: ${unrealized_pl:+.2f})")
     
     # =====================================================================
     # VALIDATION AND LOGGING
