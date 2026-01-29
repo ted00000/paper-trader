@@ -709,7 +709,7 @@ def get_operations_status():
     operation_status_dir = PROJECT_DIR / 'dashboard_data' / 'operation_status'
     daily_reviews_dir = PROJECT_DIR / 'daily_reviews'
 
-    for operation in ['go', 'execute', 'analyze']:
+    for operation in ['go', 'execute', 'recheck', 'analyze']:
         op_upper = operation.upper()
         status_file = operation_status_dir / f"{operation}_status.json"
 
@@ -861,7 +861,7 @@ def get_operation_log(operation):
     Returns screener_candidates.json for SCREENER
     Matches old dashboard behavior: shows today's log or falls back to most recent
     """
-    valid_operations = ['go', 'execute', 'analyze', 'screener']
+    valid_operations = ['go', 'execute', 'recheck', 'analyze', 'screener']
     operation = operation.lower()
 
     if operation not in valid_operations:
@@ -1015,6 +1015,55 @@ def get_operation_log(operation):
 
             content = '\n'.join(lines)
 
+        # If no content, check if this is a structured recheck log
+        if not content and operation == 'recheck' and 'summary' in data:
+            # Format recheck log nicely
+            summary = data.get('summary', {})
+            new_entries = data.get('new_entries', [])
+            skipped_stocks = data.get('skipped_stocks', [])
+            timestamp = data.get('timestamp', 'Unknown')
+
+            lines = []
+            lines.append('# 🔄 RECHECK Results (10:15 AM Gap Settlement)')
+            lines.append('')
+            lines.append(f'**Timestamp:** {timestamp}')
+            lines.append('')
+            lines.append('## Summary')
+            lines.append('')
+            lines.append(f'- **Stocks Checked:** {summary.get("stocks_checked", 0)}')
+            lines.append(f'- **Entered (Gap Settled):** {summary.get("entered", 0)}')
+            lines.append(f'- **Still Skipped:** {summary.get("still_skipped", 0)}')
+            lines.append('')
+
+            if new_entries:
+                lines.append('## ✅ Gap Settled - Entries Made')
+                lines.append('')
+                for entry in new_entries:
+                    ticker = entry.get('ticker', 'N/A')
+                    price = entry.get('entry_price', 0)
+                    orig_gap = entry.get('original_gap', 0)
+                    entry_gap = entry.get('entry_gap', 0)
+                    reason = entry.get('settlement_reason', 'Gap settled')
+                    lines.append(f'- **{ticker}** @ ${price:.2f}')
+                    lines.append(f'  - Original gap: {orig_gap:+.1f}% → Entry gap: {entry_gap:+.1f}%')
+                    lines.append(f'  - Reason: {reason}')
+                lines.append('')
+
+            if skipped_stocks:
+                lines.append('## ⏳ Gap Not Settled - Skipped')
+                lines.append('')
+                for stock in skipped_stocks:
+                    ticker = stock.get('ticker', 'N/A')
+                    orig_gap = stock.get('original_gap', 0)
+                    final_gap = stock.get('final_gap', orig_gap)
+                    lines.append(f'- **{ticker}**: {orig_gap:+.1f}% → {final_gap:+.1f}% (still above threshold)')
+                lines.append('')
+
+            if not new_entries and not skipped_stocks:
+                lines.append('*No gap-skipped stocks to recheck.*')
+
+            content = '\n'.join(lines)
+
         # Extract date and timestamp from filename (e.g., go_20251218_153944.json)
         filename = latest_file.name
         parts = filename.replace('.json', '').split('_')
@@ -1144,13 +1193,25 @@ def get_screening_decisions():
         today = datetime.now().strftime('%Y-%m-%d')
         is_today = (data_date == today)
 
+        # Load current portfolio to check for owned stocks
+        portfolio = load_portfolio()
+        owned_tickers = set(pos.get('ticker') for pos in portfolio.get('positions', []))
+
         # Build decisions list from picks
         decisions = []
         for pick in picks_data.get('picks', []):
             decision_status = pick.get('status', 'UNKNOWN')
+            ticker = pick.get('ticker')
+
+            # Check if stock is already owned
+            is_owned = ticker in owned_tickers
 
             # Map to display-friendly format
-            if decision_status == 'ACCEPTED':
+            if is_owned:
+                # Stock is already in portfolio - don't show as rejected
+                decision_status = 'OWNED'
+                decision = '📈 Already Owned'
+            elif decision_status == 'ACCEPTED':
                 if pick.get('position_size_pct', 0) == 0:
                     decision = 'Accepted (Low Conviction - 0% size)'
                 else:

@@ -4334,21 +4334,84 @@ CRITICAL OUTPUT REQUIREMENT - JSON at end:
 DO NOT include entry_price, stop_loss, or price_target - system will calculate from real market prices.
 Every position must have position_size: 100.00 exactly."""
         elif command == 'analyze':
-            # ANALYZE command - include date context so Claude knows what day it is
+            # ANALYZE command - best-in-class prompt with structured output
             today_date = datetime.now().strftime('%A, %B %d, %Y')
             current_time = datetime.now().strftime('%I:%M %p')
-            user_message = f"""ANALYZE - Performance Review
 
-Current Date: {today_date}
-Current Time: {current_time}
+            # Calculate next trading day
+            from datetime import timedelta
+            next_day = datetime.now() + timedelta(days=1)
+            # Skip weekends
+            while next_day.weekday() >= 5:  # Saturday = 5, Sunday = 6
+                next_day += timedelta(days=1)
+            next_trading_day = next_day.strftime('%A, %B %d')
 
-Review the current portfolio and provide analysis on:
-1. Overall portfolio performance
-2. Individual position status (P&L, days held, thesis intact)
-3. Any positions that should be exited tomorrow (stop loss, target, catalyst invalid, time stop)
-4. Market conditions and outlook
+            user_message = f"""# DAILY PORTFOLIO ANALYSIS - {today_date} ({current_time} ET)
 
-For any recommended exits, specify "Exit at market open tomorrow" with the actual next trading day.
+## YOUR TASK
+Analyze today's portfolio performance and provide **actionable intelligence** for tomorrow's trading session.
+
+## ANALYSIS FRAMEWORK
+
+### 1. PORTFOLIO HEALTH CHECK
+Review the portfolio JSON and account status provided in context. Calculate and report:
+- **Total P&L Today**: Sum of unrealized_gain_dollars across all positions
+- **Winners vs Losers**: Count positions with positive vs negative unrealized_gain_pct
+- **Best Performer**: Ticker with highest unrealized_gain_pct
+- **Worst Performer**: Ticker with lowest unrealized_gain_pct
+- **Account Utilization**: positions_value / account_value (target: 50-60% invested)
+
+### 2. POSITION-BY-POSITION REVIEW
+For EACH position in the portfolio, evaluate:
+
+**Exit Triggers (check all):**
+- ❌ **Stop Loss**: Is current_price ≤ stop_loss? → EXIT TOMORROW
+- ✅ **Profit Target**: Is unrealized_gain_pct ≥ +10%? → Consider taking profits
+- ⏰ **Time Stop**: Is days_held ≥ 21? → EXIT (capital tied up too long)
+- 📉 **Stagnant**: Is days_held ≥ 10 AND |unrealized_gain_pct| < 3%? → Consider exit for better opportunity
+- 🔴 **Deep Red**: Is unrealized_gain_pct < -5%? → Monitor closely, may hit stop soon
+
+**Trailing Stop Status** (if position has trailing_stop_active = true):
+- Report peak_return_pct vs current unrealized_gain_pct
+- If current < peak by >2%, trailing stop may trigger
+
+**Thesis Check:**
+- Is the original catalyst still valid?
+- Any negative news since entry that invalidates thesis?
+
+### 3. SECTOR EXPOSURE
+Group positions by sector (from catalyst field or ticker industry):
+- Flag if >30% concentrated in any single sector
+- Note any correlated risk (e.g., multiple semiconductor stocks)
+
+### 4. TOMORROW'S ACTION ITEMS
+Provide specific, actionable recommendations:
+
+**MANDATORY EXITS** (non-negotiable):
+- List any positions that hit stop_loss, time_stop, or catalyst invalidation
+
+**SUGGESTED EXITS** (your recommendation with reasoning):
+- Positions you recommend exiting with brief rationale
+
+**POSITIONS TO MONITOR** (watch closely):
+- Approaching stop loss (within 2%)
+- Approaching profit target (within 2%)
+- Significant overnight news expected
+
+**HOLD WITH CONFIDENCE**:
+- Strong positions with intact thesis
+
+### 5. MARKET CONTEXT (Brief)
+- Overall market sentiment today (1-2 sentences max)
+- Any macro events tomorrow that could impact portfolio
+
+## OUTPUT FORMAT
+Use this exact structure with markdown headers. Be concise and data-driven.
+Do NOT include generic commentary or filler text.
+Every statement should be backed by specific numbers from the portfolio data.
+
+**Next Trading Day: {next_trading_day}**
+Any exit recommendations should specify "Exit at market open on {next_trading_day}"
 """
         else:
             user_message = command
@@ -4833,7 +4896,11 @@ RECENT LESSONS LEARNED:
                     # Use current_price * shares for actual market value
                     current_price = pos.get('current_price', pos.get('entry_price', 0))
                     shares = pos.get('shares', 0)
-                    position_cost = pos.get('position_size', 0)
+                    entry_price = pos.get('entry_price', 0)
+
+                    # FIXED: Cost basis = entry_price * shares (what we actually paid)
+                    # NOT position_size (which was the allocation amount)
+                    position_cost = entry_price * shares
 
                     portfolio_value += current_price * shares
                     cost_basis += position_cost
@@ -6917,6 +6984,38 @@ CURRENT PORTFOLIO
                         print(f"   ⚠️ SKIPPED {ticker}: {gap_analysis['classification']} detected ({gap_analysis['gap_pct']:+.1f}%)")
                         print(f"      {gap_analysis['reasoning']}")
                         print(f"      Recommended: {gap_analysis['recommended_action']}")
+                        print(f"      → Will re-check at 10:15 AM (run 'python agent_v5.5.py recheck')")
+
+                        # Save to skipped_for_gap.json for 10:15 AM recheck
+                        skipped_file = self.project_dir / 'skipped_for_gap.json'
+                        skipped_stocks = []
+                        if skipped_file.exists():
+                            try:
+                                with open(skipped_file) as f:
+                                    skipped_data = json.load(f)
+                                    # Only keep today's skipped stocks
+                                    today = datetime.now().strftime('%Y-%m-%d')
+                                    if skipped_data.get('date') == today:
+                                        skipped_stocks = skipped_data.get('stocks', [])
+                            except:
+                                pass
+
+                        skipped_stocks.append({
+                            'ticker': ticker,
+                            'original_entry_price': entry_price,
+                            'previous_close': previous_close,
+                            'gap_pct': gap_analysis['gap_pct'],
+                            'classification': gap_analysis['classification'],
+                            'position_data': pos,  # Full position data for entry
+                            'skipped_at': datetime.now().strftime('%H:%M:%S')
+                        })
+
+                        with open(skipped_file, 'w') as f:
+                            json.dump({
+                                'date': datetime.now().strftime('%Y-%m-%d'),
+                                'stocks': skipped_stocks
+                            }, f, indent=2, default=str)
+
                         continue  # Skip this entry
 
                     # Log gap info for awareness
@@ -7239,6 +7338,234 @@ CURRENT PORTFOLIO
 
         print(f"   ✓ Created daily activity summary: {total_closed} closed, ${total_pl_dollars:.2f} P&L")
 
+    def execute_recheck_command(self):
+        """
+        Execute RECHECK command (10:15 AM)
+
+        Re-evaluates stocks that were skipped at 9:45 AM due to gap-up.
+        If the gap has settled (price pulled back or reduced), execute entry.
+
+        Research basis: "Wait 30min for pullback to VWAP" strategy for 2-5% gaps.
+        """
+        print("\n" + "="*60)
+        print("RECHECK COMMAND - Gap Settlement Re-evaluation")
+        print("="*60)
+
+        # Load skipped stocks
+        skipped_file = self.project_dir / 'skipped_for_gap.json'
+        if not skipped_file.exists():
+            print("\n❌ No skipped stocks file found.")
+            print("   Run 'execute' command first - if stocks are skipped for gaps,")
+            print("   they'll be saved for recheck.")
+            return False
+
+        with open(skipped_file) as f:
+            skipped_data = json.load(f)
+
+        today = datetime.now().strftime('%Y-%m-%d')
+        if skipped_data.get('date') != today:
+            print(f"\n❌ Skipped stocks file is from {skipped_data.get('date')}, not today.")
+            print("   No stocks to recheck.")
+            return False
+
+        stocks = skipped_data.get('stocks', [])
+        if not stocks:
+            print("\n✓ No stocks were skipped for gaps today.")
+            return True
+
+        print(f"\n📋 Found {len(stocks)} stock(s) skipped at 9:45 AM for gap re-evaluation:\n")
+
+        # Load current portfolio
+        portfolio = self.load_portfolio()
+        current_account_value = portfolio.get('account_value', 10000)
+        cash_available = portfolio.get('cash_available', current_account_value)
+        positions = portfolio.get('positions', [])
+
+        entered_count = 0
+        still_skipped = []
+        entered_positions = []  # Track for dashboard
+
+        for stock in stocks:
+            ticker = stock['ticker']
+            original_gap = stock['gap_pct']
+            previous_close = stock['previous_close']
+            original_price = stock['original_entry_price']
+            pos_data = stock['position_data']
+
+            print(f"   Checking {ticker} (was {original_gap:+.1f}% gap at 9:45 AM)...")
+
+            # Get current price
+            current_price = self.get_current_price(ticker)
+            if not current_price:
+                print(f"      ❌ Could not get current price for {ticker}")
+                still_skipped.append(stock)
+                continue
+
+            # Calculate current gap from previous close
+            current_gap = ((current_price - previous_close) / previous_close) * 100
+
+            # Calculate price change since 9:45 AM
+            price_change_since_945 = ((current_price - original_price) / original_price) * 100
+
+            print(f"      Previous close: ${previous_close:.2f}")
+            print(f"      9:45 AM price:  ${original_price:.2f} ({original_gap:+.1f}% gap)")
+            print(f"      Current price:  ${current_price:.2f} ({current_gap:+.1f}% from close)")
+            print(f"      Change since 9:45: {price_change_since_945:+.1f}%")
+
+            # Decision logic for gap settlement
+            # Enter if:
+            # 1. Gap has reduced to <2% (normal entry territory), OR
+            # 2. Price has pulled back at least 1% from 9:45 AM price (pullback entry), OR
+            # 3. Current gap is <3% and original was 2-5% range (gap settling)
+            should_enter = False
+            entry_reason = ""
+
+            if current_gap < 2.0:
+                should_enter = True
+                entry_reason = f"Gap settled to {current_gap:+.1f}% (below 2% threshold)"
+            elif price_change_since_945 <= -1.0:
+                should_enter = True
+                entry_reason = f"Pullback of {price_change_since_945:.1f}% from 9:45 AM price"
+            elif original_gap <= 5.0 and current_gap < 3.0:
+                should_enter = True
+                entry_reason = f"Gap reduced from {original_gap:+.1f}% to {current_gap:+.1f}%"
+
+            if should_enter:
+                print(f"      ✓ GAP SETTLED: {entry_reason}")
+                print(f"      → Executing entry at ${current_price:.2f}...")
+
+                # Calculate position size
+                position_size_pct = pos_data.get('position_size_pct', 10.0)
+                position_size_dollars = round((position_size_pct / 100) * current_account_value, 2)
+
+                if position_size_dollars > cash_available:
+                    position_size_dollars = round(cash_available, 2)
+                    print(f"      ⚠️ Reduced size to available cash ${cash_available:.2f}")
+
+                # Create position - copy ALL fields from original for learning engine
+                new_position = {
+                    'ticker': ticker,
+                    'entry_price': current_price,
+                    'current_price': current_price,
+                    'entry_date': datetime.now().strftime('%Y-%m-%d'),
+                    'days_held': 0,
+                    'position_size': position_size_dollars,
+                    'shares': position_size_dollars / current_price,
+                    'position_size_pct': position_size_pct,
+                    # RECHECK-specific fields
+                    'entry_type': 'RECHECK',  # Mark as recheck entry for learning
+                    'original_gap': original_gap,
+                    'entry_gap': current_gap,
+                    'gap_settlement_reason': entry_reason,
+                    # Copy ALL learning-relevant fields from original position
+                    'catalyst': pos_data.get('catalyst', 'Unknown'),
+                    'catalyst_tier': pos_data.get('catalyst_tier', 'Tier2'),
+                    'catalyst_details': pos_data.get('catalyst_details', {}),
+                    'catalyst_age_days': pos_data.get('catalyst_age_days', 0),
+                    'conviction': pos_data.get('conviction', 'Medium'),
+                    'conviction_level': pos_data.get('conviction_level', 'MEDIUM'),
+                    'supporting_factors': pos_data.get('supporting_factors', 0),
+                    'sector': pos_data.get('sector', 'Unknown'),
+                    'thesis': pos_data.get('thesis', ''),
+                    'technical_score': pos_data.get('technical_score', 0),
+                    'technical_sma50': pos_data.get('technical_sma50', 0.0),
+                    'technical_ema5': pos_data.get('technical_ema5', 0.0),
+                    'technical_ema20': pos_data.get('technical_ema20', 0.0),
+                    'technical_adx': pos_data.get('technical_adx', 0.0),
+                    'technical_volume_ratio': pos_data.get('technical_volume_ratio', 0.0),
+                    'relative_strength': pos_data.get('relative_strength', 0.0),
+                    'stock_return_3m': pos_data.get('stock_return_3m', 0.0),
+                    'sector_etf': pos_data.get('sector_etf', 'Unknown'),
+                    'news_validation_score': pos_data.get('news_validation_score', 0),
+                    'keywords_matched': pos_data.get('keywords_matched', ''),
+                    'news_sources': pos_data.get('news_sources', ''),
+                    'news_article_count': pos_data.get('news_article_count', 0),
+                    'vix_at_entry': pos_data.get('vix_at_entry', 0.0),
+                    'market_regime': pos_data.get('market_regime', 'Unknown'),
+                    'macro_event_near': pos_data.get('macro_event_near', 'None'),
+                    'volume_quality': pos_data.get('volume_quality', ''),
+                    'volume_trending_up': pos_data.get('volume_trending_up', False),
+                }
+
+                # Set stop loss (simple 5% for recheck entries)
+                new_position['stop_loss'] = round(current_price * 0.95, 2)
+
+                # Set profit target
+                catalyst_tier = pos_data.get('catalyst_tier', 'Tier2')
+                if catalyst_tier == 'Tier1':
+                    new_position['profit_target'] = round(current_price * 1.08, 2)
+                else:
+                    new_position['profit_target'] = round(current_price * 1.05, 2)
+
+                positions.append(new_position)
+                cash_available -= position_size_dollars
+                entered_count += 1
+                entered_positions.append(new_position)  # Track for dashboard
+
+                print(f"      ✓ ENTERED: {new_position['shares']:.2f} shares @ ${current_price:.2f}")
+                print(f"        Stop: ${new_position['stop_loss']:.2f}, Target: ${new_position['profit_target']:.2f}")
+            else:
+                print(f"      ✗ Gap NOT settled: still {current_gap:+.1f}% (need <2% or pullback)")
+                print(f"        Skipping - will not enter today")
+                still_skipped.append({**stock, 'final_gap': current_gap})
+
+        # Save updated portfolio
+        if entered_count > 0:
+            portfolio['positions'] = positions
+            portfolio['cash_available'] = cash_available
+            self.save_portfolio(portfolio)
+            print(f"\n✓ Portfolio updated with {entered_count} new position(s)")
+
+        # Clear the skipped file (processed for today)
+        skipped_file.unlink()
+        print(f"\n✓ Cleared skipped stocks file")
+
+        # Summary
+        print(f"\n{'='*60}")
+        print(f"RECHECK SUMMARY")
+        print(f"{'='*60}")
+        print(f"   Stocks checked:  {len(stocks)}")
+        print(f"   Entered:         {entered_count}")
+        print(f"   Still skipped:   {len(still_skipped)}")
+
+        if still_skipped:
+            print(f"\n   Stocks not entered (gap didn't settle):")
+            for s in still_skipped:
+                print(f"      - {s['ticker']}: {s.get('final_gap', s['gap_pct']):+.1f}% gap")
+
+        # Save RECHECK response for dashboard (shows in EXECUTE modal)
+        recheck_summary = {
+            "command": "recheck",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "summary": {
+                "stocks_checked": len(stocks),
+                "entered": entered_count,
+                "still_skipped": len(still_skipped),
+            },
+            "new_entries": [
+                {
+                    "ticker": p.get("ticker"),
+                    "entry_price": p.get("entry_price"),
+                    "original_gap": p.get("original_gap"),
+                    "entry_gap": p.get("entry_gap"),
+                    "settlement_reason": p.get("gap_settlement_reason")
+                }
+                for p in entered_positions
+            ],
+            "skipped_stocks": [
+                {
+                    "ticker": s.get("ticker"),
+                    "original_gap": s.get("gap_pct"),
+                    "final_gap": s.get("final_gap", s.get("gap_pct"))
+                }
+                for s in still_skipped
+            ]
+        }
+        self.save_response("recheck", recheck_summary)
+        print(f"\n   ✓ Recheck summary saved for dashboard")
+
+        return True
+
     def execute_analyze_command(self):
         """
         Execute ANALYZE command (4:30 PM)
@@ -7347,10 +7674,11 @@ def main():
     """Main execution"""
     
     if len(sys.argv) < 2:
-        print("\nUsage: python agent.py [go|execute|analyze|learn]")
+        print("\nUsage: python agent.py [go|execute|recheck|analyze|learn]")
         print("\nCommands:")
         print("  go       - Select 10 stocks (8:45 AM)")
-        print("  execute  - Enter positions (9:30 AM)")
+        print("  execute  - Enter positions (9:45 AM)")
+        print("  recheck  - Re-evaluate gap-skipped stocks (10:15 AM)")
         print("  analyze  - Update & close positions (4:30 PM)")
         print("  learn    - Analyze performance metrics (Phase 5)")
         sys.exit(1)
@@ -7370,6 +7698,8 @@ def main():
             success = agent.execute_go_command()
         elif command == 'execute':
             success = agent.execute_execute_command()
+        elif command == 'recheck':
+            success = agent.execute_recheck_command()
         elif command == 'analyze':
             success = agent.execute_analyze_command()
         elif command == 'learn':
