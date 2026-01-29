@@ -4686,27 +4686,54 @@ RECENT LESSONS LEARNED:
     
     def extract_json_from_response(self, response_text):
         """Extract JSON block from Claude's response"""
-        
-        # Try to find JSON in code blocks
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-        
+
+        # Method 1: Try to find JSON in ```json code blocks (most common)
+        json_match = re.search(r'```json\s*(\{[\s\S]*?\})\s*```', response_text)
         if json_match:
             try:
                 json_str = json_match.group(1)
-                return json.loads(json_str)
+                result = json.loads(json_str)
+                if 'hold' in result or 'exit' in result or 'buy' in result:
+                    return result
             except json.JSONDecodeError as e:
-                print(f"   ⚠️ JSON parsing error: {e}")
-                return None
-        
-        # Fallback: look for raw JSON object
-        json_match = re.search(r'\{[\s\S]*"positions"[\s\S]*\}', response_text)
+                print(f"   ⚠️ JSON code block parsing error: {e}")
+
+        # Method 2: Try to find JSON in ``` code blocks (no json tag)
+        json_match = re.search(r'```\s*(\{[\s\S]*?\})\s*```', response_text)
         if json_match:
             try:
-                return json.loads(json_match.group(0))
+                json_str = json_match.group(1)
+                result = json.loads(json_str)
+                if 'hold' in result or 'exit' in result or 'buy' in result:
+                    return result
+            except json.JSONDecodeError as e:
+                print(f"   ⚠️ Code block parsing error: {e}")
+
+        # Method 3: Fallback - look for raw JSON with "hold" key (GO command format)
+        json_match = re.search(r'\{[^{}]*"hold"[^{}]*\}', response_text, re.DOTALL)
+        if json_match:
+            try:
+                result = json.loads(json_match.group(0))
+                return result
             except Exception as e:
-                print(f"   ⚠️ Fallback JSON parsing error: {e}")
-                pass
-        
+                print(f"   ⚠️ Fallback hold-key JSON parsing error: {e}")
+
+        # Method 4: Try to find any JSON object with expected keys
+        # Look for JSON starting with { and containing hold/exit/buy
+        for key in ['hold', 'exit', 'buy']:
+            pattern = rf'\{{[^{{}}]*"{key}"[^{{}}]*\}}'
+            json_match = re.search(pattern, response_text, re.DOTALL)
+            if json_match:
+                try:
+                    result = json.loads(json_match.group(0))
+                    return result
+                except Exception:
+                    pass
+
+        # Debug: Log what we received if nothing worked
+        print(f"   ⚠️ Could not extract JSON. Response length: {len(response_text)}")
+        print(f"   ⚠️ Response preview: {response_text[:500]}...")
+
         return None
     
     def update_portfolio_from_json(self, portfolio_data):
