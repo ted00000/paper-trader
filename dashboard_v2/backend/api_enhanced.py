@@ -703,48 +703,105 @@ def get_operations_status():
         - Stats (for screener: candidates, breadth, etc.)
     """
     operations = {}
+    today = datetime.now().strftime('%Y-%m-%d')
 
-    # Check daily_reviews for GO/EXECUTE/ANALYZE operations
+    # Check operation_status files FIRST (these have real-time status including failures)
+    operation_status_dir = PROJECT_DIR / 'dashboard_data' / 'operation_status'
     daily_reviews_dir = PROJECT_DIR / 'daily_reviews'
-    if daily_reviews_dir.exists():
-        for operation in ['go', 'execute', 'analyze']:
+
+    for operation in ['go', 'execute', 'analyze']:
+        op_upper = operation.upper()
+        status_file = operation_status_dir / f"{operation}_status.json"
+
+        # First check the operation_status file (most accurate, includes failures)
+        if status_file.exists():
+            try:
+                with open(status_file) as f:
+                    status_data = json.load(f)
+
+                last_run = status_data.get('last_run', '')
+                status = status_data.get('status', 'UNKNOWN')
+                error = status_data.get('error', '')
+
+                # Check if this is from today
+                is_today = last_run.startswith(today) if last_run else False
+
+                if status == 'FAILED':
+                    operations[op_upper] = {
+                        'status': 'FAILED',
+                        'last_run': last_run,
+                        'health': 'FAILED',
+                        'error': error,
+                        'is_today': is_today
+                    }
+                    continue
+                elif status == 'SUCCESS' and is_today:
+                    # Find the corresponding daily_reviews file for details
+                    pattern = f"{operation}_{today.replace('-', '')}*.json"
+                    files = sorted(daily_reviews_dir.glob(pattern), reverse=True)
+                    log_file = str(files[0]) if files else status_data.get('log_file', '')
+
+                    operations[op_upper] = {
+                        'status': 'SUCCESS',
+                        'last_run': last_run,
+                        'health': 'HEALTHY',
+                        'log_file': log_file,
+                        'summary': f"Latest {operation} command completed",
+                        'is_today': True
+                    }
+                    continue
+            except Exception:
+                pass  # Fall through to check daily_reviews
+
+        # Fallback: Check daily_reviews for historical data
+        if daily_reviews_dir.exists():
             pattern = f"{operation}_*.json"
             files = sorted(daily_reviews_dir.glob(pattern), reverse=True)
 
             if files:
                 latest_file = files[0]
-                # Extract timestamp from filename (e.g., go_20251218_153944.json)
                 filename = latest_file.name
                 parts = filename.replace('.json', '').split('_')
                 if len(parts) >= 3:
+                    date_str = parts[1]
                     timestamp_str = parts[2]
-                    # Format: HHMMSS -> HH:MM:SS
-                    timestamp = f"{parts[1][:4]}-{parts[1][4:6]}-{parts[1][6:8]} {timestamp_str[:2]}:{timestamp_str[2:4]}:{timestamp_str[4:]}"
+                    timestamp = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]} {timestamp_str[:2]}:{timestamp_str[2:4]}:{timestamp_str[4:]}"
+                    file_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+                    is_today = (file_date == today)
 
-                    try:
-                        with open(latest_file) as f:
-                            data = json.load(f)
+                    # If not from today and we had a failure today, mark as stale
+                    if not is_today and status_file.exists():
+                        try:
+                            with open(status_file) as f:
+                                status_data = json.load(f)
+                            if status_data.get('status') == 'FAILED' and status_data.get('last_run', '').startswith(today):
+                                operations[op_upper] = {
+                                    'status': 'FAILED',
+                                    'last_run': status_data.get('last_run'),
+                                    'health': 'FAILED',
+                                    'error': status_data.get('error', 'Operation failed today'),
+                                    'last_success': timestamp,
+                                    'is_today': False
+                                }
+                                continue
+                        except Exception:
+                            pass
 
-                        operations[operation.upper()] = {
-                            'status': 'SUCCESS',
-                            'last_run': timestamp,
-                            'health': 'HEALTHY',
-                            'log_file': str(latest_file),
-                            'summary': f"Latest {operation} command completed"
-                        }
-                    except Exception as e:
-                        operations[operation.upper()] = {
-                            'status': 'FAILED',
-                            'last_run': timestamp,
-                            'health': 'FAILED',
-                            'error': str(e)
-                        }
-            else:
-                operations[operation.upper()] = {
-                    'status': 'NEVER_RUN',
-                    'last_run': None,
-                    'health': 'UNKNOWN'
-                }
+                    operations[op_upper] = {
+                        'status': 'SUCCESS',
+                        'last_run': timestamp,
+                        'health': 'HEALTHY' if is_today else 'WARNING',
+                        'log_file': str(latest_file),
+                        'summary': f"Latest {operation} command completed" if is_today else f"Showing data from {file_date} (not today)",
+                        'is_today': is_today
+                    }
+                    continue
+
+        operations[op_upper] = {
+            'status': 'NEVER_RUN',
+            'last_run': None,
+            'health': 'UNKNOWN'
+        }
 
     # Check screener_candidates.json for SCREENER operation
     if SCREENER_JSON.exists():
@@ -1167,11 +1224,18 @@ def get_screening_decisions():
             except Exception:
                 pass  # Ignore errors reading activity file
 
+        # Build stale warning if data is not from today
+        stale_warning = None
+        if not is_today:
+            stale_warning = f"⚠️ Showing data from {data_date} - GO command may have failed today"
+
         return jsonify({
             'decisions': decisions,
             'summary': summary,
             'timestamp': picks_data.get('time', ''),
+            'data_date': data_date,
             'is_today': is_today,
+            'stale_warning': stale_warning,
             'total_reviewed': total,
             'market_conditions': picks_data.get('market_conditions', {}),
             'todays_trades': todays_trades
