@@ -148,3 +148,46 @@
 ---
 
 *This document evolves daily as we learn. It's the brain of the system.*
+
+---
+
+## 🚨 CRITICAL SYSTEM FAILURE - January 30, 2026
+
+### STX Trailing Stop Execution Failure
+
+**Trade Details:**
+- Ticker: STX (Seagate Technology)
+- Entry: .99 (Jan 23, 2026)
+- Peak: ~ (+32%)
+- Actual Exit: .48 (+18.3%)
+- Lost Profit: ~ (14% of potential gains)
+
+**What Happened:**
+1. STX hit +10% target on ~Jan 27, triggering "trailing stop activation"
+2. Stock continued to +32% - Claude correctly decided to HOLD with trailing stop
+3. BUT: The trailing stop was ONLY tracked in JSON - there was NO MECHANISM to execute it
+4. The JSON trailing stop was checked only at 9:45 AM and 4:30 PM (twice daily)
+5. When EXECUTE ran the next morning, trailing stop data was LOST (Alpaca load bug)
+6. By the time a real Alpaca trailing stop was placed, stock had dropped to ~
+
+**Root Causes:**
+1. **Paper Trailing Stops Are Useless**: Tracking a trailing stop in JSON without real-time execution is theater, not protection
+2. **Check Frequency Too Low**: Checking exits only at 9:45 AM and 4:30 PM means 6+ hours of unprotected exposure
+3. **Data Loss Bug**: Trailing stop fields weren't preserved when loading portfolio from Alpaca
+
+**The Lesson:**
+Claude's analysis was CORRECT - holding with trailing stop protection was the right call.
+But the SYSTEM failed to provide the protection Claude was relying on.
+**The gap between stated protection and actual protection cost 14% in lost gains.**
+
+**Fixes Implemented (Jan 30, 2026):**
+1. Added Alpaca native trailing stop orders - real-time execution by broker
+2. Fixed portfolio loading to preserve trailing stop fields
+3. When position hits +10%, now places actual Alpaca order instead of just JSON flag
+
+**Future Consideration:**
+For Tier 1 earnings beats that can run 30%+, should we use a tighter trail (1.5%)?
+Or wider trail (3%) to ride momentum? STX demonstrates that +10% flat targets
+leave massive gains on the table for strong catalysts.
+
+---
