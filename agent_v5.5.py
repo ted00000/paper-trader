@@ -6559,10 +6559,22 @@ CURRENT PORTFOLIO
                     # The screener already ran Claude analysis and classified tiers - trust it
                     screener_tier = screener_candidate.get('catalyst_tier')
 
+                    # BUG FIX (Jan 30, 2026): Use screener's actual catalyst type, not "Screener Validated"
+                    # The screener has the real catalyst (Earnings_Beat, M&A_Target, etc.) in claude_catalyst
+                    screener_catalyst_type = screener_candidate.get('claude_catalyst', {}).get('catalyst_type')
+                    if screener_catalyst_type and screener_catalyst_type != 'Unknown' and screener_catalyst_type != 'None':
+                        catalyst_type = screener_catalyst_type
+                        buy_pos['catalyst'] = screener_catalyst_type  # Update position with real catalyst
+                        print(f"   ℹ️  Using screener catalyst: {screener_catalyst_type}")
+
                     if screener_tier:
                         # Override tier_result with screener's tier (more accurate)
                         tier_result['tier'] = screener_tier.replace(' ', '')  # 'Tier 1' → 'Tier1'
-                        tier_result['tier_name'] = f'Screener Validated - {screener_tier}'
+                        # Use actual catalyst type in tier_name if available
+                        if screener_catalyst_type and screener_catalyst_type != 'Unknown':
+                            tier_result['tier_name'] = f'{screener_catalyst_type} ({screener_tier})'
+                        else:
+                            tier_result['tier_name'] = f'Screener Validated - {screener_tier}'
                         tier_result['reasoning'] = 'Tier assigned by screener Claude analysis'
                         print(f"   ℹ️  Using screener tier: {screener_tier}")
 
