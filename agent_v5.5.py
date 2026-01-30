@@ -1496,6 +1496,11 @@ POSITION {i}: {ticker}
                         'rs_rating': metadata.get('rs_rating'),
                         'vix_at_entry': metadata.get('vix_at_entry'),
                         'market_regime': metadata.get('market_regime'),
+                        # CRITICAL: Preserve trailing stop data from JSON (set by ANALYZE)
+                        'trailing_stop_active': metadata.get('trailing_stop_active', False),
+                        'trailing_stop_price': metadata.get('trailing_stop_price'),
+                        'peak_price': metadata.get('peak_price'),
+                        'peak_return_pct': metadata.get('peak_return_pct'),
                     })
 
                 account = self.broker.get_account()
