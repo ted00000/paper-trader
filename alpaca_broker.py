@@ -241,6 +241,129 @@ class AlpacaBroker:
         return self.api.cancel_all_orders()
 
     # =====================================================================
+    # TRAILING STOP ORDERS (Real-time execution by Alpaca)
+    # =====================================================================
+
+    def place_trailing_stop_order(self, ticker: str, qty: int, trail_percent: float = 2.0) -> Tuple[bool, str, Optional[str]]:
+        """
+        Place trailing stop sell order - Alpaca monitors and executes in real-time
+
+        When the position's price drops by trail_percent from its peak,
+        Alpaca automatically executes a market sell order.
+
+        Args:
+            ticker: Stock symbol (e.g., 'AAPL')
+            qty: Number of shares to sell
+            trail_percent: Percentage to trail below peak (e.g., 2.0 = 2%)
+
+        Returns:
+            Tuple of (success: bool, message: str, order_id: str or None)
+        """
+        if qty <= 0:
+            return False, f"Invalid quantity: {qty}. Must be > 0", None
+
+        if trail_percent <= 0 or trail_percent > 10:
+            return False, f"Invalid trail_percent: {trail_percent}. Must be between 0 and 10", None
+
+        try:
+            # First cancel any existing open orders for this symbol
+            # (avoid duplicate trailing stops)
+            self.cancel_orders_for_symbol(ticker)
+
+            # Place trailing stop order
+            order = self.api.submit_order(
+                symbol=ticker,
+                qty=qty,
+                side='sell',
+                type='trailing_stop',
+                trail_percent=str(trail_percent),  # Alpaca API expects string
+                time_in_force='gtc'  # Good-til-canceled (persists across days)
+            )
+
+            return True, f"Trailing stop placed: {qty} shares, trail {trail_percent}%", order.id
+
+        except Exception as e:
+            return False, f"Failed to place trailing stop for {ticker}: {str(e)}", None
+
+    def get_orders_for_symbol(self, ticker: str, status: str = 'open') -> List:
+        """
+        Get orders for a specific symbol
+
+        Args:
+            ticker: Stock symbol
+            status: 'open', 'closed', or 'all'
+
+        Returns:
+            List of Order objects for this symbol
+        """
+        try:
+            all_orders = self.api.list_orders(status=status)
+            return [o for o in all_orders if o.symbol == ticker]
+        except Exception as e:
+            logging.warning(f"Failed to get orders for {ticker}: {e}")
+            return []
+
+    def cancel_orders_for_symbol(self, ticker: str) -> Tuple[int, List[str]]:
+        """
+        Cancel all open orders for a specific symbol
+
+        Args:
+            ticker: Stock symbol
+
+        Returns:
+            Tuple of (count_canceled: int, order_ids: List[str])
+        """
+        canceled = []
+        try:
+            orders = self.get_orders_for_symbol(ticker, status='open')
+            for order in orders:
+                try:
+                    self.api.cancel_order(order.id)
+                    canceled.append(order.id)
+                except Exception as e:
+                    logging.warning(f"Failed to cancel order {order.id}: {e}")
+        except Exception as e:
+            logging.warning(f"Failed to get orders for {ticker}: {e}")
+
+        return len(canceled), canceled
+
+    def has_trailing_stop_order(self, ticker: str) -> Tuple[bool, Optional[str], Optional[float]]:
+        """
+        Check if there's an existing trailing stop order for a symbol
+
+        Args:
+            ticker: Stock symbol
+
+        Returns:
+            Tuple of (has_order: bool, order_id: str or None, trail_percent: float or None)
+        """
+        try:
+            orders = self.get_orders_for_symbol(ticker, status='open')
+            for order in orders:
+                if order.type == 'trailing_stop' and order.side == 'sell':
+                    trail_pct = float(order.trail_percent) if hasattr(order, 'trail_percent') and order.trail_percent else None
+                    return True, order.id, trail_pct
+            return False, None, None
+        except Exception as e:
+            logging.warning(f"Failed to check trailing stop for {ticker}: {e}")
+            return False, None, None
+
+    def update_trailing_stop(self, ticker: str, qty: int, new_trail_percent: float) -> Tuple[bool, str, Optional[str]]:
+        """
+        Update an existing trailing stop order (cancel and replace)
+
+        Args:
+            ticker: Stock symbol
+            qty: Number of shares
+            new_trail_percent: New trail percentage
+
+        Returns:
+            Tuple of (success: bool, message: str, new_order_id: str or None)
+        """
+        # Cancel existing and place new
+        return self.place_trailing_stop_order(ticker, qty, new_trail_percent)
+
+    # =====================================================================
     # PRICE DATA
     # =====================================================================
 

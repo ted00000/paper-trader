@@ -5239,27 +5239,70 @@ CURRENT PORTFOLIO
             if not position.get('trailing_stop_active'):
                 # First time hitting target - activate trailing stop
                 position['trailing_stop_active'] = True
-                position['trailing_stop_price'] = entry_price * 1.08  # Lock in +8% minimum
+                position['trailing_stop_price'] = entry_price * 1.08  # Lock in +8% minimum (for JSON tracking)
                 position['peak_price'] = current_price
                 position['peak_return_pct'] = return_pct
-                print(f"      🎯 {ticker} hit +{return_pct:.1f}% target, trailing stop activated at +8% (${position['trailing_stop_price']:.2f})")
+
+                # CRITICAL: Place Alpaca trailing stop order for REAL-TIME execution
+                # Alpaca will monitor continuously and sell if price drops 2% from peak
+                if self.use_alpaca and self.broker:
+                    shares = position.get('shares', 0)
+                    if shares > 0:
+                        success, msg, order_id = self.broker.place_trailing_stop_order(
+                            ticker=ticker,
+                            qty=int(shares),
+                            trail_percent=2.0  # 2% trailing stop
+                        )
+                        if success:
+                            position['alpaca_trailing_order_id'] = order_id
+                            print(f"      🎯 {ticker} hit +{return_pct:.1f}% target!")
+                            print(f"      📤 ALPACA TRAILING STOP PLACED: {int(shares)} shares, 2% trail (Order: {order_id})")
+                            print(f"      → Alpaca will auto-sell if price drops 2% from peak")
+                        else:
+                            print(f"      🎯 {ticker} hit +{return_pct:.1f}% target, trailing stop activated at +8%")
+                            print(f"      ⚠️ Alpaca trailing stop failed: {msg}")
+                            print(f"      → Using JSON tracking as fallback (checked at 9:45 AM / 4:30 PM)")
+                else:
+                    print(f"      🎯 {ticker} hit +{return_pct:.1f}% target, trailing stop activated at +8% (${position['trailing_stop_price']:.2f})")
+                    print(f"      → No Alpaca connection - using JSON tracking (checked at 9:45 AM / 4:30 PM)")
+
                 return False, 'Hold (trailing active)', return_pct
 
-            # Trailing stop already active - update peak and trail upward
-            if current_price > position['peak_price']:
+            # Trailing stop already active - update peak tracking (for visibility)
+            if current_price > position.get('peak_price', 0):
                 position['peak_price'] = current_price
                 position['peak_return_pct'] = return_pct
-                # Trail stop 2% below current price
+                # Update JSON tracking price (Alpaca handles the real trailing)
                 position['trailing_stop_price'] = current_price * 0.98
-                print(f"      📈 {ticker} new peak: +{return_pct:.1f}%, trailing stop now at ${position['trailing_stop_price']:.2f}")
+                print(f"      📈 {ticker} new peak: +{return_pct:.1f}%")
 
-            # Check if trailing stop hit
-            if current_price <= position.get('trailing_stop_price', price_target):
-                peak_pct = position.get('peak_return_pct', return_pct)
-                exit_reason = f"Trailing stop at +{return_pct:.1f}% (peak +{peak_pct:.1f}%)"
-                return True, exit_reason, return_pct
+                # Check if Alpaca trailing stop exists
+                if self.use_alpaca and self.broker:
+                    has_order, order_id, trail_pct = self.broker.has_trailing_stop_order(ticker)
+                    if has_order:
+                        print(f"      → Alpaca trailing stop active (Order: {order_id}, trail: {trail_pct}%)")
+                    else:
+                        # Re-place trailing stop if it was somehow lost
+                        shares = position.get('shares', 0)
+                        if shares > 0:
+                            success, msg, order_id = self.broker.place_trailing_stop_order(
+                                ticker=ticker,
+                                qty=int(shares),
+                                trail_percent=2.0
+                            )
+                            if success:
+                                position['alpaca_trailing_order_id'] = order_id
+                                print(f"      📤 Re-placed Alpaca trailing stop (Order: {order_id})")
 
-            # Still trailing, hold position
+            # Fallback check: If Alpaca trailing stop doesn't exist, use JSON tracking
+            # (This catches cases where Alpaca order was canceled or failed)
+            if not self.use_alpaca or not self.broker:
+                if current_price <= position.get('trailing_stop_price', price_target):
+                    peak_pct = position.get('peak_return_pct', return_pct)
+                    exit_reason = f"Trailing stop at +{return_pct:.1f}% (peak +{peak_pct:.1f}%)"
+                    return True, exit_reason, return_pct
+
+            # Still trailing, hold position (Alpaca will handle the actual exit)
             return False, 'Hold (trailing)', return_pct
 
         # PRIORITY 4: Check time stop (21 days standard, 90 days for PED)
@@ -5469,38 +5512,82 @@ CURRENT PORTFOLIO
     def update_portfolio_prices_and_check_exits(self):
         """
         CRITICAL FUNCTION - The heart of the ANALYZE command
-        
-        1. Fetch current prices for all positions
-        2. Update P&L for each position
-        3. Check if any stops/targets hit
-        4. Close positions that need closing
-        5. Update portfolio and account JSON files
-        6. Log closed trades to CSV
-        
+
+        1. Detect positions auto-sold by Alpaca trailing stops
+        2. Fetch current prices for all positions
+        3. Update P&L for each position
+        4. Check if any stops/targets hit
+        5. Close positions that need closing
+        6. Update portfolio and account JSON files
+        7. Log closed trades to CSV
+
         Returns: List of closed trades
         """
-        
+
         print("\n" + "="*60)
         print("PORTFOLIO UPDATE & EXIT CHECKING")
         print("="*60 + "\n")
-        
+
         if not self.portfolio_file.exists():
             print("   ⚠️ No portfolio file found")
             return []
-        
+
         with open(self.portfolio_file, 'r') as f:
             portfolio = json.load(f)
-        
+
         positions = portfolio.get('positions', [])
-        
+
         if not positions:
             print("   ℹ No positions to update")
             return []
-        
+
+        # STEP 0: Check for positions auto-sold by Alpaca trailing stops
+        alpaca_closed_trades = []
+        if self.use_alpaca and self.broker:
+            print("0. Checking for Alpaca trailing stop fills...")
+            alpaca_positions = {p.symbol: p for p in self.broker.get_positions()}
+
+            for position in positions[:]:  # Iterate copy to allow removal
+                ticker = position['ticker']
+                if position.get('trailing_stop_active') and ticker not in alpaca_positions:
+                    # Position had trailing stop and is no longer in Alpaca = sold!
+                    print(f"   🔔 {ticker} was AUTO-SOLD by Alpaca trailing stop!")
+
+                    # Try to get the fill price from closed orders
+                    exit_price = position.get('trailing_stop_price', position.get('current_price', 0))
+                    try:
+                        closed_orders = self.broker.get_orders_for_symbol(ticker, status='closed')
+                        for order in closed_orders:
+                            if order.type == 'trailing_stop' and order.status == 'filled':
+                                exit_price = float(order.filled_avg_price)
+                                print(f"      Fill price: ${exit_price:.2f}")
+                                break
+                    except Exception as e:
+                        print(f"      ⚠️ Could not fetch fill price: {e}")
+
+                    # Create trade record
+                    peak_pct = position.get('peak_return_pct', 0)
+                    entry_price = position.get('entry_price', 0)
+                    return_pct = ((exit_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+                    exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
+
+                    trade_data = self.close_position(position, exit_price, exit_reason)
+                    self.log_completed_trade(trade_data)
+                    alpaca_closed_trades.append(trade_data)
+
+                    # Remove from positions list
+                    positions.remove(position)
+                    print(f"      ✓ Logged: {ticker} exited at ${exit_price:.2f} ({return_pct:+.1f}%)")
+
+            if alpaca_closed_trades:
+                print(f"   ✓ {len(alpaca_closed_trades)} position(s) auto-closed by Alpaca\n")
+            else:
+                print("   ✓ No Alpaca trailing stop fills detected\n")
+
         print(f"1. Updating {len(positions)} positions...")
-        
+
         tickers = [pos['ticker'] for pos in positions]
-        
+
         print("\n2. Fetching current market prices...")
         current_prices = self.fetch_current_prices(tickers)
         
@@ -5576,10 +5663,15 @@ CURRENT PORTFOLIO
         # Update account status
         print("\n4. Updating account status...")
         self.update_account_status()
-        
-        print(f"\n✓ Portfolio updated: {len(positions_to_keep)} open, {len(closed_trades)} closed")
-        
-        return closed_trades
+
+        # Combine Alpaca auto-closed trades with manual closes
+        all_closed_trades = alpaca_closed_trades + closed_trades
+
+        print(f"\n✓ Portfolio updated: {len(positions_to_keep)} open, {len(all_closed_trades)} closed")
+        if alpaca_closed_trades:
+            print(f"   ({len(alpaca_closed_trades)} by Alpaca trailing stop, {len(closed_trades)} by exit check)")
+
+        return all_closed_trades
     
     # =====================================================================
     # PORTFOLIO ROTATION (PHASE 4)
