@@ -5010,7 +5010,7 @@ RECENT LESSONS LEARNED:
         with open(filename, 'w') as f:
             json.dump(response, f, indent=2)
 
-    def send_go_report_email(self, hold_positions, exit_positions, buy_positions, portfolio):
+    def send_go_report_email(self, hold_positions, exit_positions, buy_positions, portfolio, trailing_stop_positions=None):
         """Send daily GO report email via SendGrid"""
         if not SENDGRID_AVAILABLE:
             print("   ⚠️ SendGrid not available, skipping email")
@@ -5029,12 +5029,14 @@ RECENT LESSONS LEARNED:
             today = datetime.now().strftime('%b %d, %Y')
 
             # Today's Decisions section
+            trailing_count = len(trailing_stop_positions) if trailing_stop_positions else 0
             decisions_text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TODAY'S DECISIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 HOLD: {len(hold_positions)} positions
 EXIT: {len(exit_positions)} positions
 BUY:  {len(buy_positions)} new positions
+TRAILING STOPS: {trailing_count} positions
 """
             # Add new entries details
             if buy_positions:
@@ -5065,6 +5067,14 @@ BUY:  {len(buy_positions)} new positions
                         decisions_text += f"• {ticker}\n"
             else:
                 decisions_text += "\n🚪 EXITS:\n• None today\n"
+
+            # Add trailing stops details (if any)
+            if trailing_stop_positions:
+                decisions_text += "\n🛡️ TRAILING STOPS (placed at 9:45 AM):\n"
+                for ts in trailing_stop_positions:
+                    ticker = ts.get('ticker', 'N/A')
+                    return_pct = ts.get('return_pct', 0)
+                    decisions_text += f"• {ticker} (+{return_pct:.1f}%) - 2% trailing stop\n"
 
             # Current Portfolio section
             portfolio_text = """
@@ -6811,13 +6821,64 @@ CURRENT PORTFOLIO
         # Save daily picks for dashboard visibility (ALWAYS save, even if 0 picks)
         self.save_daily_picks(all_picks, vix_result, macro_result)
 
+        # Step 5.7: Identify positions needing trailing stop orders (Jan 2026 fix)
+        # Trailing stops should be placed at market open (EXECUTE), not at 4:30 PM (ANALYZE)
+        print("5.7 Identifying positions for trailing stop protection...")
+        trailing_stop_positions = []
+
+        for ticker in hold_positions:
+            # Get position data
+            position = next((p for p in existing_positions if p['ticker'] == ticker), None)
+            if not position:
+                continue
+
+            entry_price = position.get('entry_price', 0)
+            if entry_price <= 0:
+                continue
+
+            # Get premarket price
+            pm_data = premarket_data.get(ticker, {})
+            current_price = pm_data.get('premarket_price', position.get('current_price', entry_price))
+
+            # Calculate current return
+            return_pct = ((current_price - entry_price) / entry_price) * 100
+
+            # Check if position qualifies for trailing stop (+10% or more)
+            if return_pct >= 10.0:
+                # Check if already has an Alpaca trailing stop order
+                has_alpaca_order = False
+                if self.use_alpaca and self.broker:
+                    has_order, order_id, trail_pct = self.broker.has_trailing_stop_order(ticker)
+                    has_alpaca_order = has_order
+
+                if not has_alpaca_order:
+                    shares = int(position.get('shares', 0))
+                    trailing_stop_positions.append({
+                        'ticker': ticker,
+                        'shares': shares,
+                        'entry_price': entry_price,
+                        'current_price': current_price,
+                        'return_pct': round(return_pct, 1),
+                        'trail_percent': 2.0  # 2% trailing stop
+                    })
+                    print(f"   📤 {ticker}: +{return_pct:.1f}% gain → needs trailing stop (2% trail)")
+                else:
+                    print(f"   ✓ {ticker}: +{return_pct:.1f}% gain → already has Alpaca trailing stop")
+
+        if trailing_stop_positions:
+            print(f"   ✓ {len(trailing_stop_positions)} positions need trailing stop orders at market open")
+        else:
+            print("   ✓ No positions currently qualify for trailing stop protection")
+        print()
+
         # Step 6: Build pending_positions.json
         print("6. Building pending positions file...")
         pending = {
             'decision_time': datetime.now().isoformat(),
             'hold': hold_positions,
             'exit': exit_positions,
-            'buy': buy_positions
+            'buy': buy_positions,
+            'trailing_stops': trailing_stop_positions  # NEW: Trailing stops to place at market open
         }
 
         with open(self.pending_file, 'w') as f:
@@ -6836,12 +6897,14 @@ CURRENT PORTFOLIO
         print(f"  - HOLD: {len(hold_positions)} positions")
         print(f"  - EXIT: {len(exit_positions)} positions (will close at 9:30 AM)")
         print(f"  - BUY:  {len(buy_positions)} new positions (will enter at 9:30 AM)")
-        print(f"\n✓ Run 'execute' command at 9:30 AM to execute these decisions\n")
+        if trailing_stop_positions:
+            print(f"  - TRAILING STOPS: {len(trailing_stop_positions)} positions (Alpaca orders at 9:45 AM)")
+        print(f"\n✓ Run 'execute' command at 9:45 AM to execute these decisions\n")
 
         # Send GO report email
         print("8. Sending GO report email...")
         portfolio = self.load_current_portfolio()
-        self.send_go_report_email(hold_positions, exit_positions, buy_positions, portfolio)
+        self.send_go_report_email(hold_positions, exit_positions, buy_positions, portfolio, trailing_stop_positions)
 
         return True
     
@@ -6875,10 +6938,12 @@ CURRENT PORTFOLIO
         hold_tickers = pending.get('hold', [])
         exit_decisions = pending.get('exit', [])
         buy_positions = pending.get('buy', [])
+        trailing_stop_orders = pending.get('trailing_stops', [])  # NEW: Trailing stops to place
 
         print(f"   ✓ HOLD: {len(hold_tickers)} positions")
         print(f"   ✓ EXIT: {len(exit_decisions)} positions")
-        print(f"   ✓ BUY:  {len(buy_positions)} new positions\n")
+        print(f"   ✓ BUY:  {len(buy_positions)} new positions")
+        print(f"   ✓ TRAILING STOPS: {len(trailing_stop_orders)} positions\n")
 
         # Load current portfolio
         print("2. Loading current portfolio...")
@@ -7257,8 +7322,59 @@ CURRENT PORTFOLIO
         self.create_daily_activity_summary(closed_trades)
         print()
 
+        # Step 10: Place Alpaca trailing stop orders for qualifying positions
+        print("10. Placing trailing stop orders...")
+        trailing_stops_placed = 0
+        if trailing_stop_orders and self.use_alpaca and self.broker:
+            for ts_order in trailing_stop_orders:
+                ticker = ts_order['ticker']
+                shares = ts_order['shares']
+                trail_percent = ts_order.get('trail_percent', 2.0)
+                return_pct = ts_order.get('return_pct', 0)
+
+                # Verify position still exists (wasn't exited)
+                if ticker in exited_tickers:
+                    print(f"   ⚠️ {ticker}: Skipping - position was exited")
+                    continue
+
+                # Place the trailing stop order with Alpaca
+                success, msg, order_id = self.broker.place_trailing_stop_order(
+                    ticker=ticker,
+                    qty=shares,
+                    trail_percent=trail_percent
+                )
+
+                if success:
+                    trailing_stops_placed += 1
+                    print(f"   ✓ {ticker}: Trailing stop placed ({trail_percent}% trail) - protecting +{return_pct:.1f}% gain")
+
+                    # Update portfolio position to reflect trailing stop is active
+                    for pos in updated_positions:
+                        if pos['ticker'] == ticker:
+                            pos['trailing_stop_active'] = True
+                            pos['alpaca_trailing_order_id'] = order_id
+                            break
+                else:
+                    print(f"   ✗ {ticker}: Failed to place trailing stop - {msg}")
+
+            print(f"   ✓ {trailing_stops_placed}/{len(trailing_stop_orders)} trailing stops placed")
+
+            # Re-save portfolio with trailing stop updates
+            if trailing_stops_placed > 0:
+                updated_portfolio = {
+                    'account_value': portfolio_value,
+                    'cash_available': cash_available,
+                    'positions': updated_positions,
+                    'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                with open(self.portfolio_file, 'w') as f:
+                    json.dump(updated_portfolio, f, indent=2)
+        else:
+            print("   ✓ No trailing stop orders to place")
+        print()
+
         # Save execute response for dashboard tracking
-        print("10. Saving execute summary...")
+        print("11. Saving execute summary...")
         execute_summary = {
             "command": "execute",
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -7266,7 +7382,8 @@ CURRENT PORTFOLIO
                 "closed": len(closed_trades),
                 "holding": held_positions_count,
                 "entered": len(updated_positions) - held_positions_count,
-                "total_active": len(updated_positions)
+                "total_active": len(updated_positions),
+                "trailing_stops_placed": trailing_stops_placed
             },
             "closed_trades": [
                 {
@@ -7277,7 +7394,8 @@ CURRENT PORTFOLIO
                 }
                 for t in closed_trades
             ],
-            "new_entries": [{"ticker": b.get("ticker"), "entry_price": b.get("entry_price")} for b in buy_positions if b.get("entry_price")]
+            "new_entries": [{"ticker": b.get("ticker"), "entry_price": b.get("entry_price")} for b in buy_positions if b.get("entry_price")],
+            "trailing_stops": [{"ticker": ts.get("ticker"), "return_pct": ts.get("return_pct")} for ts in trailing_stop_orders]
         }
         self.save_response("execute", execute_summary)
         print("   ✓ Execute summary saved\n")
@@ -7292,7 +7410,10 @@ CURRENT PORTFOLIO
         print(f"  - Closed: {len(closed_trades)} positions")
         print(f"  - Holding: {held_positions_count} positions")
         print(f"  - Entered: {len(updated_positions) - held_positions_count} new positions")
-        print(f"  - Total Active: {len(updated_positions)} positions\n")
+        print(f"  - Total Active: {len(updated_positions)} positions")
+        if trailing_stops_placed > 0:
+            print(f"  - Trailing Stops: {trailing_stops_placed} Alpaca orders placed (real-time protection)")
+        print()
 
         return True
 
