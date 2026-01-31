@@ -4475,20 +4475,30 @@ CRITICAL: When executing 'go' command, you MUST include a properly formatted JSO
                     raise
     
     def load_optimized_context(self, command):
-        """Load optimized context for command"""
-        
+        """
+        Load optimized context for command.
+
+        INSTITUTIONAL LEARNING INTEGRATION (Jan 2026):
+        Context now includes structured learning data from learning_database.json:
+        - Critical system failures (ACTIVE failures shown prominently)
+        - Catalyst performance metrics with statistical confidence
+        - Market regime performance data
+        - Exit timing patterns (for ANALYZE)
+        - Actionable insights derived from data
+        """
+
         context = {}
-        
+
         # Load instructions
         instructions_file = self.project_dir / 'PROJECT_INSTRUCTIONS.md'
         if instructions_file.exists():
             context['instructions'] = instructions_file.read_text()[:5000]
-        
+
         # Load strategy rules (limit to 8000 chars to prevent timeout)
         strategy_file = self.project_dir / 'strategy_evolution' / 'strategy_rules.md'
         if strategy_file.exists():
             context['strategy'] = strategy_file.read_text()[:8000]
-        
+
         # Load catalyst exclusions with performance data
         exclusions = self.load_catalyst_exclusions()
         if exclusions:
@@ -4499,22 +4509,18 @@ CRITICAL: When executing 'go' command, you MUST include a properly formatted JSO
         else:
             context['exclusions'] = 'None (all catalysts available)'
 
-        # Load catalyst performance for data-driven decisions (Learning System Enhancement Jan 2026)
-        context['catalyst_performance'] = self.get_catalyst_performance_summary()
-        
+        # INSTITUTIONAL LEARNING: Load structured learning context (Jan 2026)
+        # This replaces the old unstructured lessons_learned.md with data-driven insights
+        context['learning'] = self.get_learning_context_for_command(command)
+
         # Load portfolio
         if self.portfolio_file.exists():
             context['portfolio'] = self.portfolio_file.read_text()
-        
+
         # Load account status
         if self.account_file.exists():
             context['account'] = self.account_file.read_text()
-        
-        # Load recent lessons
-        lessons_file = self.project_dir / 'strategy_evolution' / 'lessons_learned.md'
-        if lessons_file.exists():
-            context['lessons'] = lessons_file.read_text()[-2000:]
-        
+
         context_str = f"""
 PROJECT INSTRUCTIONS:
 {context.get('instructions', 'Not found')}
@@ -4522,12 +4528,13 @@ PROJECT INSTRUCTIONS:
 STRATEGY RULES (AUTO-UPDATED BY LEARNING):
 {context.get('strategy', 'Not found')}
 
-📊 HISTORICAL CATALYST PERFORMANCE (Data-Driven Guidance):
-Use this data to inform your decisions. Prioritize catalyst types with proven track records.
-{context.get('catalyst_performance', 'No data yet')}
+============================================================
+LEARNING DATABASE (Institutional Grade - Auto-Updated)
+============================================================
+{context.get('learning', 'Learning database initializing...')}
 
-⚠️  EXCLUDED CATALYSTS:
-The following catalysts have shown poor results. You may still use them if you have strong conviction,
+⚠️  EXCLUDED PATTERNS:
+The following patterns have shown poor results. You may still use them if you have strong conviction,
 but explain your reasoning and consider what makes this situation different from past failures.
 Your decisions will be tracked for accountability.
 {context.get('exclusions', 'None')}
@@ -4537,11 +4544,8 @@ CURRENT PORTFOLIO:
 
 ACCOUNT STATUS:
 {context.get('account', 'Not initialized')}
-
-RECENT LESSONS LEARNED:
-{context.get('lessons', 'None yet')}
 """
-        
+
         return context_str
     
     def load_catalyst_exclusions(self):
@@ -4755,6 +4759,386 @@ RECENT LESSONS LEARNED:
             'observed_rate': observed_rate,
             'sample_size': total
         }
+
+    # =====================================================================
+    # INSTITUTIONAL LEARNING DATABASE (Jan 2026)
+    # =====================================================================
+
+    def load_learning_database(self):
+        """
+        Load the structured learning database.
+
+        This is the primary source of learning data for Claude.
+        Contains:
+        - Critical failures and their resolution status
+        - Catalyst performance metrics
+        - Market regime performance
+        - Entry/exit timing patterns
+        - Active hypotheses under test
+        - Actionable insights
+        """
+        db_file = self.project_dir / 'strategy_evolution' / 'learning_database.json'
+
+        if not db_file.exists():
+            return None
+
+        try:
+            with open(db_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"   Warning: Failed to load learning database: {e}")
+            return None
+
+    def save_learning_database(self, db):
+        """Save the learning database with timestamp update."""
+        db_file = self.project_dir / 'strategy_evolution' / 'learning_database.json'
+
+        db['last_updated'] = datetime.now().isoformat()
+
+        try:
+            with open(db_file, 'w') as f:
+                json.dump(db, f, indent=2)
+            return True
+        except Exception as e:
+            print(f"   Error: Failed to save learning database: {e}")
+            return False
+
+    def get_learning_context_for_command(self, command):
+        """
+        Generate command-specific learning context for Claude.
+
+        Different commands need different learning context:
+        - GO: Full context (failures, catalyst performance, insights)
+        - SCREEN: Catalyst performance only (for prioritization)
+        - ANALYZE: Exit patterns and failure learnings
+        - EXECUTE: System status only
+
+        Returns a formatted string for inclusion in prompts.
+        """
+        db = self.load_learning_database()
+
+        if not db:
+            return "Learning database not yet initialized."
+
+        lines = []
+
+        # CRITICAL FAILURES - Always show ACTIVE failures prominently
+        active_failures = [
+            f for f in db.get('critical_failures', {}).get('failures', [])
+            if f.get('status') == 'ACTIVE'
+        ]
+
+        if active_failures:
+            lines.append("=" * 60)
+            lines.append("CRITICAL SYSTEM FAILURES (UNRESOLVED)")
+            lines.append("=" * 60)
+            for failure in active_failures:
+                lines.append(f"\nFAILURE: {failure.get('summary', 'Unknown')}")
+                lines.append(f"Date: {failure.get('date')}")
+                lines.append(f"Impact: {failure.get('impact', {})}")
+                lines.append(f"Lesson: {failure.get('lesson_for_claude', 'None')}")
+            lines.append("")
+
+        # RESOLVED FAILURES - Brief mention of recent resolutions
+        resolved_failures = [
+            f for f in db.get('critical_failures', {}).get('failures', [])
+            if f.get('status') == 'RESOLVED' and f.get('fix_implemented')
+        ]
+
+        if resolved_failures and command in ['go', 'analyze']:
+            lines.append("Recent System Fixes (for awareness):")
+            for failure in resolved_failures[-3:]:  # Last 3 only
+                lines.append(f"  - {failure.get('summary')} [FIXED {failure.get('fix_implemented')}]")
+            lines.append("")
+
+        # CATALYST PERFORMANCE - For GO and SCREEN
+        if command in ['go', 'screen']:
+            catalyst_perf = db.get('catalyst_performance', {}).get('catalysts', {})
+
+            # Find catalysts with actual data
+            catalysts_with_data = [
+                (name, stats) for name, stats in catalyst_perf.items()
+                if stats.get('total_trades', 0) > 0
+            ]
+
+            if catalysts_with_data:
+                # Sort by win rate
+                catalysts_with_data.sort(key=lambda x: x[1].get('win_rate_pct', 0), reverse=True)
+
+                lines.append("CATALYST PERFORMANCE (Data-Driven):")
+                for name, stats in catalysts_with_data:
+                    win_rate = stats.get('win_rate_pct', 0)
+                    total = stats.get('total_trades', 0)
+                    avg_return = stats.get('net_avg_return_pct', 0)
+                    confidence = stats.get('confidence', 'LOW')
+
+                    emoji = "" if win_rate >= 60 else "" if win_rate >= 50 else ""
+                    lines.append(f"  {emoji} {name}: {win_rate:.0f}% win rate, {avg_return:+.1f}% avg ({total} trades, {confidence})")
+                lines.append("")
+            else:
+                lines.append("CATALYST PERFORMANCE: Insufficient trade data. Prioritize Tier 1 catalysts.")
+                lines.append("")
+
+        # MARKET REGIME - For GO
+        if command == 'go':
+            regime_perf = db.get('market_regime_performance', {}).get('regimes', {})
+
+            regimes_with_data = [
+                (name, stats) for name, stats in regime_perf.items()
+                if stats.get('total_trades', 0) >= 5
+            ]
+
+            if regimes_with_data:
+                lines.append("MARKET REGIME PERFORMANCE:")
+                for name, stats in regimes_with_data:
+                    lines.append(f"  {name}: {stats.get('win_rate_pct', 0):.0f}% win rate, optimal size {stats.get('optimal_position_size_pct')}%")
+                lines.append("")
+
+        # EXIT PATTERNS - For ANALYZE
+        if command == 'analyze':
+            exit_patterns = db.get('exit_timing_patterns', {}).get('exit_types', {})
+
+            exits_with_data = [
+                (name, stats) for name, stats in exit_patterns.items()
+                if stats.get('total', 0) > 0
+            ]
+
+            if exits_with_data:
+                lines.append("EXIT TYPE PERFORMANCE:")
+                for name, stats in exits_with_data:
+                    total = stats.get('total', 0)
+                    avg_return = stats.get('avg_return_pct', stats.get('avg_loss_pct', 0))
+                    lines.append(f"  {name}: {total} exits, {avg_return:+.1f}% avg")
+                lines.append("")
+
+        # ACTIONABLE INSIGHTS - For all commands
+        insights = db.get('actionable_insights', {}).get('insights', [])
+        active_insights = [i for i in insights if i.get('priority') not in ['RESOLVED', 'DISMISSED']]
+
+        if active_insights:
+            lines.append("ACTIONABLE INSIGHTS:")
+            for insight in active_insights[:5]:  # Top 5
+                lines.append(f"  [{insight.get('type')}] {insight.get('message')}")
+            lines.append("")
+
+        # EXCLUDED PATTERNS - For GO and SCREEN
+        if command in ['go', 'screen']:
+            excluded = db.get('excluded_patterns', {}).get('patterns', [])
+            if excluded:
+                lines.append("EXCLUDED PATTERNS (Poor Performance):")
+                for pattern in excluded:
+                    lines.append(f"  - {pattern.get('name')}: {pattern.get('reason')}")
+                lines.append("")
+
+        return '\n'.join(lines) if lines else "No learning data available yet."
+
+    def update_learning_from_trade(self, trade_data):
+        """
+        Update learning database after a trade closes.
+
+        This is called automatically when a position is closed.
+        Updates:
+        - Catalyst performance stats
+        - Market regime performance
+        - Exit type statistics
+        - Conviction level outcomes
+
+        Args:
+            trade_data: Dict with trade details (from completed_trades.csv format)
+        """
+        db = self.load_learning_database()
+        if not db:
+            print("   Warning: Cannot update learning - database not found")
+            return
+
+        # Extract trade details
+        catalyst_type = trade_data.get('catalyst_type', 'Unknown')
+        return_pct = float(trade_data.get('return_percent', 0))
+        hold_days = int(trade_data.get('hold_days', 0))
+        exit_type = trade_data.get('exit_type', 'unknown')
+        conviction = trade_data.get('conviction_level', 'MEDIUM')
+        market_regime = trade_data.get('market_regime', 'uncertain')
+        ticker = trade_data.get('ticker', '')
+
+        is_winner = return_pct > 0
+
+        # Update catalyst performance
+        catalyst_type_key = catalyst_type.replace(' ', '_').replace('-', '_')
+        if catalyst_type_key in db.get('catalyst_performance', {}).get('catalysts', {}):
+            cat_stats = db['catalyst_performance']['catalysts'][catalyst_type_key]
+
+            cat_stats['total_trades'] = cat_stats.get('total_trades', 0) + 1
+            if is_winner:
+                cat_stats['winners'] = cat_stats.get('winners', 0) + 1
+            else:
+                cat_stats['losers'] = cat_stats.get('losers', 0) + 1
+
+            # Recalculate averages
+            total = cat_stats['total_trades']
+            winners = cat_stats['winners']
+            losers = cat_stats['losers']
+
+            cat_stats['win_rate_pct'] = round((winners / total) * 100, 1) if total > 0 else 0
+
+            # Update best/worst
+            if return_pct > cat_stats.get('best_trade_pct', 0):
+                cat_stats['best_trade_pct'] = round(return_pct, 2)
+            if return_pct < cat_stats.get('worst_trade_pct', 0):
+                cat_stats['worst_trade_pct'] = round(return_pct, 2)
+
+            # Running average return
+            prev_avg = cat_stats.get('net_avg_return_pct', 0)
+            cat_stats['net_avg_return_pct'] = round(prev_avg + (return_pct - prev_avg) / total, 2)
+
+            # Running average hold days
+            prev_hold = cat_stats.get('avg_hold_days', 0)
+            cat_stats['avg_hold_days'] = round(prev_hold + (hold_days - prev_hold) / total, 1)
+
+            # Add to sample trades (keep last 10)
+            sample = cat_stats.get('sample_trades', [])
+            sample.append({
+                'ticker': ticker,
+                'return_pct': round(return_pct, 2),
+                'hold_days': hold_days,
+                'date': datetime.now().strftime('%Y-%m-%d')
+            })
+            cat_stats['sample_trades'] = sample[-10:]
+
+            # Update confidence level
+            if total >= 25:
+                cat_stats['confidence'] = 'HIGH'
+            elif total >= 10:
+                cat_stats['confidence'] = 'MEDIUM'
+            elif total >= 5:
+                cat_stats['confidence'] = 'LOW'
+            else:
+                cat_stats['confidence'] = 'INSUFFICIENT_DATA'
+
+        # Update market regime performance
+        regime_key = market_regime.lower().replace(' ', '_').replace('-', '_')
+        if regime_key in db.get('market_regime_performance', {}).get('regimes', {}):
+            regime_stats = db['market_regime_performance']['regimes'][regime_key]
+
+            regime_stats['total_trades'] = regime_stats.get('total_trades', 0) + 1
+            total = regime_stats['total_trades']
+
+            prev_win_rate = regime_stats.get('win_rate_pct', 0) * (total - 1) / 100
+            new_wins = prev_win_rate + (1 if is_winner else 0)
+            regime_stats['win_rate_pct'] = round((new_wins / total) * 100, 1)
+
+            prev_avg = regime_stats.get('avg_return_pct', 0)
+            regime_stats['avg_return_pct'] = round(prev_avg + (return_pct - prev_avg) / total, 2)
+
+        # Update exit type statistics
+        exit_key = exit_type.lower().replace(' ', '_').replace('-', '_')
+        if exit_key in db.get('exit_timing_patterns', {}).get('exit_types', {}):
+            exit_stats = db['exit_timing_patterns']['exit_types'][exit_key]
+
+            exit_stats['total'] = exit_stats.get('total', 0) + 1
+            total = exit_stats['total']
+
+            prev_avg = exit_stats.get('avg_return_pct', exit_stats.get('avg_loss_pct', 0))
+            exit_stats['avg_return_pct'] = round(prev_avg + (return_pct - prev_avg) / total, 2)
+
+        # Update conviction level outcomes
+        conviction_key = conviction.upper().replace('-', '_')
+        if conviction_key in db.get('position_sizing_outcomes', {}).get('by_conviction', {}):
+            conv_stats = db['position_sizing_outcomes']['by_conviction'][conviction_key]
+
+            conv_stats['total_trades'] = conv_stats.get('total_trades', 0) + 1
+            total = conv_stats['total_trades']
+
+            prev_win_rate = conv_stats.get('win_rate_pct', 0) * (total - 1) / 100
+            new_wins = prev_win_rate + (1 if is_winner else 0)
+            conv_stats['win_rate_pct'] = round((new_wins / total) * 100, 1)
+
+            prev_avg = conv_stats.get('avg_return_pct', 0)
+            conv_stats['avg_return_pct'] = round(prev_avg + (return_pct - prev_avg) / total, 2)
+
+        # Save updated database
+        self.save_learning_database(db)
+        print(f"   Learning updated: {catalyst_type} trade ({return_pct:+.1f}%)")
+
+    def add_critical_failure(self, failure_id, summary, impact, root_causes, lesson_for_claude,
+                            ticker=None, category='SYSTEM', severity='HIGH'):
+        """
+        Log a critical system failure for tracking and learning.
+
+        Args:
+            failure_id: Unique ID for the failure
+            summary: Brief description
+            impact: Dict with impact metrics
+            root_causes: List of root cause strings
+            lesson_for_claude: What Claude should learn from this
+            ticker: Optional ticker if position-specific
+            category: EXECUTION | ANALYSIS | SYSTEM | DATA
+            severity: HIGH | MEDIUM | LOW
+        """
+        db = self.load_learning_database()
+        if not db:
+            return
+
+        failure = {
+            'id': failure_id,
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'status': 'ACTIVE',
+            'category': category,
+            'severity': severity,
+            'ticker': ticker,
+            'summary': summary,
+            'impact': impact,
+            'root_causes': root_causes,
+            'fix_implemented': None,
+            'fix_description': None,
+            'lesson_for_claude': lesson_for_claude
+        }
+
+        db['critical_failures']['failures'].append(failure)
+        self.save_learning_database(db)
+        print(f"   Critical failure logged: {failure_id}")
+
+    def resolve_critical_failure(self, failure_id, fix_description):
+        """Mark a critical failure as resolved."""
+        db = self.load_learning_database()
+        if not db:
+            return
+
+        for failure in db.get('critical_failures', {}).get('failures', []):
+            if failure.get('id') == failure_id:
+                failure['status'] = 'RESOLVED'
+                failure['fix_implemented'] = datetime.now().strftime('%Y-%m-%d')
+                failure['fix_description'] = fix_description
+                break
+
+        self.save_learning_database(db)
+        print(f"   Critical failure resolved: {failure_id}")
+
+    def add_actionable_insight(self, insight_type, message, priority='NORMAL'):
+        """
+        Add an actionable insight for Claude to act on.
+
+        Args:
+            insight_type: STRATEGY | SYSTEM_FIX | PERFORMANCE | RISK
+            message: The insight message
+            priority: CRITICAL | HIGH | NORMAL | LOW
+        """
+        db = self.load_learning_database()
+        if not db:
+            return
+
+        insight = {
+            'type': insight_type,
+            'priority': priority,
+            'message': message,
+            'date_added': datetime.now().strftime('%Y-%m-%d')
+        }
+
+        db['actionable_insights']['insights'].append(insight)
+
+        # Keep only last 50 insights
+        db['actionable_insights']['insights'] = db['actionable_insights']['insights'][-50:]
+
+        self.save_learning_database(db)
 
     # =====================================================================
     # JSON PARSING AND PORTFOLIO CREATION
@@ -5515,9 +5899,15 @@ CURRENT PORTFOLIO
                 trade_data.get('rotation_into_ticker', ''),
                 trade_data.get('rotation_reason', '')
             ])
-        
+
         print(f"   ✓ Logged trade to CSV: {trade_data.get('ticker')} "
               f"({trade_data.get('return_percent', 0):.2f}%)")
+
+        # INSTITUTIONAL LEARNING: Update learning database with trade outcome (Jan 2026)
+        try:
+            self.update_learning_from_trade(trade_data)
+        except Exception as e:
+            print(f"   Warning: Failed to update learning database: {e}")
     
     def update_portfolio_prices_and_check_exits(self):
         """

@@ -1,0 +1,307 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-01-30T23:00:00",
+  "schema_version": 1,
+
+  "critical_failures": {
+    "description": "System failures that caused material losses. ACTIVE failures are surfaced prominently to Claude until resolved.",
+    "failures": [
+      {
+        "id": "STX_TRAILING_STOP_001",
+        "date": "2026-01-30",
+        "status": "RESOLVED",
+        "category": "EXECUTION",
+        "severity": "HIGH",
+        "ticker": "STX",
+        "summary": "Trailing stop was tracked in JSON but not executed by broker",
+        "impact": {
+          "lost_profit_pct": 14.0,
+          "lost_profit_dollars": 94,
+          "peak_return_pct": 32.0,
+          "actual_exit_pct": 18.3
+        },
+        "root_causes": [
+          "Trailing stop data only in JSON with no execution mechanism",
+          "Portfolio load from Alpaca didn't preserve trailing stop fields",
+          "Exits only checked at 9:45 AM and 4:30 PM (not real-time)"
+        ],
+        "fix_implemented": "2026-01-30",
+        "fix_description": "Added Alpaca native trailing stop orders placed during EXECUTE at market open",
+        "lesson_for_claude": "When recommending trailing stop protection, verify the system can actually execute it. The GO phase now identifies +10% positions and EXECUTE places Alpaca orders at market open."
+      }
+    ]
+  },
+
+  "catalyst_performance": {
+    "description": "Performance metrics by catalyst type. Updated automatically after each trade closes.",
+    "catalysts": {
+      "Earnings_Beat": {
+        "total_trades": 0,
+        "winners": 0,
+        "losers": 0,
+        "win_rate_pct": 0.0,
+        "avg_winner_pct": 0.0,
+        "avg_loser_pct": 0.0,
+        "net_avg_return_pct": 0.0,
+        "best_trade_pct": 0.0,
+        "worst_trade_pct": 0.0,
+        "avg_hold_days": 0.0,
+        "optimal_exit_day": null,
+        "confidence": "INSUFFICIENT_DATA",
+        "sample_trades": []
+      },
+      "M_and_A_Target": {
+        "total_trades": 0,
+        "winners": 0,
+        "losers": 0,
+        "win_rate_pct": 0.0,
+        "avg_winner_pct": 0.0,
+        "avg_loser_pct": 0.0,
+        "net_avg_return_pct": 0.0,
+        "best_trade_pct": 0.0,
+        "worst_trade_pct": 0.0,
+        "avg_hold_days": 0.0,
+        "optimal_exit_day": null,
+        "confidence": "INSUFFICIENT_DATA",
+        "sample_trades": []
+      },
+      "Analyst_Upgrade": {
+        "total_trades": 0,
+        "winners": 0,
+        "losers": 0,
+        "win_rate_pct": 0.0,
+        "avg_winner_pct": 0.0,
+        "avg_loser_pct": 0.0,
+        "net_avg_return_pct": 0.0,
+        "best_trade_pct": 0.0,
+        "worst_trade_pct": 0.0,
+        "avg_hold_days": 0.0,
+        "optimal_exit_day": null,
+        "confidence": "INSUFFICIENT_DATA",
+        "sample_trades": []
+      },
+      "Technical_Breakout": {
+        "total_trades": 0,
+        "winners": 0,
+        "losers": 0,
+        "win_rate_pct": 0.0,
+        "avg_winner_pct": 0.0,
+        "avg_loser_pct": 0.0,
+        "net_avg_return_pct": 0.0,
+        "best_trade_pct": 0.0,
+        "worst_trade_pct": 0.0,
+        "avg_hold_days": 0.0,
+        "optimal_exit_day": null,
+        "confidence": "INSUFFICIENT_DATA",
+        "sample_trades": []
+      },
+      "Sector_Momentum": {
+        "total_trades": 0,
+        "winners": 0,
+        "losers": 0,
+        "win_rate_pct": 0.0,
+        "avg_winner_pct": 0.0,
+        "avg_loser_pct": 0.0,
+        "net_avg_return_pct": 0.0,
+        "best_trade_pct": 0.0,
+        "worst_trade_pct": 0.0,
+        "avg_hold_days": 0.0,
+        "optimal_exit_day": null,
+        "confidence": "INSUFFICIENT_DATA",
+        "sample_trades": []
+      },
+      "Binary_Event": {
+        "total_trades": 0,
+        "winners": 0,
+        "losers": 0,
+        "win_rate_pct": 0.0,
+        "avg_winner_pct": 0.0,
+        "avg_loser_pct": 0.0,
+        "net_avg_return_pct": 0.0,
+        "best_trade_pct": 0.0,
+        "worst_trade_pct": 0.0,
+        "avg_hold_days": 0.0,
+        "optimal_exit_day": null,
+        "confidence": "INSUFFICIENT_DATA",
+        "sample_trades": []
+      }
+    }
+  },
+
+  "market_regime_performance": {
+    "description": "Performance by market regime. Helps adapt strategy to market conditions.",
+    "regimes": {
+      "bull_low_vix": {
+        "total_trades": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "optimal_position_size_pct": 10.0,
+        "notes": "VIX < 15, SPY above 20-day SMA"
+      },
+      "bull_elevated_vix": {
+        "total_trades": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "optimal_position_size_pct": 8.0,
+        "notes": "VIX 15-20, SPY above 20-day SMA"
+      },
+      "uncertain": {
+        "total_trades": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "optimal_position_size_pct": 6.0,
+        "notes": "VIX 20-25 or mixed signals"
+      },
+      "bear_high_vix": {
+        "total_trades": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "optimal_position_size_pct": 5.0,
+        "notes": "VIX > 25 or SPY below 20-day SMA"
+      }
+    }
+  },
+
+  "entry_timing_patterns": {
+    "description": "Analysis of entry timing and outcomes",
+    "gap_entries": {
+      "gap_under_2pct": {
+        "total": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "notes": "Standard entries"
+      },
+      "gap_2_to_5pct": {
+        "total": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "notes": "RECHECK entries after 30min wait"
+      },
+      "gap_over_5pct": {
+        "total": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "notes": "Large gaps - often chased, mixed results"
+      }
+    }
+  },
+
+  "exit_timing_patterns": {
+    "description": "Analysis of exit types and outcomes",
+    "exit_types": {
+      "stop_loss": {
+        "total": 0,
+        "avg_loss_pct": 0.0,
+        "notes": "Positions that hit -7% stop"
+      },
+      "trailing_stop": {
+        "total": 0,
+        "avg_return_pct": 0.0,
+        "avg_peak_to_exit_loss_pct": 0.0,
+        "notes": "Trailing stop triggered exits"
+      },
+      "price_target": {
+        "total": 0,
+        "avg_return_pct": 0.0,
+        "notes": "Hit +10% target and exited"
+      },
+      "catalyst_exhausted": {
+        "total": 0,
+        "avg_return_pct": 0.0,
+        "avg_hold_days": 0.0,
+        "notes": "Thesis played out, time-based exit"
+      },
+      "sector_rotation": {
+        "total": 0,
+        "avg_return_pct": 0.0,
+        "notes": "Rotated to better opportunity"
+      }
+    }
+  },
+
+  "position_sizing_outcomes": {
+    "description": "How position sizing affected outcomes",
+    "by_conviction": {
+      "HIGH": {
+        "avg_size_pct": 12.0,
+        "total_trades": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "notes": "12-13% position size"
+      },
+      "MEDIUM_HIGH": {
+        "avg_size_pct": 10.0,
+        "total_trades": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "notes": "10% position size"
+      },
+      "MEDIUM": {
+        "avg_size_pct": 8.0,
+        "total_trades": 0,
+        "win_rate_pct": 0.0,
+        "avg_return_pct": 0.0,
+        "notes": "8% position size"
+      }
+    }
+  },
+
+  "hypotheses_under_test": {
+    "description": "Trading hypotheses we are actively testing with real trades",
+    "hypotheses": [
+      {
+        "id": "H001",
+        "statement": "Earnings beats outperform other catalyst types in win rate and avg return",
+        "status": "TESTING",
+        "sample_required": 20,
+        "current_sample": 0,
+        "current_result": null,
+        "conclusion": null
+      },
+      {
+        "id": "H002",
+        "statement": "Waiting 30 minutes for gap-up pullback improves entry on 2-5% gaps",
+        "status": "TESTING",
+        "sample_required": 15,
+        "current_sample": 0,
+        "current_result": null,
+        "conclusion": null
+      },
+      {
+        "id": "H003",
+        "statement": "Higher conviction picks (12%+ position size) have higher win rates",
+        "status": "TESTING",
+        "sample_required": 20,
+        "current_sample": 0,
+        "current_result": null,
+        "conclusion": null
+      },
+      {
+        "id": "H004",
+        "statement": "Trailing stops capture more profit than flat +10% targets on strong catalysts",
+        "status": "TESTING",
+        "sample_required": 15,
+        "current_sample": 0,
+        "current_result": null,
+        "conclusion": null
+      }
+    ]
+  },
+
+  "excluded_patterns": {
+    "description": "Patterns that have been excluded due to poor performance",
+    "patterns": []
+  },
+
+  "actionable_insights": {
+    "description": "Current actionable insights derived from learning data. Updated automatically.",
+    "insights": [
+      {
+        "type": "SYSTEM_FIX",
+        "priority": "RESOLVED",
+        "message": "Trailing stops now placed via Alpaca at market open (EXECUTE phase) for real-time protection",
+        "date_added": "2026-01-30"
+      }
+    ]
+  }
+}

@@ -349,6 +349,71 @@ class MarketScreener:
         # Initialize near-miss logging (v10.3)
         self._init_near_miss_log()
 
+        # INSTITUTIONAL LEARNING: Load catalyst performance for AI context (Jan 2026)
+        self.catalyst_performance_context = self._load_catalyst_performance_for_ai()
+
+    def _load_catalyst_performance_for_ai(self):
+        """
+        Load catalyst performance data from learning database for Claude context.
+
+        INSTITUTIONAL LEARNING INTEGRATION (Jan 2026):
+        - Loads performance metrics from learning_database.json
+        - Formats as guidance for Claude's catalyst analysis
+        - Helps Claude prioritize catalyst types with proven track records
+
+        Returns:
+            String with formatted catalyst performance or empty string if no data
+        """
+        db_file = PROJECT_DIR / 'strategy_evolution' / 'learning_database.json'
+
+        if not db_file.exists():
+            return ""
+
+        try:
+            with open(db_file, 'r') as f:
+                db = json.load(f)
+
+            catalysts = db.get('catalyst_performance', {}).get('catalysts', {})
+
+            # Filter to catalysts with actual trade data
+            catalysts_with_data = [
+                (name, stats) for name, stats in catalysts.items()
+                if stats.get('total_trades', 0) > 0
+            ]
+
+            if not catalysts_with_data:
+                return ""
+
+            # Sort by win rate descending
+            catalysts_with_data.sort(key=lambda x: x[1].get('win_rate_pct', 0), reverse=True)
+
+            lines = ["\nHISTORICAL CATALYST PERFORMANCE (from live trades):"]
+
+            for name, stats in catalysts_with_data:
+                win_rate = stats.get('win_rate_pct', 0)
+                total = stats.get('total_trades', 0)
+                avg_return = stats.get('net_avg_return_pct', 0)
+                confidence = stats.get('confidence', 'LOW')
+
+                # Performance indicator
+                if win_rate >= 65:
+                    indicator = "STRONG"
+                elif win_rate >= 50:
+                    indicator = "MODERATE"
+                else:
+                    indicator = "WEAK"
+
+                lines.append(f"  - {name}: {win_rate:.0f}% win rate, {avg_return:+.1f}% avg return ({total} trades) [{indicator}]")
+
+            lines.append("Prioritize catalyst types with STRONG historical performance when confidence is similar.")
+            lines.append("")
+
+            return '\n'.join(lines)
+
+        except Exception as e:
+            print(f"   Warning: Could not load catalyst performance: {e}")
+            return ""
+
     def _init_near_miss_log(self):
         """
         Initialize near-miss logging CSV file (v10.3)
@@ -458,7 +523,9 @@ class MarketScreener:
         else:
             news_summary = "No recent news articles found in last 7 days."
 
-        # Build prompt
+        # Build prompt with learning context
+        learning_context = self.catalyst_performance_context if hasattr(self, 'catalyst_performance_context') else ""
+
         user_message = f"""Analyze this stock for catalyst-driven swing trading opportunities (3-7 day holding period).
 
 Stock: {ticker}
@@ -471,7 +538,7 @@ Technical Context:
 - 52-week high: ${technical_data.get('high_52w', 0):.2f} ({technical_data.get('distance_from_52w_high_pct', 0):.1f}% from high)
 - Volume ratio: {technical_data.get('volume_ratio', 0):.1f}x average
 - RS Percentile: {technical_data.get('rs_percentile', 0)} (relative strength vs market)
-
+{learning_context}
 YOUR ROLE: You are the ONLY filter for news sentiment and catalyst quality. Keyword matching has been removed. You must:
 1. REJECT stocks with material negative news (offerings, lawsuits, downgrades, guidance cuts, earnings misses)
 2. IDENTIFY high-quality bullish catalysts (Tier 1 or Tier 2)
