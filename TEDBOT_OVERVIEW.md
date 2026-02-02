@@ -61,8 +61,11 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │                                                                  │
 │  CONTEXT LOADED (load_optimized_context):                       │
 │  • Strategy rules (8000 chars, auto-updated by learning)       │
+│  • Learning database context (v8.1):                           │
+│    - ACTIVE critical failures (surfaced until resolved)        │
+│    - Catalyst performance stats by type                        │
+│    - Actionable insights from past trades                      │
 │  • Catalyst exclusions (<40% win rate triggers warnings)       │
-│  • Recent lessons learned (2000 chars from past trades)        │
 │  • Current portfolio positions                                  │
 │  • Account status                                               │
 │                                                                  │
@@ -102,6 +105,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │  • PLACES REAL ORDERS via Alpaca API (v8.0):                   │
 │    - BUY: Market orders for new positions                      │
 │    - SELL: Market orders for Claude-recommended exits          │
+│    - TRAILING STOP: Alpaca orders for +10% positions (v8.1)   │
 │    - Validates buying power before buys                        │
 │    - Verifies position exists before sells                     │
 │    - Logs all order IDs for tracking                           │
@@ -138,6 +142,12 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │  • MONTHLY (Last Sunday 6:00 PM): 90-day strategic review      │
 │                                                                  │
 │  LEARNING OUTPUTS:                                              │
+│  • learning_database.json: Structured learning data (v8.1)     │
+│    - Critical failures (ACTIVE/RESOLVED)                       │
+│    - Catalyst performance by type                              │
+│    - Market regime performance                                  │
+│    - Entry/exit timing patterns                                │
+│    - Hypotheses under test                                      │
 │  • catalyst_exclusions.json: <40% win rate → exclusion list    │
 │  • lessons_learned.md: Proven patterns (70%+) vs failures (<40%)│
 │  • strategy_rules.md: Auto-updated position sizing rules       │
@@ -854,11 +864,32 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: January 1, 2026
-**Version**: v10.1 (Hybrid Screener - Binary Gates + Claude AI)
+**Last Updated**: February 2, 2026
+**Version**: v8.1 (Institutional Learning + Trailing Stop Architecture)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Update (v10.1 - Jan 1, 2026)**:
+**Latest Update (v8.1 - Feb 2, 2026)**:
+- ✅ **Trailing Stop Architecture Overhaul**: Real-time broker execution instead of JSON tracking
+  - **Problem Solved**: STX trailing stop failure (Jan 30) - JSON-only tracking cost 14% in lost gains
+  - **GO Phase**: Identifies positions at +10% that need trailing stop protection
+  - **EXECUTE Phase (9:45 AM)**: Places Alpaca native trailing stop orders at market open
+  - **Alpaca Monitoring**: Broker monitors price in real-time, executes automatically when triggered
+  - **ANALYZE Phase (4:30 PM)**: Reconciles any positions auto-sold by Alpaca
+  - **Impact**: Positions now have 24/7 real-time trailing stop protection (was only 2x daily checks)
+- ✅ **Institutional Learning System**: Structured learning database replaces markdown lessons
+  - **New File**: `strategy_evolution/learning_database.json`
+  - **Sections**: critical_failures (ACTIVE/RESOLVED), catalyst_performance, market_regime_performance, entry_timing_patterns, exit_timing_patterns, position_sizing_outcomes, hypotheses_under_test, actionable_insights
+  - **Integration**: GO and ANALYZE load learning context automatically
+  - **Auto-Updates**: Trade completions automatically update catalyst performance stats
+  - **Critical Failure Surfacing**: ACTIVE failures prominently shown to Claude until RESOLVED
+- ✅ **RECHECK Command Fix**: Returns success when nothing to recheck
+  - **Problem**: Exit code 1 when no skipped stocks (incorrectly showed as "failed" in cron)
+  - **Fix**: Valid "nothing to do" states now return success (exit code 0)
+- ✅ **Dashboard Status Display Fix**: Frontend compatibility for purchased stocks
+  - **Problem**: Purchased stocks showed as "Rejected" (frontend only knew ACCEPTED/SKIPPED/OWNED)
+  - **Fix**: API returns ACCEPTED status with "✅ Purchased" in decision text
+
+**Previous Update (v10.1 - Jan 1, 2026)**:
 - ✅ **HYBRID SCREENER ARCHITECTURE**: Complete redesign - Binary Gates + Claude AI
   - **Philosophy**: "If it's not binary, Claude decides"
   - **Removed ALL keyword-based filtering**: No more false negatives
