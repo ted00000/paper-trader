@@ -1203,21 +1203,27 @@ def get_screening_decisions():
             decision_status = pick.get('status', 'UNKNOWN')
             ticker = pick.get('ticker')
 
-            # Check if stock is already owned
+            # Check if stock is currently owned
             is_owned = ticker in owned_tickers
 
             # Map to display-friendly format
-            if is_owned:
-                # Stock is already in portfolio - don't show as rejected
-                decision_status = 'OWNED'
-                decision = '📈 Already Owned'
-            elif decision_status == 'ACCEPTED':
-                if pick.get('position_size_pct', 0) == 0:
+            # FIX (Feb 2026): Don't override ACCEPTED status to OWNED
+            # If a stock was ACCEPTED and is now owned, it was purchased today - show as PURCHASED
+            if decision_status == 'ACCEPTED':
+                if is_owned:
+                    # Stock was accepted AND is now in portfolio = purchased today
+                    decision_status = 'PURCHASED'
+                    decision = f"✅ Purchased ({pick.get('conviction', 'MEDIUM')} conviction)"
+                elif pick.get('position_size_pct', 0) == 0:
                     decision = 'Accepted (Low Conviction - 0% size)'
                 else:
                     decision = f"✓ Accepted ({pick.get('conviction', 'MEDIUM')} conviction)"
             elif decision_status == 'SKIPPED':
                 decision = f"⏸ Skipped (Portfolio Full)"
+            elif is_owned and decision_status not in ['ACCEPTED', 'PURCHASED']:
+                # Stock is owned but was NOT recommended today (e.g., from previous day)
+                decision_status = 'OWNED'
+                decision = '📈 Already Owned'
             else:
                 decision = f"✗ Rejected"
 
