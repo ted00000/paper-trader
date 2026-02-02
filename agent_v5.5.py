@@ -7966,6 +7966,10 @@ CURRENT PORTFOLIO
         If the gap has settled (price pulled back or reduced), execute entry.
 
         Research basis: "Wait 30min for pullback to VWAP" strategy for 2-5% gaps.
+
+        Returns:
+            True: Command completed successfully (including when nothing to recheck)
+            False: Command failed due to an actual error
         """
         print("\n" + "="*60)
         print("RECHECK COMMAND - Gap Settlement Re-evaluation")
@@ -7974,19 +7978,20 @@ CURRENT PORTFOLIO
         # Load skipped stocks
         skipped_file = self.project_dir / 'skipped_for_gap.json'
         if not skipped_file.exists():
-            print("\n❌ No skipped stocks file found.")
-            print("   Run 'execute' command first - if stocks are skipped for gaps,")
-            print("   they'll be saved for recheck.")
-            return False
+            print("\n✓ No skipped stocks file found.")
+            print("   This is normal - no stocks were skipped for gaps during EXECUTE.")
+            print("   RECHECK completed successfully (nothing to do).")
+            return True  # SUCCESS - nothing to recheck is a valid outcome
 
         with open(skipped_file) as f:
             skipped_data = json.load(f)
 
         today = datetime.now().strftime('%Y-%m-%d')
         if skipped_data.get('date') != today:
-            print(f"\n❌ Skipped stocks file is from {skipped_data.get('date')}, not today.")
-            print("   No stocks to recheck.")
-            return False
+            print(f"\n✓ Skipped stocks file is from {skipped_data.get('date')}, not today ({today}).")
+            print("   This is normal - the file is stale from a previous day.")
+            print("   RECHECK completed successfully (nothing to do today).")
+            return True  # SUCCESS - nothing to recheck today is a valid outcome
 
         stocks = skipped_data.get('stocks', [])
         if not stocks:
