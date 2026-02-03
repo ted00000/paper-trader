@@ -2147,6 +2147,25 @@ POSITION {i}: {ticker}
         triggering_articles = []
         max_score = 0
 
+        # Common ticker-to-company name mappings for relevance check
+        TICKER_COMPANY_NAMES = {
+            'STX': ['seagate', 'stx'],
+            'GLW': ['corning', 'glw'],
+            'VIAV': ['viavi', 'viav'],
+            'NVDA': ['nvidia', 'nvda'],
+            'AAPL': ['apple', 'aapl'],
+            'MSFT': ['microsoft', 'msft'],
+            'META': ['meta', 'facebook', 'meta platforms'],
+            'GOOGL': ['google', 'alphabet', 'googl'],
+            'AMZN': ['amazon', 'amzn'],
+            'TSLA': ['tesla', 'tsla'],
+        }
+
+        # Get company identifiers for this ticker
+        ticker_lower = ticker.lower()
+        company_identifiers = TICKER_COMPANY_NAMES.get(ticker, [ticker_lower])
+        company_identifiers.append(ticker_lower)  # Always include ticker symbol
+
         for article in articles:
             article_score = 0
             keywords_found = []
@@ -2154,6 +2173,14 @@ POSITION {i}: {ticker}
             title = article.get('title', '').lower()
             desc = article.get('description', '').lower()
             combined = f"{title} {desc}"
+
+            # RELEVANCE CHECK: Skip articles that don't mention our ticker/company
+            # This prevents unrelated sector news from triggering false invalidations
+            # (e.g., "Meta Faces Lawsuit" shouldn't invalidate STX/Seagate position)
+            article_is_relevant = any(identifier in combined for identifier in company_identifiers)
+            if not article_is_relevant:
+                # Article doesn't mention our company - skip it entirely
+                continue
 
             # 1. NEGATIVE KEYWORD SCORING
             for severity, keywords in NEGATIVE_KEYWORDS.items():
@@ -4521,6 +4548,33 @@ CRITICAL: When executing 'go' command, you MUST include a properly formatted JSO
         if self.account_file.exists():
             context['account'] = self.account_file.read_text()
 
+        # For ANALYZE command: Include auto-exits that happened before Claude's review
+        # This provides visibility into positions that were auto-closed (Feb 2026 fix)
+        auto_exits_section = ""
+        if command == 'analyze' and hasattr(self, '_todays_auto_exits') and self._todays_auto_exits:
+            auto_exits_section = "\n============================================================\n"
+            auto_exits_section += "⚠️ AUTO-EXITED POSITIONS (Closed before this review)\n"
+            auto_exits_section += "============================================================\n"
+            auto_exits_section += "The following positions were automatically closed during this ANALYZE run.\n"
+            auto_exits_section += "Please include them in your analysis with commentary on the exit decision.\n\n"
+
+            for trade in self._todays_auto_exits:
+                ticker = trade.get('ticker', 'UNKNOWN')
+                entry_price = trade.get('entry_price', 0)
+                exit_price = trade.get('exit_price', 0)
+                return_pct = trade.get('return_pct', 0)
+                exit_reason = trade.get('exit_reason', 'Unknown')
+                days_held = trade.get('days_held', 0)
+
+                auto_exits_section += f"• {ticker}: Exited at ${exit_price:.2f} ({return_pct:+.1f}%)\n"
+                auto_exits_section += f"  Entry: ${entry_price:.2f} | Days Held: {days_held}\n"
+                auto_exits_section += f"  Reason: {exit_reason}\n\n"
+
+            auto_exits_section += "IMPORTANT: Acknowledge these auto-exits in your analysis and comment on:\n"
+            auto_exits_section += "1. Whether the exit reason was appropriate\n"
+            auto_exits_section += "2. The trade outcome (win/loss and magnitude)\n"
+            auto_exits_section += "3. Any lessons learned for future similar setups\n"
+
         context_str = f"""
 PROJECT INSTRUCTIONS:
 {context.get('instructions', 'Not found')}
@@ -4538,7 +4592,7 @@ The following patterns have shown poor results. You may still use them if you ha
 but explain your reasoning and consider what makes this situation different from past failures.
 Your decisions will be tracked for accountability.
 {context.get('exclusions', 'None')}
-
+{auto_exits_section}
 CURRENT PORTFOLIO:
 {context.get('portfolio', 'Not initialized')}
 
@@ -8212,6 +8266,9 @@ CURRENT PORTFOLIO
 
         # Update prices and check exits
         closed_trades = self.update_portfolio_prices_and_check_exits()
+
+        # Store auto-exits for inclusion in Claude context (visibility fix Feb 2026)
+        self._todays_auto_exits = closed_trades
 
         # ALWAYS create daily activity summary (picks up ALL trades closed today from CSV)
         print("\n4. Creating daily activity summary...")
