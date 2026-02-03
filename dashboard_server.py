@@ -946,11 +946,12 @@ def system_status():
         # Determine overall health
         go_info = get_last_run_info('go')
         execute_info = get_last_run_info('execute')
+        exit_info = get_last_run_info('exit')
         analyze_info = get_last_run_info('analyze')
 
         # Simple health logic: if any command hasn't run in 48 hours, degraded
         all_times = []
-        for cmd in ['go', 'execute', 'analyze']:
+        for cmd in ['go', 'execute', 'exit', 'analyze']:
             log_file = logs_dir / f'{cmd}.log'
             if log_file.exists():
                 mod_time = datetime.fromtimestamp(log_file.stat().st_mtime)
@@ -992,6 +993,7 @@ def system_status():
                 'screener': screener_status or 'N/A',
                 'go': go_info or 'N/A',
                 'execute': execute_info or 'N/A',
+                'exit': exit_info or 'N/A',
                 'analyze': analyze_info or 'N/A'
             },
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -1006,6 +1008,7 @@ def system_status():
                 'screener': 'N/A',
                 'go': 'N/A',
                 'execute': 'N/A',
+                'exit': 'N/A',
                 'analyze': 'N/A'
             },
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),

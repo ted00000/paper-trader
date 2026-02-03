@@ -709,7 +709,7 @@ def get_operations_status():
     operation_status_dir = PROJECT_DIR / 'dashboard_data' / 'operation_status'
     daily_reviews_dir = PROJECT_DIR / 'daily_reviews'
 
-    for operation in ['go', 'execute', 'recheck', 'analyze']:
+    for operation in ['go', 'execute', 'recheck', 'exit', 'analyze']:
         op_upper = operation.upper()
         status_file = operation_status_dir / f"{operation}_status.json"
 
@@ -861,7 +861,7 @@ def get_operation_log(operation):
     Returns screener_candidates.json for SCREENER
     Matches old dashboard behavior: shows today's log or falls back to most recent
     """
-    valid_operations = ['go', 'execute', 'recheck', 'analyze', 'screener']
+    valid_operations = ['go', 'execute', 'recheck', 'exit', 'analyze', 'screener']
     operation = operation.lower()
 
     if operation not in valid_operations:
@@ -1061,6 +1061,49 @@ def get_operation_log(operation):
 
             if not new_entries and not skipped_stocks:
                 lines.append('*No gap-skipped stocks to recheck.*')
+
+            content = '\n'.join(lines)
+
+        # If no content, check if this is a structured exit log
+        if not content and operation == 'exit' and 'timestamp' in data:
+            # Format exit log nicely
+            timestamp = data.get('timestamp', 'Unknown')
+            claude_used = data.get('claude_used', True)
+            failsafe = data.get('failsafe_activated', False)
+            positions_reviewed = data.get('positions_reviewed', 0)
+            positions_exited = data.get('positions_exited', 0)
+            positions_held = data.get('positions_held', 0)
+            closed_trades = data.get('closed_trades', [])
+
+            lines = []
+            lines.append('# 🚪 EXIT Results (3:45 PM Pre-Close)')
+            lines.append('')
+            lines.append(f'**Timestamp:** {timestamp}')
+            if failsafe:
+                lines.append('')
+                lines.append('⚠️ **FAILSAFE MODE**: Claude API timeout - automated rules only')
+            lines.append('')
+            lines.append('## Summary')
+            lines.append('')
+            lines.append(f'- **Positions Reviewed:** {positions_reviewed}')
+            lines.append(f'- **Positions Exited:** {positions_exited}')
+            lines.append(f'- **Positions Held:** {positions_held}')
+            lines.append(f'- **Claude Review:** {"Yes" if claude_used else "No (Failsafe)"}')
+            lines.append('')
+
+            if closed_trades:
+                lines.append('## 📉 Exits Executed')
+                lines.append('')
+                for trade in closed_trades:
+                    ticker = trade.get('ticker', 'N/A')
+                    return_pct = trade.get('return_pct', 0)
+                    reason = trade.get('exit_reason', 'Unknown')
+                    emoji = '✅' if return_pct >= 0 else '❌'
+                    lines.append(f'- {emoji} **{ticker}**: {return_pct:+.1f}%')
+                    lines.append(f'  - Reason: {reason}')
+                lines.append('')
+            else:
+                lines.append('*No exits triggered - all positions held.*')
 
             content = '\n'.join(lines)
 
