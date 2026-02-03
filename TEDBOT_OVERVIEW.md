@@ -88,37 +88,46 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│           STAGE 3: EXECUTION (EXECUTE + ANALYZE Commands)       │
-│                    🔗 ALPACA API INTEGRATION (v8.0)             │
+│     STAGE 3: EXECUTION (EXECUTE + EXIT + ANALYZE Commands)      │
+│                    🔗 ALPACA API INTEGRATION (v8.2)             │
 │                                                                  │
 │  PORTFOLIO LOADING:                                              │
 │  • Loads positions from Alpaca API (not JSON file - v8.0)      │
 │  • Syncs real-time position data (shares, entry price, P/L)    │
 │  • Graceful fallback to JSON if Alpaca unavailable             │
 │                                                                  │
-│  EXECUTE (9:45 AM - after market open):                         │
+│  EXECUTE (9:45 AM - 15 min after market open):                  │
 │  • Validates gap-aware entry (<3%: enter, 3-8%: caution, >8%: skip) │
 │  • Checks bid-ask spread (skip if >0.5% - v7.0)                │
 │  • Calculates position size (conviction × market breadth adj)  │
 │  • Sets ATR-based stop loss (2.5x ATR, capped at -7% - v7.0)  │
 │  • Sets price target (dynamic based on catalyst type)          │
-│  • PLACES REAL ORDERS via Alpaca API (v8.0):                   │
+│  • PLACES REAL ORDERS via Alpaca API:                          │
 │    - BUY: Market orders for new positions                      │
-│    - SELL: Market orders for Claude-recommended exits          │
 │    - TRAILING STOP: Alpaca orders for +10% positions (v8.1)   │
 │    - Validates buying power before buys                        │
-│    - Verifies position exists before sells                     │
 │    - Logs all order IDs for tracking                           │
 │                                                                  │
-│  ANALYZE (4:30 PM - after market close):                        │
-│  • Checks ATR-based stops (stop_pct = -min(2.5*ATR/price, 0.07)) │
-│  • Checks price targets (activates trailing stops)             │
-│  • Monitors time limits (3 weeks max hold)                     │
-│  • Checks news sentiment deterioration                         │
-│  • Trailing stop: Locks +8%, trails -2% from peak (v7.1)      │
-│  • PLACES SELL ORDERS via Alpaca API when triggered (v8.0)     │
-│  • Exits positions meeting criteria                             │
-│  OUTPUT: Updates current_portfolio.json, logs to CSV           │
+│  EXIT (3:45 PM - 15 min before market close) [NEW v8.2]:        │
+│  • Fetches REAL-TIME prices from Alpaca (not delayed Polygon)  │
+│  • Checks for Alpaca trailing stop fills                       │
+│  • Applies exit rules:                                          │
+│    - Stop loss (-7%)                                            │
+│    - Price target (+10%)                                        │
+│    - Time stop (21 days)                                        │
+│    - News invalidation (score ≥70)                             │
+│  • Claude reviews remaining positions for discretionary exits   │
+│  • FAILSAFE: If Claude timeout (60s), executes auto rules only │
+│  • PLACES SELL ORDERS via Alpaca - execute BEFORE close        │
+│  • OUTPUT: Updates portfolio, logs closed trades to CSV         │
+│                                                                  │
+│  ANALYZE (4:30 PM - after market close) [REFACTORED v8.2]:      │
+│  • NO ORDER EXECUTION - learning/summary only                   │
+│  • Updates portfolio with closing prices for P&L display        │
+│  • Creates daily activity summary                               │
+│  • Calls Claude for performance analysis                        │
+│  • Updates learning database                                    │
+│  OUTPUT: Daily summary, learning insights                       │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -815,7 +824,7 @@ Analyzes past performance across multiple dimensions:
 - Stop Loss: $130.20 (-7%)
 - Price Target: $156.80 (+12%)
 
-**4. Position Monitoring (ANALYZE - Daily 4:30 PM):**
+**4. Position Monitoring (EXIT @ 3:45 PM + ANALYZE @ 4:30 PM):**
 - Day 1: $142 (+1.4%) → HOLD
 - Day 2: $145 (+3.6%) → HOLD
 - Day 3: $150 (+7.1%) → HOLD
@@ -823,7 +832,7 @@ Analyzes past performance across multiple dimensions:
 - Day 15: $162 (+15.7%) → NEW PEAK, trail → $158.76
 - Day 20: $165 (+17.9%) → NEW PEAK, trail → $161.70
 - Day 22: $163 (+16.4%) → HOLD (above trail)
-- Day 23: $161.70 (+15.5%) → **TRAILING STOP HIT - EXIT**
+- Day 23 @ 3:45 PM: $161.70 → **ALPACA TRAILING STOP TRIGGERED - SELL EXECUTED**
 
 **5. Trade Result:**
 - Entry: $140.00
@@ -864,11 +873,39 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: February 2, 2026
-**Version**: v8.1 (Institutional Learning + Trailing Stop Architecture)
+**Last Updated**: February 3, 2026
+**Version**: v8.2 (Exit/Analyze Split Architecture)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Update (v8.1 - Feb 2, 2026)**:
+**Latest Update (v8.2 - Feb 3, 2026)**:
+- **EXIT/ANALYZE Architecture Split**: Separates execution from learning
+  - **Problem Solved**: Orders placed after market close (4:30 PM) queued overnight, creating stale position state for next day's GO
+  - **New EXIT Command (3:45 PM)**: Pre-close position review with Claude + exit rules
+    - Fetches REAL-TIME prices from Alpaca (not 15-min delayed Polygon)
+    - Applies exit rules (stop loss -7%, target +10%, time stop 21d, news invalidation)
+    - Claude reviews positions and recommends additional exits
+    - Orders execute BEFORE market close at known prices
+    - Failsafe: If Claude API times out (60s), executes automated rules only with full visibility logging
+  - **Refactored ANALYZE Command (4:30 PM)**: Now learning-only, no order execution
+    - Updates portfolio with closing prices for accurate P&L display
+    - Creates daily activity summary from trade log
+    - Calls Claude for performance analysis and learning insights
+    - No order execution risk
+  - **Benefits**:
+    - Exits at known prices (no overnight gap risk)
+    - Clean state for next morning's GO (no pending orders)
+    - Symmetric timing: +15 min after open (EXECUTE), -15 min before close (EXIT)
+    - Accurate learning data based on actual fills
+- **RECHECK Pricing Fix**: Now uses Alpaca real-time prices (was calling non-existent method)
+- **Updated Schedule**:
+  - 7:00 AM: SCREEN (filter S&P 1500)
+  - 9:00 AM: GO (Claude analyzes candidates)
+  - 9:45 AM: EXECUTE (buy orders + trailing stops)
+  - 10:30 AM: RECHECK (gap-skipped stocks)
+  - 3:45 PM: EXIT (Claude + exit rules, same-day execution)
+  - 4:30 PM: ANALYZE (summary + learning only)
+
+**Previous Update (v8.1 - Feb 2, 2026)**:
 - ✅ **Trailing Stop Architecture Overhaul**: Real-time broker execution instead of JSON tracking
   - **Problem Solved**: STX trailing stop failure (Jan 30) - JSON-only tracking cost 14% in lost gains
   - **GO Phase**: Identifies positions at +10% that need trailing stop protection

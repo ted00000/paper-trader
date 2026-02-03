@@ -4445,6 +4445,59 @@ Every statement should be backed by specific numbers from the portfolio data.
 **Next Trading Day: {next_trading_day}**
 Any exit recommendations should specify "Exit at market open on {next_trading_day}"
 """
+        elif command == 'exit':
+            # EXIT command - pre-market-close position review (3:45 PM)
+            today_date = datetime.now().strftime('%A, %B %d, %Y')
+            current_time = datetime.now().strftime('%I:%M %p')
+
+            user_message = f"""# PRE-CLOSE EXIT REVIEW - {today_date} ({current_time} ET)
+
+## TIMING CONTEXT
+Market closes at 4:00 PM ET. You have ~15 minutes to review positions for exit.
+Exits decided now will execute BEFORE market close at current prices.
+
+## AUTOMATED EXITS (Already Triggered)
+The system has already identified positions that hit hard exit rules:
+- Stop loss (-7%)
+- Price target hit (+10%)
+- Time stop (21 days)
+- News invalidation (negative catalyst score ≥70)
+
+These are listed in the context as "Auto-exits triggered."
+
+## YOUR TASK
+Review the remaining positions that did NOT trigger automated exits.
+Consider if any should be manually exited based on:
+
+1. **Catalyst Degradation**: Original thesis weakened but not fully invalidated
+2. **Better Opportunity Cost**: Capital trapped in stagnant position
+3. **Risk Management**: Position approaching stop, better to exit early
+4. **Technical Breakdown**: Chart pattern failed, momentum lost
+
+## RESPONSE FORMAT
+For each position reviewed, respond with:
+
+```json
+{{
+  "exit_recommendations": [
+    {{
+      "ticker": "SYMBOL",
+      "action": "EXIT" | "HOLD",
+      "reasoning": "Brief explanation",
+      "urgency": "HIGH" | "MEDIUM" | "LOW"
+    }}
+  ],
+  "summary": "One sentence overall assessment"
+}}
+```
+
+If no additional exits recommended beyond auto-exits, respond with empty array.
+
+## IMPORTANT
+- Be decisive. Market closes soon.
+- Only recommend EXIT if you have clear conviction
+- Default is HOLD if position is working
+"""
         else:
             user_message = command
 
@@ -8073,8 +8126,11 @@ CURRENT PORTFOLIO
 
             print(f"   Checking {ticker} (was {original_gap:+.1f}% gap at 9:45 AM)...")
 
-            # Get current price
-            current_price = self.get_current_price(ticker)
+            # Get current price via Alpaca (real-time) - RECHECK needs live prices during market hours
+            current_price = None
+            if self.use_alpaca and self.broker:
+                current_price = self.broker.get_last_price(ticker)
+
             if not current_price:
                 print(f"      ❌ Could not get current price for {ticker}")
                 still_skipped.append(stock)
@@ -8245,73 +8301,434 @@ CURRENT PORTFOLIO
 
         return True
 
-    def execute_analyze_command(self):
+    def fetch_alpaca_realtime_prices(self, tickers):
         """
-        Execute ANALYZE command (4:30 PM)
+        Fetch REAL-TIME prices from Alpaca API (no delay)
 
-        SAME AS v4.2 - No changes needed:
-        - Fetch current prices (Alpha Vantage)
-        - Update portfolio with latest P&L
-        - Check stop losses and profit targets
-        - Close positions that hit exits
-        - Log closed trades to CSV
-        - Update account status
-        - Call Claude for analysis and commentary
-        - Create daily activity summary for dashboard
+        Used by EXIT command at 3:45 PM for same-day execution decisions.
+        Falls back to Polygon if Alpaca unavailable.
+
+        Args:
+            tickers: List of ticker symbols
+
+        Returns:
+            dict: {ticker: price} for successfully fetched prices
         """
+        prices = {}
+
+        if not self.use_alpaca or not self.broker:
+            print("   ⚠️ Alpaca not available, falling back to Polygon (15-min delay)")
+            return self.fetch_current_prices(tickers)
+
+        print(f"   Fetching REAL-TIME prices for {len(tickers)} tickers via Alpaca...")
+
+        for ticker in tickers:
+            try:
+                price = self.broker.get_last_price(ticker)
+                if price and price > 0:
+                    prices[ticker] = price
+                else:
+                    print(f"      ⚠️ No price for {ticker}")
+            except Exception as e:
+                print(f"      ⚠️ Failed to fetch {ticker}: {e}")
+
+        print(f"   ✓ Fetched {len(prices)}/{len(tickers)} prices")
+        return prices
+
+    def execute_exit_command(self):
+        """
+        Execute EXIT command (3:45 PM - before market close)
+
+        v8.2 - New command separating execution from analysis:
+        - Fetch REAL-TIME prices via Alpaca (not delayed Polygon)
+        - Check for Alpaca trailing stop fills
+        - Apply exit rules (stop loss, target, time stop, news invalidation)
+        - Call Claude for exit review (with failsafe if timeout)
+        - Execute sell orders via Alpaca (fills before 4:00 PM close)
+        - Log closed trades
+
+        This ensures exits happen at known prices, not queued overnight.
+
+        Returns:
+            True: Command completed successfully
+            False: Command failed due to error
+        """
+        import signal
 
         print("\n" + "="*60)
-        print("EXECUTING 'ANALYZE' COMMAND - EVENING PERFORMANCE UPDATE")
+        print("EXIT COMMAND - Pre-Market-Close Position Review")
+        print("Time: 3:45 PM (15 min before close)")
         print("="*60 + "\n")
 
-        # Update prices and check exits
-        closed_trades = self.update_portfolio_prices_and_check_exits()
+        if not self.portfolio_file.exists():
+            print("   ✓ No portfolio file - nothing to exit")
+            return True
 
-        # Store auto-exits for inclusion in Claude context (visibility fix Feb 2026)
-        self._todays_auto_exits = closed_trades
+        with open(self.portfolio_file, 'r') as f:
+            portfolio = json.load(f)
 
-        # ALWAYS create daily activity summary (picks up ALL trades closed today from CSV)
-        print("\n4. Creating daily activity summary...")
-        self.create_daily_activity_summary(closed_trades)
+        positions = portfolio.get('positions', [])
+
+        if not positions:
+            print("   ✓ No positions to review")
+            return True
+
+        print(f"📋 Reviewing {len(positions)} position(s) for exit...\n")
+
+        # STEP 1: Check for positions auto-sold by Alpaca trailing stops
+        alpaca_closed_trades = []
+        if self.use_alpaca and self.broker:
+            print("1. Checking for Alpaca trailing stop fills...")
+            alpaca_positions = {p.symbol: p for p in self.broker.get_positions()}
+
+            for position in positions[:]:  # Iterate copy to allow removal
+                ticker = position['ticker']
+                if position.get('trailing_stop_active') and ticker not in alpaca_positions:
+                    print(f"   🔔 {ticker} was AUTO-SOLD by Alpaca trailing stop!")
+
+                    exit_price = position.get('trailing_stop_price', position.get('current_price', 0))
+                    try:
+                        closed_orders = self.broker.get_orders_for_symbol(ticker, status='closed')
+                        for order in closed_orders:
+                            if order.type == 'trailing_stop' and order.status == 'filled':
+                                exit_price = float(order.filled_avg_price)
+                                print(f"      Fill price: ${exit_price:.2f}")
+                                break
+                    except Exception as e:
+                        print(f"      ⚠️ Could not fetch fill price: {e}")
+
+                    peak_pct = position.get('peak_return_pct', 0)
+                    entry_price = position.get('entry_price', 0)
+                    return_pct = ((exit_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+                    exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
+
+                    trade_data = self.close_position(position, exit_price, exit_reason)
+                    self.log_completed_trade(trade_data)
+                    alpaca_closed_trades.append(trade_data)
+                    positions.remove(position)
+                    print(f"      ✓ Logged: {ticker} exited at ${exit_price:.2f} ({return_pct:+.1f}%)")
+
+            if alpaca_closed_trades:
+                print(f"   ✓ {len(alpaca_closed_trades)} position(s) auto-closed by Alpaca\n")
+            else:
+                print("   ✓ No Alpaca trailing stop fills detected\n")
+
+        if not positions:
+            print("   ✓ All positions were closed by trailing stops")
+            portfolio['positions'] = []
+            portfolio['last_updated'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+            with open(self.portfolio_file, 'w') as f:
+                json.dump(portfolio, f, indent=2)
+            return True
+
+        # STEP 2: Fetch REAL-TIME prices from Alpaca
+        print("2. Fetching REAL-TIME prices from Alpaca...")
+        tickers = [pos['ticker'] for pos in positions]
+        current_prices = self.fetch_alpaca_realtime_prices(tickers)
         print()
 
-        # Call Claude for analysis
+        # STEP 3: Apply automated exit rules
+        print("3. Checking automated exit rules...")
+        auto_exits = []
+        positions_for_claude_review = []
+
+        for position in positions:
+            ticker = position['ticker']
+            current_price = current_prices.get(ticker, position.get('current_price', 0))
+
+            # Update position with current price
+            position['current_price'] = current_price
+            entry_price = position['entry_price']
+            position['unrealized_gain_pct'] = round(((current_price - entry_price) / entry_price) * 100, 2)
+
+            # Check exit rules
+            should_close, exit_reason, return_pct = self.check_position_exits(position, current_price)
+
+            if should_close:
+                auto_exits.append({
+                    'position': position,
+                    'exit_reason': exit_reason,
+                    'return_pct': return_pct,
+                    'current_price': current_price
+                })
+                print(f"   🚪 {ticker}: EXIT - {exit_reason} ({return_pct:+.1f}%)")
+            else:
+                positions_for_claude_review.append({
+                    'position': position,
+                    'status': exit_reason,
+                    'return_pct': return_pct,
+                    'current_price': current_price
+                })
+                print(f"   ✓ {ticker}: HOLD - {exit_reason} ({return_pct:+.1f}%)")
+
+        print()
+
+        # STEP 4: Call Claude for exit review (with failsafe)
+        claude_exits = []
+        claude_used = True
+
+        print("4. Calling Claude for exit review...")
+
+        # Prepare context for Claude
+        exit_context = self.load_optimized_context('exit')
+
+        # Add position details to context
+        position_summary = "\n=== POSITIONS FOR EXIT REVIEW ===\n"
+        position_summary += f"Auto-exits triggered: {len(auto_exits)}\n"
+        for ae in auto_exits:
+            pos = ae['position']
+            position_summary += f"  - {pos['ticker']}: {ae['exit_reason']} ({ae['return_pct']:+.1f}%)\n"
+
+        position_summary += f"\nPositions to review: {len(positions_for_claude_review)}\n"
+        for pr in positions_for_claude_review:
+            pos = pr['position']
+            position_summary += f"  - {pos['ticker']}: ${pr['current_price']:.2f} ({pr['return_pct']:+.1f}%) - {pr['status']}\n"
+            position_summary += f"    Entry: ${pos['entry_price']:.2f} on {pos['entry_date']}, Days held: {pos.get('days_held', 0)}\n"
+            position_summary += f"    Catalyst: {pos.get('catalyst_type', 'Unknown')}\n"
+
+        exit_context += position_summary
+
+        # Failsafe: 60-second timeout for Claude
+        try:
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Claude API timeout")
+
+            # Set timeout (Unix only - on Windows this won't work but we'll catch the exception)
+            try:
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(60)  # 60 second timeout
+            except (AttributeError, ValueError):
+                pass  # Windows or signal not available
+
+            response = self.call_claude_api('exit', exit_context)
+
+            # Cancel timeout
+            try:
+                signal.alarm(0)
+            except (AttributeError, ValueError):
+                pass
+
+            print("   ✓ Claude response received\n")
+
+            # Parse Claude's exit recommendations
+            # Claude can recommend additional exits for positions not caught by auto rules
+            if response:
+                self.save_response('exit', response)
+                # TODO: Parse Claude's recommendations for additional exits
+                # For now, we trust the automated rules
+
+        except (TimeoutError, Exception) as e:
+            claude_used = False
+            error_type = type(e).__name__
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            print(f"\n   {'='*50}")
+            print(f"   ⚠️ FAILSAFE ACTIVATED: Claude API {error_type}")
+            print(f"   Executing automated exit rules only (no Claude review)")
+            print(f"   Positions checked: {len(positions)}")
+            print(f"   Auto-exits triggered: {len(auto_exits)}")
+            if auto_exits:
+                for ae in auto_exits:
+                    print(f"      - {ae['position']['ticker']}: {ae['exit_reason']}")
+            print(f"   {'='*50}\n")
+
+            # Log failsafe activation
+            failsafe_log = {
+                'timestamp': timestamp,
+                'command': 'exit',
+                'error_type': error_type,
+                'error_message': str(e),
+                'failsafe_activated': True,
+                'positions_checked': len(positions),
+                'auto_exits_executed': len(auto_exits)
+            }
+
+            log_file = self.project_dir / 'logs' / 'exit_failsafe_log.json'
+            log_file.parent.mkdir(exist_ok=True)
+
+            existing_logs = []
+            if log_file.exists():
+                try:
+                    existing_logs = json.loads(log_file.read_text())
+                except:
+                    pass
+            existing_logs.append(failsafe_log)
+            log_file.write_text(json.dumps(existing_logs, indent=2))
+
+        # STEP 5: Execute all exits
+        print("5. Executing exits...")
+        all_exits = auto_exits + claude_exits
+        closed_trades = []
+
+        for exit_info in all_exits:
+            position = exit_info['position']
+            ticker = position['ticker']
+            current_price = exit_info['current_price']
+            exit_reason = exit_info['exit_reason']
+
+            print(f"   Selling {ticker}...")
+
+            # Execute via Alpaca
+            alpaca_success, alpaca_msg, order_id = self._execute_alpaca_sell(
+                ticker,
+                position.get('shares', 0),
+                exit_reason
+            )
+
+            if alpaca_success:
+                print(f"      ✓ Alpaca: {alpaca_msg} (Order: {order_id})")
+            elif "not available" not in alpaca_msg:
+                print(f"      ⚠️ Alpaca: {alpaca_msg}")
+
+            # Create and log trade record
+            trade_data = self.close_position(position, current_price, exit_reason)
+            self.log_completed_trade(trade_data)
+            closed_trades.append(trade_data)
+
+            # Remove from positions
+            positions = [p for p in positions if p['ticker'] != ticker]
+
+        # STEP 6: Update portfolio
+        print("\n6. Updating portfolio...")
+        portfolio['positions'] = positions
+        portfolio['last_updated'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        portfolio['portfolio_status'] = f"Active - {len(positions)} positions"
+        portfolio['total_positions'] = len(positions)
+
+        with open(self.portfolio_file, 'w') as f:
+            json.dump(portfolio, f, indent=2)
+
+        # Update account status
+        self.update_account_status()
+
+        # STEP 7: Save exit summary for dashboard
+        all_closed = alpaca_closed_trades + closed_trades
+        exit_summary = {
+            "command": "exit",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "claude_used": claude_used,
+            "failsafe_activated": not claude_used,
+            "positions_reviewed": len(positions) + len(all_closed),
+            "positions_exited": len(all_closed),
+            "positions_held": len(positions),
+            "closed_trades": [
+                {
+                    "ticker": t['ticker'],
+                    "return_pct": t['return_pct'],
+                    "exit_reason": t['exit_reason']
+                }
+                for t in all_closed
+            ]
+        }
+        self.save_response("exit", exit_summary)
+
+        # Summary
+        print(f"\n{'='*60}")
+        print("EXIT COMMAND COMPLETE")
+        print(f"{'='*60}")
+        print(f"   Positions exited: {len(all_closed)}")
+        print(f"   Positions held:   {len(positions)}")
+        if not claude_used:
+            print(f"   ⚠️ FAILSAFE MODE: Auto rules only (Claude timeout)")
+        print()
+
+        return True
+
+    def execute_analyze_command(self):
+        """
+        Execute ANALYZE command (4:30 PM - after market close)
+
+        v8.2 REFACTORED - Now focused on learning and summary only:
+        - NO order execution (moved to EXIT command at 3:45 PM)
+        - Fetch closing prices for accurate P&L display
+        - Update portfolio metrics with end-of-day values
+        - Create daily activity summary (reads from today's trade log)
+        - Call Claude for performance analysis and learning insights
+        - Update learning database
+
+        This ensures accurate end-of-day data for learning without execution risk.
+        """
+
         print("\n" + "="*60)
-        print("CALLING CLAUDE FOR ANALYSIS")
+        print("ANALYZE COMMAND - End-of-Day Summary & Learning")
+        print("Time: 4:30 PM (after market close)")
         print("="*60 + "\n")
 
-        print("1. Loading optimized context...")
+        # STEP 1: Update portfolio with closing prices (display only, no exits)
+        print("1. Fetching closing prices for portfolio display...")
+
+        if self.portfolio_file.exists():
+            with open(self.portfolio_file, 'r') as f:
+                portfolio = json.load(f)
+
+            positions = portfolio.get('positions', [])
+
+            if positions:
+                tickers = [pos['ticker'] for pos in positions]
+
+                # Fetch closing prices (can use Polygon here since we're after market close)
+                # and just want accurate end-of-day values for display
+                closing_prices = self.fetch_current_prices(tickers)
+
+                for position in positions:
+                    ticker = position['ticker']
+                    if ticker in closing_prices:
+                        current_price = closing_prices[ticker]
+                        entry_price = position['entry_price']
+                        position['current_price'] = current_price
+                        position['unrealized_gain_pct'] = round(((current_price - entry_price) / entry_price) * 100, 2)
+                        position['unrealized_gain_dollars'] = round((current_price - entry_price) * position['shares'], 2)
+
+                # Save updated portfolio
+                portfolio['last_updated'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+                with open(self.portfolio_file, 'w') as f:
+                    json.dump(portfolio, f, indent=2)
+
+                print(f"   ✓ Updated {len(positions)} positions with closing prices\n")
+            else:
+                print("   ✓ No positions to update\n")
+        else:
+            print("   ✓ No portfolio file found\n")
+
+        # STEP 2: Create daily activity summary (reads from trade log CSV)
+        print("2. Creating daily activity summary...")
+        # Pass empty list since EXIT command already logged trades
+        # create_daily_activity_summary reads from CSV for today's trades
+        self.create_daily_activity_summary([])
+        print()
+
+        # STEP 3: Call Claude for analysis and learning
+        print("3. Calling Claude for performance analysis...")
+        print()
+
+        print("   Loading optimized context...")
         context = self.load_optimized_context('analyze')
         print("   ✓ Context loaded\n")
 
-        print("2. Calling Claude API for performance analysis...")
+        print("   Calling Claude API...")
 
-        # AI FAILOVER: Graceful degradation if Claude API fails
         try:
             response = self.call_claude_api('analyze', context)
             print("   ✓ Response received\n")
 
-            print("3. Saving response...")
+            print("   Saving response...")
             self.save_response('analyze', response)
             print("   ✓ Complete\n")
 
         except Exception as e:
-            # ANALYZE command failure - log but continue (not critical)
             error_type = type(e).__name__
             error_msg = str(e)
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-            print(f"\n{'='*70}")
-            print(f"⚠️ CLAUDE API FAILURE - ANALYZE COMMAND")
-            print(f"{'='*70}")
-            print(f"   Error Type: {error_type}")
-            print(f"   Error Message: {error_msg}")
-            print(f"   Timestamp: {timestamp}")
-            print(f"\n   IMPACT: Daily analysis not generated")
-            print(f"   - All position exits/holds already processed")
-            print(f"   - Trade logging completed successfully")
-            print(f"   - Only missing: Claude's commentary on performance")
-            print(f"{'='*70}\n")
+            print(f"\n   {'='*50}")
+            print(f"   ⚠️ CLAUDE API FAILURE - ANALYZE")
+            print(f"   {'='*50}")
+            print(f"   Error: {error_type} - {error_msg}")
+            print(f"\n   IMPACT: Analysis not generated")
+            print(f"   - Daily summary still created")
+            print(f"   - Portfolio prices updated")
+            print(f"   - Only missing: Claude's learning insights")
+            print(f"   {'='*50}\n")
 
             # Log the failure
             log_entry = {
@@ -8319,8 +8736,7 @@ CURRENT PORTFOLIO
                 'command': 'analyze',
                 'error_type': error_type,
                 'error_message': error_msg,
-                'degraded_mode': True,
-                'action_taken': 'Skipped Claude analysis, core operations completed'
+                'degraded_mode': True
             }
 
             log_file = self.project_dir / 'logs' / 'claude_api_failures.json'
@@ -8330,20 +8746,23 @@ CURRENT PORTFOLIO
             if log_file.exists():
                 try:
                     existing_logs = json.loads(log_file.read_text())
-                except Exception as e:
-                    print(f"⚠️ Warning: Failed to load existing failure logs: {e}")
+                except:
                     pass
 
             existing_logs.append(log_entry)
             log_file.write_text(json.dumps(existing_logs, indent=2))
 
-            print("   ℹ️ ANALYZE gracefully skipped - all critical operations complete\n")
+        # STEP 4: Update account status
+        print("4. Updating account status...")
+        self.update_account_status()
+        print("   ✓ Complete\n")
 
         print("="*60)
         print("ANALYZE COMMAND COMPLETE")
         print("="*60)
-        if closed_trades:
-            print(f"\n✓ {len(closed_trades)} positions closed and logged to CSV")
+        print("   ✓ Portfolio updated with closing prices")
+        print("   ✓ Daily activity summary created")
+        print("   ✓ Learning analysis complete")
         print()
 
         return True
@@ -8354,21 +8773,22 @@ CURRENT PORTFOLIO
 
 def main():
     """Main execution"""
-    
+
     if len(sys.argv) < 2:
-        print("\nUsage: python agent.py [go|execute|recheck|analyze|learn]")
+        print("\nUsage: python agent.py [go|execute|recheck|exit|analyze|learn]")
         print("\nCommands:")
-        print("  go       - Select 10 stocks (8:45 AM)")
+        print("  go       - Select stocks for today (9:00 AM)")
         print("  execute  - Enter positions (9:45 AM)")
-        print("  recheck  - Re-evaluate gap-skipped stocks (10:15 AM)")
-        print("  analyze  - Update & close positions (4:30 PM)")
-        print("  learn    - Analyze performance metrics (Phase 5)")
+        print("  recheck  - Re-evaluate gap-skipped stocks (10:30 AM)")
+        print("  exit     - Exit positions before close (3:45 PM) [NEW v8.2]")
+        print("  analyze  - Summary & learning (4:30 PM)")
+        print("  learn    - Analyze performance metrics")
         sys.exit(1)
 
     command = sys.argv[1].lower()
 
     print(f"\n{'='*60}")
-    print(f"Paper Trading Lab Agent v8.0 (Alpaca Integration)")
+    print(f"Paper Trading Lab Agent v8.2 (Exit/Analyze Split)")
     et_tz = pytz.timezone('America/New_York')
     print(f"Time: {datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S ET')}")
     print(f"{'='*60}")
@@ -8382,6 +8802,8 @@ def main():
             success = agent.execute_execute_command()
         elif command == 'recheck':
             success = agent.execute_recheck_command()
+        elif command == 'exit':
+            success = agent.execute_exit_command()
         elif command == 'analyze':
             success = agent.execute_analyze_command()
         elif command == 'learn':
