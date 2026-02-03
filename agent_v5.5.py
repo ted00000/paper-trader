@@ -4459,18 +4459,36 @@ Exits decided now will execute BEFORE market close at current prices.
 ## AUTOMATED EXITS (Already Triggered)
 The system has already identified positions that hit hard exit rules:
 - Stop loss (-7%)
-- Price target hit (+10%)
+- Trailing stop triggered by Alpaca (positions at +10% with 2% trail)
 - Time stop (21 days)
-- News invalidation (negative catalyst score ≥70)
 
 These are listed in the context as "Auto-exits triggered."
 
-## YOUR TASK
+## YOUR TASK (v8.3 - Semantic News Review)
 Review the remaining positions that did NOT trigger automated exits.
-Consider if any should be manually exited based on:
+**You have access to recent news for each position.** Use this to make informed decisions.
 
-1. **Catalyst Degradation**: Original thesis weakened but not fully invalidated
-2. **Better Opportunity Cost**: Capital trapped in stagnant position
+### CRITICAL: NEWS INVALIDATION REVIEW
+For each position, review the recent news articles provided and determine:
+1. **Does any news INVALIDATE the original catalyst thesis?**
+   - Company-specific negative news (lawsuit, guidance cut, product failure)
+   - Sector-wide issues that hurt the specific stock
+   - Regulatory actions or investigations
+
+2. **Is the news material or just noise?**
+   - "Company settles lawsuit for $5M" = Probably POSITIVE (removes uncertainty)
+   - "Company faces $500M lawsuit" = NEGATIVE (material risk)
+   - "Analyst maintains hold rating" = NOISE (no change)
+
+3. **Context matters:**
+   - An FDA delay for one drug doesn't invalidate an earnings beat thesis
+   - A CEO departure may or may not invalidate depending on circumstances
+   - Sector rotation doesn't invalidate strong company-specific catalysts
+
+### OTHER EXIT CONSIDERATIONS
+Also consider if any should be exited based on:
+1. **Catalyst Degradation**: Original thesis weakened (even without explicit bad news)
+2. **Opportunity Cost**: Capital trapped in stagnant position (>7 days, <3% gain)
 3. **Risk Management**: Position approaching stop, better to exit early
 4. **Technical Breakdown**: Chart pattern failed, momentum lost
 
@@ -4483,7 +4501,8 @@ For each position reviewed, respond with:
     {{
       "ticker": "SYMBOL",
       "action": "EXIT" | "HOLD",
-      "reasoning": "Brief explanation",
+      "reasoning": "Brief explanation - include news analysis if relevant",
+      "news_impact": "NEGATIVE" | "NEUTRAL" | "POSITIVE" | "NO_NEWS",
       "urgency": "HIGH" | "MEDIUM" | "LOW"
     }}
   ],
@@ -4495,8 +4514,9 @@ If no additional exits recommended beyond auto-exits, respond with empty array.
 
 ## IMPORTANT
 - Be decisive. Market closes soon.
-- Only recommend EXIT if you have clear conviction
-- Default is HOLD if position is working
+- EXIT if news clearly invalidates thesis (even if not at stop)
+- HOLD if news is noise or doesn't affect the catalyst
+- Default is HOLD if position is working and news is neutral
 """
         else:
             user_message = command
@@ -5661,13 +5681,16 @@ CURRENT PORTFOLIO
 
     def check_position_exits(self, position, current_price):
         """
-        Check if position should be closed based on stops/targets/news (FULL EXIT only)
+        Check if position should be closed based on stops/targets (FULL EXIT only)
 
-        Exit Rules (Phase 1 - News Monitoring Integrated):
-        1. News Invalidation: Score ≥70 (PRIORITY - check first)
-        2. Stop Loss: -7% from entry (exit 100%)
-        3. Price Target: +10% from entry (exit 100%)
-        4. Time Stop: 21 days held (exit 100%)
+        Exit Rules (v8.3 - News moved to Claude semantic review):
+        1. Stop Loss: -7% from entry (exit 100%)
+        2. Trailing Stop: Alpaca handles positions at +10%
+        3. Time Stop: 21 days held (exit 100%)
+
+        NEWS INVALIDATION: No longer auto-exits. News is fetched and passed to
+        Claude for semantic review during EXIT command. Claude decides if news
+        truly invalidates the thesis.
 
         No partial exits - simplicity over complexity
         """
@@ -5679,44 +5702,15 @@ CURRENT PORTFOLIO
 
         return_pct = ((current_price - entry_price) / entry_price) * 100
 
-        # PRIORITY 1: Check news invalidation (Phase 1)
-        # This catches thesis-breaking news BEFORE it becomes a big loss
-        try:
-            news_result = self.calculate_news_invalidation_score(ticker)
+        # v8.3: News invalidation moved to Claude semantic review in EXIT command
+        # No longer auto-exiting based on keyword scores - Claude decides
 
-            if news_result['should_exit']:
-                # Log news invalidation event
-                self.log_news_monitoring(
-                    ticker=ticker,
-                    event_type='INVALIDATION',
-                    result=news_result,
-                    entry_price=entry_price,
-                    exit_price=current_price
-                )
-
-                # Format exit reason with news details
-                if news_result['triggering_articles']:
-                    top_article = news_result['triggering_articles'][0]
-                    exit_reason = f"Catalyst invalidated - {top_article['title'][:50]}"
-                else:
-                    exit_reason = "Catalyst invalidated - negative news"
-
-                print(f"      ⚠️ NEWS INVALIDATION: {ticker} (score: {news_result['score']})")
-                if news_result['triggering_articles']:
-                    print(f"         Article: {news_result['triggering_articles'][0]['title'][:80]}")
-
-                return True, exit_reason, return_pct
-
-        except Exception as e:
-            print(f"      ⚠️ News check failed for {ticker}: {e}")
-            # Continue to other exit checks if news check fails
-
-        # PRIORITY 2: Check stop loss (-7%)
+        # PRIORITY 1: Check stop loss (-7%)
         if current_price <= stop_loss:
             standardized_reason = self.standardize_exit_reason(position, current_price, 'stop loss')
             return True, standardized_reason, return_pct
 
-        # PRIORITY 3: Check profit target / trailing stop (Enhancement 1.1)
+        # PRIORITY 2: Check profit target / trailing stop (Enhancement 1.1)
         # Once position hits target, activate trailing stop to let winners run
         if current_price >= price_target:
             # Enhancement 1.1: Trailing stop logic
@@ -5806,7 +5800,7 @@ CURRENT PORTFOLIO
             # Still trailing, hold position (Alpaca will handle the actual exit)
             return False, 'Hold (trailing)', return_pct
 
-        # PRIORITY 4: Check time stop (21 days standard, 90 days for PED)
+        # PRIORITY 3: Check time stop (21 days standard, 90 days for PED)
         entry_date_str = position['entry_date']
         entry_date = datetime.fromisoformat(entry_date_str.replace('Z', '+00:00')).replace(tzinfo=None) if 'T' in entry_date_str else datetime.strptime(entry_date_str, '%Y-%m-%d')
         days_held = (datetime.now() - entry_date).days
@@ -8463,16 +8457,33 @@ CURRENT PORTFOLIO
 
         print()
 
-        # STEP 4: Call Claude for exit review (with failsafe)
+        # STEP 4: Fetch news for each position (v8.3 - Claude semantic review)
+        print("4. Fetching news for positions...")
+        position_news = {}
+        all_positions_to_check = [ae['position'] for ae in auto_exits] + [pr['position'] for pr in positions_for_claude_review]
+
+        for position in all_positions_to_check:
+            ticker = position['ticker']
+            try:
+                articles = self.fetch_polygon_news(ticker, limit=5, days_back=3)
+                position_news[ticker] = articles
+                print(f"   ✓ Fetched {len(articles)} news articles for {ticker}")
+            except Exception as e:
+                position_news[ticker] = []
+                print(f"   ⚠️ News fetch failed for {ticker}: {e}")
+
+        print()
+
+        # STEP 5: Call Claude for exit review (with failsafe)
         claude_exits = []
         claude_used = True
 
-        print("4. Calling Claude for exit review...")
+        print("5. Calling Claude for exit review...")
 
         # Prepare context for Claude
         exit_context = self.load_optimized_context('exit')
 
-        # Add position details to context
+        # Add position details with NEWS to context (v8.3)
         position_summary = "\n=== POSITIONS FOR EXIT REVIEW ===\n"
         position_summary += f"Auto-exits triggered: {len(auto_exits)}\n"
         for ae in auto_exits:
@@ -8482,9 +8493,33 @@ CURRENT PORTFOLIO
         position_summary += f"\nPositions to review: {len(positions_for_claude_review)}\n"
         for pr in positions_for_claude_review:
             pos = pr['position']
-            position_summary += f"  - {pos['ticker']}: ${pr['current_price']:.2f} ({pr['return_pct']:+.1f}%) - {pr['status']}\n"
-            position_summary += f"    Entry: ${pos['entry_price']:.2f} on {pos['entry_date']}, Days held: {pos.get('days_held', 0)}\n"
-            position_summary += f"    Catalyst: {pos.get('catalyst_type', 'Unknown')}\n"
+            ticker = pos['ticker']
+            position_summary += f"\n### {ticker}\n"
+            position_summary += f"  Price: ${pr['current_price']:.2f} ({pr['return_pct']:+.1f}%)\n"
+            position_summary += f"  Entry: ${pos['entry_price']:.2f} on {pos['entry_date']}\n"
+            position_summary += f"  Days held: {pos.get('days_held', 0)}\n"
+            position_summary += f"  Original Catalyst: {pos.get('catalyst_type', 'Unknown')}\n"
+            position_summary += f"  Thesis: {pos.get('thesis', 'N/A')}\n"
+
+            # Add news for this position
+            articles = position_news.get(ticker, [])
+            if articles:
+                position_summary += f"  Recent News ({len(articles)} articles):\n"
+                for article in articles[:3]:  # Top 3 articles
+                    title = article.get('title', '')[:80]
+                    source = article.get('publisher', {}).get('name', 'Unknown')
+                    age_hours = article.get('age_hours', 0)
+                    # Try to get sentiment from Polygon insights
+                    sentiment = 'neutral'
+                    insights = article.get('insights', [])
+                    for insight in insights:
+                        if insight.get('ticker', '').upper() == ticker.upper():
+                            sentiment = insight.get('sentiment', 'neutral')
+                            break
+                    position_summary += f"    • [{source}] {title}\n"
+                    position_summary += f"      ({age_hours:.0f}h ago, sentiment: {sentiment})\n"
+            else:
+                position_summary += f"  Recent News: None found\n"
 
         exit_context += position_summary
 
@@ -8514,8 +8549,80 @@ CURRENT PORTFOLIO
             # Claude can recommend additional exits for positions not caught by auto rules
             if response:
                 self.save_response('exit', response)
-                # TODO: Parse Claude's recommendations for additional exits
-                # For now, we trust the automated rules
+
+                # Parse JSON from Claude's response
+                try:
+                    # Extract JSON block from response
+                    json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
+                    if json_match:
+                        json_str = json_match.group(1)
+                    else:
+                        # Try to find raw JSON
+                        json_match = re.search(r'\{[\s\S]*"exit_recommendations"[\s\S]*\}', response)
+                        json_str = json_match.group(0) if json_match else None
+
+                    if json_str:
+                        exit_data = json.loads(json_str)
+                        recommendations = exit_data.get('exit_recommendations', [])
+
+                        # Get tickers already in auto_exits
+                        auto_exit_tickers = {ae['position']['ticker'].upper() for ae in auto_exits}
+
+                        # Build position lookup
+                        position_lookup = {p['ticker'].upper(): p for p in positions}
+
+                        for rec in recommendations:
+                            ticker = rec.get('ticker', '').upper()
+                            action = rec.get('action', '').upper()
+                            reasoning = rec.get('reasoning', 'Claude semantic review')
+                            news_impact = rec.get('news_impact', 'UNKNOWN')
+                            urgency = rec.get('urgency', 'MEDIUM')
+
+                            # Only process EXIT recommendations not already in auto_exits
+                            if action == 'EXIT' and ticker not in auto_exit_tickers:
+                                if ticker in position_lookup:
+                                    position = position_lookup[ticker]
+
+                                    # Get current price for this position
+                                    current_price = None
+                                    for pr in positions_for_claude_review:
+                                        if pr['position']['ticker'].upper() == ticker:
+                                            current_price = pr['current_price']
+                                            break
+
+                                    if current_price is None:
+                                        # Fetch current price
+                                        try:
+                                            current_price = self.get_current_price(ticker)
+                                        except:
+                                            current_price = position.get('current_price', 0)
+
+                                    # Build exit reason with news context
+                                    exit_reason = f"Claude Exit: {reasoning}"
+                                    if news_impact != 'NO_NEWS':
+                                        exit_reason += f" (News: {news_impact}, Urgency: {urgency})"
+
+                                    claude_exits.append({
+                                        'position': position,
+                                        'exit_reason': exit_reason,
+                                        'current_price': current_price
+                                    })
+
+                                    print(f"   → Claude recommends EXIT: {ticker}")
+                                    print(f"     Reason: {reasoning}")
+                                    print(f"     News Impact: {news_impact}, Urgency: {urgency}")
+                                else:
+                                    print(f"   ⚠️ Claude recommended EXIT for {ticker} but position not found")
+
+                        if not claude_exits:
+                            print("   → No additional exits recommended by Claude")
+                    else:
+                        print("   ⚠️ Could not parse JSON from Claude response")
+
+                except json.JSONDecodeError as e:
+                    print(f"   ⚠️ JSON parse error: {e}")
+                except Exception as e:
+                    print(f"   ⚠️ Error parsing Claude response: {e}")
 
         except (TimeoutError, Exception) as e:
             claude_used = False
@@ -8555,8 +8662,8 @@ CURRENT PORTFOLIO
             existing_logs.append(failsafe_log)
             log_file.write_text(json.dumps(existing_logs, indent=2))
 
-        # STEP 5: Execute all exits
-        print("5. Executing exits...")
+        # STEP 6: Execute all exits
+        print("6. Executing exits...")
         all_exits = auto_exits + claude_exits
         closed_trades = []
 
@@ -8588,8 +8695,8 @@ CURRENT PORTFOLIO
             # Remove from positions
             positions = [p for p in positions if p['ticker'] != ticker]
 
-        # STEP 6: Update portfolio
-        print("\n6. Updating portfolio...")
+        # STEP 7: Update portfolio
+        print("\n7. Updating portfolio...")
         portfolio['positions'] = positions
         portfolio['last_updated'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         portfolio['portfolio_status'] = f"Active - {len(positions)} positions"

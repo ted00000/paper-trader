@@ -1,0 +1,81 @@
+#!/bin/bash
+# Wrapper script for EXIT command
+# Ensures proper environment, logging, and status tracking for cron
+# EXIT runs at 3:45 PM - 15 min before market close for same-day execution
+
+# Exit on error
+set -e
+
+# Configuration
+SCRIPT_DIR="/root/paper_trading_lab"
+LOG_FILE="$SCRIPT_DIR/logs/exit.log"
+STATUS_FILE="$SCRIPT_DIR/dashboard_data/operation_status/exit_status.json"
+AGENT_SCRIPT="agent_v5.5.py"
+
+# Create log directory if it doesn't exist
+mkdir -p "$SCRIPT_DIR/logs"
+mkdir -p "$SCRIPT_DIR/dashboard_data/operation_status"
+
+# Function to update status
+update_status() {
+    local status=$1
+    local error=${2:-""}
+    local timestamp=$(date -Iseconds)
+
+    cat > "$STATUS_FILE" <<EOF
+{
+  "operation": "EXIT",
+  "last_run": "$timestamp",
+  "status": "$status",
+  "log_file": "$LOG_FILE",
+  "error": "$error"
+}
+EOF
+}
+
+# Mark as starting
+update_status "RUNNING"
+
+# Change to script directory
+cd "$SCRIPT_DIR" || {
+    update_status "FAILED" "Could not change to directory $SCRIPT_DIR"
+    exit 1
+}
+
+# Activate virtual environment
+if [ ! -f "venv/bin/activate" ]; then
+    update_status "FAILED" "Virtual environment not found at venv/bin/activate"
+    exit 1
+fi
+source venv/bin/activate
+
+# Load environment variables
+if [ ! -f "/root/.env" ]; then
+    update_status "FAILED" "Environment file not found at /root/.env"
+    exit 1
+fi
+source /root/.env
+
+# Verify agent script exists
+if [ ! -f "$AGENT_SCRIPT" ]; then
+    update_status "FAILED" "Agent script not found: $AGENT_SCRIPT"
+    exit 1
+fi
+
+# Run EXIT with logging and error capture
+echo "============================================================" >> "$LOG_FILE"
+echo "EXIT Command Starting: $(date)" >> "$LOG_FILE"
+echo "============================================================" >> "$LOG_FILE"
+
+if python3 "$AGENT_SCRIPT" exit >> "$LOG_FILE" 2>&1; then
+    # Success
+    update_status "SUCCESS"
+    echo "EXIT command completed successfully: $(date)" >> "$LOG_FILE"
+    exit 0
+else
+    # Failure
+    EXIT_CODE=$?
+    update_status "FAILED" "EXIT command failed with exit code $EXIT_CODE"
+    echo "EXIT command failed with exit code $EXIT_CODE: $(date)" >> "$LOG_FILE"
+    exit $EXIT_CODE
+fi
