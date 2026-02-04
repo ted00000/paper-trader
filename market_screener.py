@@ -1023,93 +1023,106 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     def get_earnings_date(self, ticker):
         """
-        Get upcoming earnings date for a ticker using Polygon Benzinga earnings API
+        Get upcoming earnings date for a ticker using Finnhub earnings calendar API
 
         Returns: Dict with earnings info or None if unavailable
         {
             'date': '2026-02-03',
-            'time': 'after-hours' | 'before-open' | 'during-market',
+            'timing': 'after-hours' | 'before-open' | 'unknown',
             'days_until': 0,  # negative if already passed
             'is_today': True/False,
             'warning': '⚠️ EARNINGS TODAY after-hours' | None
         }
         """
         try:
-            # Get earnings for next 30 days (and past 7 days to catch recent reports)
+            # Get Finnhub API key from environment
+            finnhub_key = os.environ.get('FINNHUB_API_KEY')
+            if not finnhub_key:
+                return None
+
+            # Query Finnhub earnings calendar (past 7 days to future 30 days)
             today = datetime.now(ET).date()
             start_date = today - timedelta(days=7)
             end_date = today + timedelta(days=30)
 
-            url = 'https://api.polygon.io/v3/reference/earnings'
+            url = 'https://finnhub.io/api/v1/calendar/earnings'
             params = {
-                'ticker': ticker,
-                'date.gte': start_date.strftime('%Y-%m-%d'),
-                'date.lte': end_date.strftime('%Y-%m-%d'),
-                'apiKey': self.api_key
+                'symbol': ticker,
+                'from': start_date.strftime('%Y-%m-%d'),
+                'to': end_date.strftime('%Y-%m-%d'),
+                'token': finnhub_key
             }
 
             response = requests.get(url, params=params, timeout=10)
+
+            if response.status_code != 200:
+                return None
+
             data = response.json()
+            earnings_list = data.get('earningsCalendar', [])
 
-            if response.status_code == 200 and 'results' in data and data['results']:
-                # Find the closest upcoming earnings date
-                upcoming = None
-                for earning in data['results']:
-                    earning_date_str = earning.get('date', earning.get('report_date'))
-                    if not earning_date_str:
-                        continue
+            if not earnings_list:
+                return None
 
-                    earning_date = datetime.strptime(earning_date_str, '%Y-%m-%d').date()
+            # Find closest earnings date (future preferred, then recent past)
+            upcoming = None
+            for earning in earnings_list:
+                earning_date_str = earning.get('date')
+                if not earning_date_str:
+                    continue
 
-                    if upcoming is None or earning_date < upcoming['date']:
-                        # Determine timing (before open, after hours, during market)
-                        time_str = earning.get('time', earning.get('report_time', ''))
-                        if time_str:
-                            time_str = time_str.lower()
-                            if 'before' in time_str or 'bmo' in time_str or '0' <= time_str[:2] < '09':
-                                timing = 'before-open'
-                            elif 'after' in time_str or 'amc' in time_str or time_str[:2] >= '16':
-                                timing = 'after-hours'
-                            else:
-                                timing = 'during-market'
-                        else:
-                            timing = 'unknown'
+                earning_date = datetime.strptime(earning_date_str, '%Y-%m-%d').date()
 
-                        upcoming = {
-                            'date': earning_date,
-                            'timing': timing,
-                            'confirmed': earning.get('confirmed', False)
-                        }
+                # Determine timing from 'hour' field (bmo = before market open, amc = after market close)
+                hour = earning.get('hour', '').lower()
+                if hour == 'bmo':
+                    timing = 'before-open'
+                elif hour == 'amc':
+                    timing = 'after-hours'
+                else:
+                    timing = 'unknown'
 
-                if upcoming:
-                    days_until = (upcoming['date'] - today).days
-                    is_today = days_until == 0
-                    is_tomorrow = days_until == 1
+                # Prefer upcoming dates, but track recent past if no upcoming
+                days_diff = (earning_date - today).days
+                if upcoming is None:
+                    upcoming = {'date': earning_date, 'timing': timing, 'days_diff': days_diff}
+                elif days_diff >= 0 and (upcoming['days_diff'] < 0 or days_diff < upcoming['days_diff']):
+                    # Prefer future date closer to today
+                    upcoming = {'date': earning_date, 'timing': timing, 'days_diff': days_diff}
+                elif days_diff < 0 and upcoming['days_diff'] < 0 and days_diff > upcoming['days_diff']:
+                    # If both past, prefer more recent
+                    upcoming = {'date': earning_date, 'timing': timing, 'days_diff': days_diff}
 
-                    # Generate warning message
-                    warning = None
-                    if is_today:
-                        warning = f"⚠️ EARNINGS TODAY ({upcoming['timing']})"
-                    elif is_tomorrow:
-                        warning = f"⚠️ EARNINGS TOMORROW ({upcoming['timing']})"
-                    elif days_until <= 3 and days_until > 0:
-                        warning = f"⚡ Earnings in {days_until} days"
-                    elif days_until < 0 and days_until >= -3:
-                        warning = f"📊 Reported {abs(days_until)} days ago"
+            if upcoming:
+                days_until = upcoming['days_diff']
+                is_today = days_until == 0
+                is_tomorrow = days_until == 1
 
-                    return {
-                        'date': upcoming['date'].strftime('%Y-%m-%d'),
-                        'timing': upcoming['timing'],
-                        'days_until': days_until,
-                        'is_today': is_today,
-                        'confirmed': upcoming['confirmed'],
-                        'warning': warning
-                    }
+                # Generate warning message
+                warning = None
+                if is_today:
+                    warning = f"⚠️ EARNINGS TODAY ({upcoming['timing']})"
+                elif is_tomorrow:
+                    warning = f"⚠️ EARNINGS TOMORROW ({upcoming['timing']})"
+                elif days_until == 2:
+                    warning = f"⚡ Earnings in 2 days"
+                elif days_until == 3:
+                    warning = f"⚡ Earnings in 3 days"
+                elif days_until < 0 and days_until >= -3:
+                    warning = f"📊 Reported {abs(days_until)} days ago"
+
+                return {
+                    'date': upcoming['date'].strftime('%Y-%m-%d'),
+                    'timing': upcoming['timing'],
+                    'days_until': days_until,
+                    'is_today': is_today,
+                    'warning': warning
+                }
 
             return None
 
-        except Exception as e:
-            logger.debug(f"Earnings lookup failed for {ticker}: {e}")
+        except Exception:
+            # Silently fail - earnings data is supplementary
             return None
 
     def get_3month_return(self, ticker):
