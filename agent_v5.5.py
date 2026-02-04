@@ -4016,6 +4016,40 @@ POSITION {i}: {ticker}
                     if article['description']:
                         output += f"         {article['description'][:150]}...\n"
 
+            # v8.4: Add RS percentile and institutional signals (previously hidden from Claude)
+            rs_percentile = rs.get('rs_percentile')
+            if rs_percentile is not None:
+                rs_label = ""
+                if rs_percentile >= 90:
+                    rs_label = " (Top 10% - STRONG)"
+                elif rs_percentile >= 80:
+                    rs_label = " (Top 20% - Good)"
+                elif rs_percentile >= 70:
+                    rs_label = " (Above Average)"
+                elif rs_percentile < 50:
+                    rs_label = " (Below Average)"
+                output += f"   RS Percentile: {rs_percentile}th{rs_label}\n"
+
+            # Institutional signals (options flow + dark pool)
+            options_flow = candidate.get('options_flow', {})
+            dark_pool = candidate.get('dark_pool', {})
+
+            inst_signals = []
+            if options_flow.get('has_unusual_activity'):
+                cp_ratio = options_flow.get('call_put_ratio', 0)
+                signal = options_flow.get('signal_type', 'unusual activity')
+                inst_signals.append(f"Options: {cp_ratio:.1f}x call/put ratio ({signal})")
+
+            if dark_pool.get('has_unusual_activity'):
+                spike = dark_pool.get('volume_spike_ratio', 0)
+                signal = dark_pool.get('signal_type', 'accumulation')
+                inst_signals.append(f"Volume spike: {spike:.1f}x average ({signal})")
+
+            if inst_signals:
+                output += f"   🏛️ Institutional Signals: {', '.join(inst_signals)}\n"
+            else:
+                output += f"   🏛️ Institutional Signals: None detected\n"
+
             output += f"   Volume: {vol['volume_ratio']:.1f}x average "
             output += f"({vol['yesterday_volume']:,} vs {vol['avg_volume_20d']:,})\n"
             output += f"   Technical: {tech['distance_from_52w_high_pct']:.1f}% from 52w high "
@@ -7096,18 +7130,38 @@ CURRENT PORTFOLIO
                         revenue_beat=revenue_beat
                     )
 
-                    # v5.7: Conviction SKIP no longer blocks entry - becomes sizing guidance
-                    # Claude already made the decision; we respect it and adjust risk via size
-                    if conviction_result['conviction'] == 'SKIP':
-                        print(f"   ⚠️  {ticker}: Low conviction ({conviction_result['reasoning']}) - reducing to starter position")
+                    # v8.4: Conviction calculation kept for LOGGING/LEARNING only
+                    # Claude now sees RS percentile, options flow, dark pool data directly
+                    # Claude's position size recommendation is trusted - no override
+                    # Conviction level stored for attribution analysis, not for overriding Claude
+                    if conviction_result['conviction'] in ('SKIP', 'LOW'):
+                        print(f"   ℹ️  {ticker}: Quant factors suggest {conviction_result['conviction']} ({conviction_result['reasoning']})")
+                        print(f"   ℹ️  Claude recommended {buy_pos.get('position_size_pct', 0)}% - TRUSTING Claude (v8.4)")
                         if 'risk_flags' not in buy_pos:
                             buy_pos['risk_flags'] = []
-                        buy_pos['risk_flags'].append(f"low_conviction: {conviction_result['reasoning']}")
-                        # Override position size to starter level (5%)
-                        buy_pos['position_size_pct'] = 5.0
-                    elif conviction_result['conviction'] == 'LOW':
-                        print(f"   ⚠️  {ticker}: Low conviction - smaller position size")
-                        buy_pos['position_size_pct'] = 6.0
+                        buy_pos['risk_flags'].append(f"quant_signal: {conviction_result['conviction']} ({conviction_result['reasoning']})")
+                        # v8.4: NO LONGER OVERRIDING - Claude has all data and made informed decision
+
+                    # v8.4: SANITY CHECKS (catch broken outputs, not second-guess judgment)
+                    claude_size = buy_pos.get('position_size_pct', 0)
+
+                    # Check 1: Clamp position size to valid range (0-13%)
+                    if claude_size > 13:
+                        print(f"   ⚠️  {ticker}: Clamping position size {claude_size}% → 13% (max)")
+                        buy_pos['position_size_pct'] = 13.0
+                        if 'risk_flags' not in buy_pos:
+                            buy_pos['risk_flags'] = []
+                        buy_pos['risk_flags'].append(f"sanity_clamped: {claude_size}% → 13%")
+                    elif claude_size < 0:
+                        print(f"   ⚠️  {ticker}: Invalid negative position size {claude_size}% - setting to 0")
+                        buy_pos['position_size_pct'] = 0
+                        validation_passed = False
+                        rejection_reasons.append(f"Negative position size: {claude_size}%")
+                    elif claude_size == 0:
+                        # Claude said 0% - don't buy
+                        print(f"   ℹ️  {ticker}: Claude recommended 0% position - skipping")
+                        validation_passed = False
+                        rejection_reasons.append("Claude recommended 0% position")
 
                     # If all validations pass, accept the position
                     if validation_passed:
