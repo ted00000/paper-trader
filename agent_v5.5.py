@@ -4063,6 +4063,22 @@ POSITION {i}: {ticker}
                     output += f"   📅 Earnings: {earnings['date']} (in {days} days)\n"
             # If no earnings data, don't add anything
 
+            # v8.6: Price target consensus (analyst upside potential)
+            price_targets = candidate.get('price_targets')
+            if price_targets and price_targets.get('target_consensus'):
+                upside = price_targets.get('upside_pct', 0)
+                consensus = price_targets.get('target_consensus')
+                current = price_targets.get('current_price')
+                if upside >= 20:
+                    output += f"   🎯 Analyst Target: ${consensus:.0f} (+{upside:.0f}% upside) 🔥\n"
+                elif upside >= 10:
+                    output += f"   🎯 Analyst Target: ${consensus:.0f} (+{upside:.0f}% upside)\n"
+                elif upside >= 5:
+                    output += f"   🎯 Analyst Target: ${consensus:.0f} (+{upside:.0f}% upside)\n"
+                elif upside < 0:
+                    output += f"   🎯 Analyst Target: ${consensus:.0f} ({upside:.0f}% - below target)\n"
+            # If no price target data, don't add anything
+
             output += f"   Volume: {vol['volume_ratio']:.1f}x average "
             output += f"({vol['yesterday_volume']:,} vs {vol['avg_volume_20d']:,})\n"
             output += f"   Technical: {tech['distance_from_52w_high_pct']:.1f}% from 52w high "

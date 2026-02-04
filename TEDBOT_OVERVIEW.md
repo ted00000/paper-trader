@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v8.5 (Earnings Calendar Integration) - Live paper trading with real brokerage API execution
+**Current Version**: v8.6 (Analyst Price Targets) - Live paper trading with real brokerage API execution
 
 ---
 
@@ -874,13 +874,27 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 ---
 
 **Last Updated**: February 4, 2026
-**Version**: v8.5 (Earnings Calendar Integration)
+**Version**: v8.6 (Analyst Price Targets)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Update (v8.5 - Feb 4, 2026)**:
+**Latest Update (v8.6 - Feb 4, 2026)**:
+- **Analyst Price Target Integration**: Claude now sees Wall Street consensus targets
+  - **Data Source**: FMP `/stable/price-target-consensus` API (switched from Finnhub which is 403 premium)
+  - **Display in GO Command**: "🎯 Analyst Target: $265 (+47% upside) 🔥" for significant upside
+  - **Data Provided to Claude**:
+    - `target_consensus`: Mean analyst price target
+    - `target_high`/`target_low`: Range of targets
+    - `upside_pct`: Calculated upside from current price
+  - **Scoring**:
+    - ≥20% upside: 12 points, Tier 2 catalyst (price_target_raise_major)
+    - 10-20% upside: 8 points (price_target_raise)
+    - 5-10% upside: 5 points (price_target_raise_minor)
+  - **Rationale**: Analyst consensus provides institutional-quality valuation context
+
+**Previous Update (v8.5 - Feb 4, 2026)**:
 - **Earnings Calendar Integration**: Claude now sees when stocks report earnings
   - **Problem Solved (MRCY Lesson)**: MRCY bought Feb 3 morning, beat estimates after hours, crashed 14% on weak guidance
-  - Screener fetches earnings dates from Polygon Benzinga API
+  - Screener fetches earnings dates from Finnhub `/calendar/earnings` API
   - Candidates show warnings: "⚠️ EARNINGS TODAY (after-hours)" or "⚡ Earnings in 3 days"
   - Strategy rules updated with explicit prohibitions:
     - ❌ Never buy stocks reporting earnings TODAY

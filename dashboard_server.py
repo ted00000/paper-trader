@@ -750,7 +750,7 @@ def portfolio_performance():
         ytd_trades = []
         mtd_trades = []
         returns = []
-        conviction_counts = {'HIGH': 0, 'MEDIUM': 0, 'LOW': 0}
+        conviction_counts = {'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'SKIP': 0}
 
         for trade in trades:
             try:

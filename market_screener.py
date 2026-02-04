@@ -3145,18 +3145,16 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     def get_price_target_changes(self, ticker):
         """
-        PHASE 1.1: Track analyst price target increases using Finnhub FREE tier
+        PHASE 1.1: Track analyst price target consensus using FMP API
 
-        Detects significant price target raises (often more impactful than rating upgrades)
+        v8.6 (Feb 4, 2026): Switched from Finnhub (403 premium) to FMP /stable/price-target-consensus
 
-        Uses: Finnhub /stock/price-target endpoint (FREE tier, 60 calls/min limit)
+        Detects significant analyst upside potential:
+        - >20% upside: Tier 2 catalyst (12 points)
+        - 10-20% upside: 8 points
+        - 5-10% upside: 5 points
 
-        Catalyst Scoring:
-        - >20% target increase: Tier 2 catalyst (12 points)
-        - 10-20% target increase: 8 points
-        - 5-10% target increase: 5 points
-
-        Example: Price target raised from $150 → $200 (+33%) drives strong buying pressure
+        Example: Current $150, Consensus target $200 → +33% upside = bullish signal
 
         Returns: Dict with price target data and catalyst classification
         """
@@ -3165,16 +3163,16 @@ Return ONLY valid JSON (no markdown, no explanation):
             return self.price_target_cache[ticker]
 
         try:
-            if not self.finnhub_key:
+            if not self.fmp_key:
                 result = {'has_target_increase': False, 'score': 0, 'catalyst_type': None}
                 self.price_target_cache[ticker] = result
                 return result
 
-            # Finnhub price target endpoint
-            url = f'https://finnhub.io/api/v1/stock/price-target'
+            # FMP price target consensus endpoint (v8.6 - switched from Finnhub 403)
+            url = f'https://financialmodelingprep.com/stable/price-target-consensus'
             params = {
                 'symbol': ticker,
-                'token': self.finnhub_key
+                'apikey': self.fmp_key
             }
 
             response = requests.get(url, params=params, timeout=10)
@@ -3187,26 +3185,18 @@ Return ONLY valid JSON (no markdown, no explanation):
 
             data = response.json()
 
-            # Extract price targets
+            # FMP returns list, get first item
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
+
+            # Extract price targets (FMP uses targetConsensus instead of targetMean)
             target_high = data.get('targetHigh')
             target_low = data.get('targetLow')
-            target_mean = data.get('targetMean')
+            target_consensus = data.get('targetConsensus')
             target_median = data.get('targetMedian')
-            last_updated = data.get('lastUpdated')
 
-            # Check if data exists and is recent (within 30 days)
-            if not target_mean or not last_updated:
-                result = {'has_target_increase': False, 'score': 0, 'catalyst_type': None}
-                self.price_target_cache[ticker] = result
-                time.sleep(0.1)  # Rate limit
-                return result
-
-            # Parse last updated date (Unix timestamp)
-            update_date = datetime.fromtimestamp(last_updated, tz=ET)
-            days_ago = (datetime.now(ET) - update_date).days
-
-            # Only consider recent price targets (within RECENCY_PRICE_TARGET days)
-            if days_ago > RECENCY_PRICE_TARGET:
+            # Check if data exists
+            if not target_consensus:
                 result = {'has_target_increase': False, 'score': 0, 'catalyst_type': None}
                 self.price_target_cache[ticker] = result
                 time.sleep(0.1)  # Rate limit
@@ -3222,7 +3212,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                 return result
 
             # Calculate upside percentage
-            upside_pct = ((target_mean - current_price) / current_price) * 100
+            upside_pct = ((target_consensus - current_price) / current_price) * 100
 
             # Score based on magnitude of upside
             has_target_increase = False
@@ -3246,12 +3236,12 @@ Return ONLY valid JSON (no markdown, no explanation):
                 'has_target_increase': has_target_increase,
                 'score': score,
                 'catalyst_type': catalyst_type,
-                'target_mean': target_mean,
+                'target_consensus': target_consensus,
                 'target_high': target_high,
                 'target_low': target_low,
+                'target_median': target_median,
                 'current_price': current_price,
-                'upside_pct': round(upside_pct, 1),
-                'days_ago': days_ago
+                'upside_pct': round(upside_pct, 1)
             }
 
             self.price_target_cache[ticker] = result
@@ -3430,6 +3420,10 @@ Return ONLY valid JSON (no markdown, no explanation):
         time.sleep(0.05)  # Light rate limit for earnings API
         earnings_info = self.get_earnings_date(ticker)
 
+        # STEP 4: Get analyst price target consensus (v8.6 - FMP integration)
+        time.sleep(0.05)  # Light rate limit for price target API
+        price_target_info = self.get_price_target_changes(ticker)
+
         # Return basic data + news for Claude to analyze
         return {
             'ticker': ticker,
@@ -3440,6 +3434,7 @@ Return ONLY valid JSON (no markdown, no explanation):
             'relative_strength': rs_result,
             'catalyst_signals': news_result,  # Raw news, no keyword filtering
             'earnings_calendar': earnings_info,  # v8.5: Earnings date for risk awareness
+            'price_targets': price_target_info,  # v8.6: Analyst consensus for upside evaluation
             'passed_binary_gates': True
         }
 
