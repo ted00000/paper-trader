@@ -4050,6 +4050,19 @@ POSITION {i}: {ticker}
             else:
                 output += f"   🏛️ Institutional Signals: None detected\n"
 
+            # v8.5: Earnings calendar warning (MRCY lesson - Feb 4, 2026)
+            earnings = candidate.get('earnings_calendar')
+            if earnings and earnings.get('warning'):
+                output += f"   📅 {earnings['warning']}"
+                if earnings.get('timing'):
+                    output += f" ({earnings['timing']})"
+                output += "\n"
+            elif earnings and earnings.get('date'):
+                days = earnings.get('days_until', 0)
+                if days > 0:
+                    output += f"   📅 Earnings: {earnings['date']} (in {days} days)\n"
+            # If no earnings data, don't add anything
+
             output += f"   Volume: {vol['volume_ratio']:.1f}x average "
             output += f"({vol['yesterday_volume']:,} vs {vol['avg_volume_20d']:,})\n"
             output += f"   Technical: {tech['distance_from_52w_high_pct']:.1f}% from 52w high "

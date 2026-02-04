@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v8.0 (Alpaca Integration) - Live paper trading with real brokerage API execution
+**Current Version**: v8.5 (Earnings Calendar Integration) - Live paper trading with real brokerage API execution
 
 ---
 
@@ -874,10 +874,20 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 ---
 
 **Last Updated**: February 4, 2026
-**Version**: v8.4 (Full Data Transparency for Claude)
+**Version**: v8.5 (Earnings Calendar Integration)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Update (v8.4 - Feb 4, 2026)**:
+**Latest Update (v8.5 - Feb 4, 2026)**:
+- **Earnings Calendar Integration**: Claude now sees when stocks report earnings
+  - **Problem Solved (MRCY Lesson)**: MRCY bought Feb 3 morning, beat estimates after hours, crashed 14% on weak guidance
+  - Screener fetches earnings dates from Polygon Benzinga API
+  - Candidates show warnings: "⚠️ EARNINGS TODAY (after-hours)" or "⚡ Earnings in 3 days"
+  - Strategy rules updated with explicit prohibitions:
+    - ❌ Never buy stocks reporting earnings TODAY
+    - ❌ Never buy stocks reporting earnings TOMORROW before open
+  - Rationale: "Beat and retreat" pattern - beat can be priced in, guidance matters more
+
+**Previous Update (v8.4 - Feb 4, 2026)**:
 - **Full Data Transparency**: Claude now sees ALL quant data when making decisions
   - **Problem Solved**: Claude was being second-guessed by a "conviction gate" using data Claude never saw
   - RS percentile, options flow, dark pool signals now shown in candidate view
