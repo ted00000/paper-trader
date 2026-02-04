@@ -1021,6 +1021,97 @@ Return ONLY valid JSON (no markdown, no explanation):
         except Exception:
             return None
 
+    def get_earnings_date(self, ticker):
+        """
+        Get upcoming earnings date for a ticker using Polygon Benzinga earnings API
+
+        Returns: Dict with earnings info or None if unavailable
+        {
+            'date': '2026-02-03',
+            'time': 'after-hours' | 'before-open' | 'during-market',
+            'days_until': 0,  # negative if already passed
+            'is_today': True/False,
+            'warning': '⚠️ EARNINGS TODAY after-hours' | None
+        }
+        """
+        try:
+            # Get earnings for next 30 days (and past 7 days to catch recent reports)
+            today = datetime.now(ET).date()
+            start_date = today - timedelta(days=7)
+            end_date = today + timedelta(days=30)
+
+            url = 'https://api.polygon.io/v3/reference/earnings'
+            params = {
+                'ticker': ticker,
+                'date.gte': start_date.strftime('%Y-%m-%d'),
+                'date.lte': end_date.strftime('%Y-%m-%d'),
+                'apiKey': self.api_key
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+
+            if response.status_code == 200 and 'results' in data and data['results']:
+                # Find the closest upcoming earnings date
+                upcoming = None
+                for earning in data['results']:
+                    earning_date_str = earning.get('date', earning.get('report_date'))
+                    if not earning_date_str:
+                        continue
+
+                    earning_date = datetime.strptime(earning_date_str, '%Y-%m-%d').date()
+
+                    if upcoming is None or earning_date < upcoming['date']:
+                        # Determine timing (before open, after hours, during market)
+                        time_str = earning.get('time', earning.get('report_time', ''))
+                        if time_str:
+                            time_str = time_str.lower()
+                            if 'before' in time_str or 'bmo' in time_str or '0' <= time_str[:2] < '09':
+                                timing = 'before-open'
+                            elif 'after' in time_str or 'amc' in time_str or time_str[:2] >= '16':
+                                timing = 'after-hours'
+                            else:
+                                timing = 'during-market'
+                        else:
+                            timing = 'unknown'
+
+                        upcoming = {
+                            'date': earning_date,
+                            'timing': timing,
+                            'confirmed': earning.get('confirmed', False)
+                        }
+
+                if upcoming:
+                    days_until = (upcoming['date'] - today).days
+                    is_today = days_until == 0
+                    is_tomorrow = days_until == 1
+
+                    # Generate warning message
+                    warning = None
+                    if is_today:
+                        warning = f"⚠️ EARNINGS TODAY ({upcoming['timing']})"
+                    elif is_tomorrow:
+                        warning = f"⚠️ EARNINGS TOMORROW ({upcoming['timing']})"
+                    elif days_until <= 3 and days_until > 0:
+                        warning = f"⚡ Earnings in {days_until} days"
+                    elif days_until < 0 and days_until >= -3:
+                        warning = f"📊 Reported {abs(days_until)} days ago"
+
+                    return {
+                        'date': upcoming['date'].strftime('%Y-%m-%d'),
+                        'timing': upcoming['timing'],
+                        'days_until': days_until,
+                        'is_today': is_today,
+                        'confirmed': upcoming['confirmed'],
+                        'warning': warning
+                    }
+
+            return None
+
+        except Exception as e:
+            logger.debug(f"Earnings lookup failed for {ticker}: {e}")
+            return None
+
     def get_3month_return(self, ticker):
         """
         Calculate 3-month return using Polygon API
@@ -3322,6 +3413,10 @@ Return ONLY valid JSON (no markdown, no explanation):
         time.sleep(0.1)  # Rate limit
         news_result = self.get_news_score(ticker)
 
+        # STEP 3: Get upcoming earnings date (v8.5 - MRCY lesson)
+        time.sleep(0.05)  # Light rate limit for earnings API
+        earnings_info = self.get_earnings_date(ticker)
+
         # Return basic data + news for Claude to analyze
         return {
             'ticker': ticker,
@@ -3331,6 +3426,7 @@ Return ONLY valid JSON (no markdown, no explanation):
             'technical_setup': technical_result,
             'relative_strength': rs_result,
             'catalyst_signals': news_result,  # Raw news, no keyword filtering
+            'earnings_calendar': earnings_info,  # v8.5: Earnings date for risk awareness
             'passed_binary_gates': True
         }
 

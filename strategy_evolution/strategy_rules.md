@@ -1,8 +1,12 @@
 # CURRENT STRATEGY RULES
 
-**Version:** 1.1
-**Last Updated:** November 11, 2025
-**Next Review:** After 25 completed trades or December 1, 2025
+**Version:** 1.2
+**Last Updated:** February 4, 2026
+**Next Review:** After 25 completed trades or March 1, 2026
+
+### v1.2 Changes (Feb 4, 2026):
+- Added earnings timing prohibitions (MRCY lesson - beat but crashed on guidance)
+- Added earnings calendar awareness to entry decisions
 
 ---
 
@@ -59,6 +63,8 @@
 - ❌ **Relative strength <3% vs sector**
 - ❌ Unclear thesis or "hope" trades
 - ❌ Overleveraged/bankruptcy risk companies
+- ❌ **Stocks reporting earnings TODAY** (v8.5 - after-hours risk)
+- ❌ **Stocks reporting earnings TOMORROW before open** (gap risk)
 
 ---
 
@@ -141,10 +147,12 @@
 ## 📊 CATALYST-SPECIFIC GUIDELINES
 
 ### Earnings Beats:
-- **Ideal Entry:** Within 3 days of report
+- **Ideal Entry:** 1-3 days AFTER report (post-earnings drift capture)
+- **NEVER ENTER:** Day of earnings or day before (gap/crash risk)
+- **Rationale:** MRCY lesson (Feb 4, 2026) - beat estimates but crashed 14% after hours on guidance
 - **Expected Hold:** 3-5 days (post-earnings drift)
 - **Target:** +12-15%
-- **Watch For:** Guidance revision
+- **Watch For:** Guidance language matters MORE than the beat itself
 
 ### Sector Momentum:
 - **Ideal Entry:** Early in rotation (first 1-3 days)
