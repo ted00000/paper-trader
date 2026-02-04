@@ -2626,7 +2626,7 @@ Return ONLY valid JSON (no markdown, no explanation):
         """
         PHASE 2.2: Get revenue surprise using Finnhub (replaces FMP which now requires premium)
 
-        Uses Finnhub /stock/earnings endpoint which includes revenueActual and revenueEstimate.
+        Uses Finnhub /calendar/earnings endpoint which includes revenueActual and revenueEstimate.
 
         Returns: Dict with revenue surprise data
         """
@@ -2638,36 +2638,42 @@ Return ONLY valid JSON (no markdown, no explanation):
             return self.revenue_surprises_cache[ticker]
 
         try:
-            # Use Finnhub earnings endpoint (includes revenue data)
-            url = 'https://finnhub.io/api/v1/stock/earnings'
+            # Use Finnhub calendar/earnings endpoint (includes revenue data)
+            today = datetime.now(ET).date()
+            start_date = today - timedelta(days=30)
+
+            url = 'https://finnhub.io/api/v1/calendar/earnings'
             params = {
                 'symbol': ticker,
+                'from': start_date.strftime('%Y-%m-%d'),
+                'to': today.strftime('%Y-%m-%d'),
                 'token': self.finnhub_key
             }
 
             response = requests.get(url, params=params, timeout=30)
-            earnings = response.json()
+            data = response.json()
+            earnings = data.get('earningsCalendar', [])
 
-            if not isinstance(earnings, list) or not earnings:
+            if not earnings:
                 result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
                 self.revenue_surprises_cache[ticker] = result
                 return result
 
-            # Look at most recent earnings with revenue data (last 30 days)
+            # Look at most recent earnings with revenue data
             for earning in earnings:
-                period = earning.get('period', '')
+                date_str = earning.get('date', '')
                 actual_revenue = earning.get('revenueActual')
                 estimated_revenue = earning.get('revenueEstimate')
 
-                if not period or actual_revenue is None or estimated_revenue is None:
+                if not date_str or actual_revenue is None or estimated_revenue is None:
                     continue
 
                 if estimated_revenue <= 0:
                     continue
 
                 try:
-                    earning_date = datetime.strptime(period, '%Y-%m-%d')
-                    days_ago = (datetime.now(ET) - earning_date).days
+                    earning_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    days_ago = (today - earning_date).days
 
                     if days_ago > 30 or days_ago < 0:
                         continue
@@ -2675,7 +2681,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                     # Calculate revenue surprise percentage
                     revenue_surprise_pct = ((actual_revenue - estimated_revenue) / estimated_revenue) * 100
 
-                    # Only count as catalyst if recent AND beat
+                    # Only count as catalyst if beat
                     has_revenue_beat = revenue_surprise_pct > 0
 
                     # Score: 0-50 points based on beat magnitude
