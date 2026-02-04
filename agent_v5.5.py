@@ -3433,6 +3433,8 @@ POSITION {i}: {ticker}
             reasoning_parts.append(f"Institutional: {', '.join(institutional_parts)}")
 
         # === CLUSTER 3: CATALYST QUALITY (no cap - independent signals) ===
+        # v8.3 FIX: Removed news_score from factor contribution
+        # Claude's Tier classification already represents catalyst/news quality
         catalyst_factors = 0
         catalyst_parts = []
 
@@ -3448,12 +3450,8 @@ POSITION {i}: {ticker}
             catalyst_factors += 1
             catalyst_parts.append('Revenue beat')
 
-        if news_score >= 15:
-            catalyst_factors += 1
-            catalyst_parts.append(f'Strong news ({news_score}/20)')
-        elif news_score >= 10:
-            catalyst_factors += 1
-            catalyst_parts.append(f'Good news ({news_score}/20)')
+        # news_score removed - redundant with Claude's semantic analysis
+        # Keyword-based score was giving false negatives (e.g., DVN M&A = -1)
 
         supporting_factors += catalyst_factors
 
@@ -3488,14 +3486,19 @@ POSITION {i}: {ticker}
         # MEDIUM-HIGH (5-6 factors): Good signals in 2-3 clusters
         # MEDIUM (3-4 factors): Minimal acceptable (catalyst + one other cluster)
         # SKIP (<3 factors): Insufficient conviction
+        #
+        # v8.3 FIX (Feb 3, 2026): REMOVED news_score from gate requirements
+        # - news_score is keyword-based, Claude already did semantic news analysis
+        # - Keyword check was overriding Claude's recommendations (DVN M&A case)
+        # - news_score kept for logging/learning but no longer blocks trades
 
-        if supporting_factors >= 7 and news_score >= 15 and vix < 25:
+        if supporting_factors >= 7 and vix < 25:
             conviction = 'HIGH'
             position_size = 13.0
-        elif supporting_factors >= 5 and news_score >= 10 and vix < 30:
+        elif supporting_factors >= 5 and vix < 30:
             conviction = 'MEDIUM-HIGH'
             position_size = 11.0
-        elif supporting_factors >= 3 and news_score >= 5 and vix < 30:
+        elif supporting_factors >= 3 and vix < 30:
             conviction = 'MEDIUM'
             position_size = 10.0
         else:
