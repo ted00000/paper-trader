@@ -873,11 +873,30 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: February 3, 2026
-**Version**: v8.2 (Exit/Analyze Split Architecture)
+**Last Updated**: February 4, 2026
+**Version**: v8.4 (Full Data Transparency for Claude)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Update (v8.2 - Feb 3, 2026)**:
+**Latest Update (v8.4 - Feb 4, 2026)**:
+- **Full Data Transparency**: Claude now sees ALL quant data when making decisions
+  - **Problem Solved**: Claude was being second-guessed by a "conviction gate" using data Claude never saw
+  - RS percentile, options flow, dark pool signals now shown in candidate view
+  - Philosophy: "Give the expert all the data, trust its judgment"
+- **Conviction Override Removed**: No longer overrides Claude's position sizing
+  - Was: If quant factors = SKIP → force 5% position (overriding Claude)
+  - Now: Quant conviction logged for attribution analysis only
+  - Claude's position size recommendation is trusted
+- **Sanity Checks Added**: Catch broken outputs, not judgment calls
+  - Position size clamped to 0-13% range (prevents >100% allocation bugs)
+  - Negative/zero position sizes rejected
+  - Does NOT second-guess valid decisions
+
+**Previous Update (v8.3 - Feb 4, 2026)**:
+- **News Score Override Removed**: Was overriding Claude with stale screener news scores
+  - Problem: DVN had 15-point news score from screener, but no recent news - override blocked entry
+  - Fix: Removed news_score override; Claude evaluates news quality directly
+
+**Previous Update (v8.2 - Feb 3, 2026)**:
 - **EXIT/ANALYZE Architecture Split**: Separates execution from learning
   - **Problem Solved**: Orders placed after market close (4:30 PM) queued overnight, creating stale position state for next day's GO
   - **New EXIT Command (3:45 PM)**: Pre-close position review with Claude + exit rules
