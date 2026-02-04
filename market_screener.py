@@ -2624,15 +2624,13 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     def get_revenue_surprise_fmp(self, ticker):
         """
-        PHASE 2.2: Get revenue surprise using FMP free tier (250 calls/day)
+        PHASE 2.2: Get revenue surprise using Finnhub (replaces FMP which now requires premium)
 
-        Uses 2 API calls per stock:
-        1. /analyst-estimates - Get estimated revenue
-        2. /income-statement - Get actual revenue
+        Uses Finnhub /stock/earnings endpoint which includes revenueActual and revenueEstimate.
 
         Returns: Dict with revenue surprise data
         """
-        if not self.fmp_key:
+        if not self.finnhub_key:
             return {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
 
         # Check cache first
@@ -2640,84 +2638,80 @@ Return ONLY valid JSON (no markdown, no explanation):
             return self.revenue_surprises_cache[ticker]
 
         try:
-            # Call 1: Get analyst revenue estimates (most recent quarter)
-            estimates_url = f"https://financialmodelingprep.com/api/v3/analyst-estimates/{ticker}"
-            estimates_params = {'apikey': self.fmp_key, 'limit': 1}
-            estimates_response = requests.get(estimates_url, params=estimates_params, timeout=30)
-            estimates_data = estimates_response.json()
-
-            if not isinstance(estimates_data, list) or not estimates_data:
-                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
-                self.revenue_surprises_cache[ticker] = result
-                return result
-
-            estimated_revenue = estimates_data[0].get('estimatedRevenueAvg', 0)
-            estimate_date = estimates_data[0].get('date', '')
-
-            if not estimated_revenue or estimated_revenue <= 0:
-                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
-                self.revenue_surprises_cache[ticker] = result
-                return result
-
-            # Call 2: Get actual revenue from income statement (most recent quarter)
-            actuals_url = f"https://financialmodelingprep.com/api/v3/income-statement/{ticker}"
-            actuals_params = {'apikey': self.fmp_key, 'period': 'quarter', 'limit': 1}
-            actuals_response = requests.get(actuals_url, params=actuals_params, timeout=30)
-            actuals_data = actuals_response.json()
-
-            if not isinstance(actuals_data, list) or not actuals_data:
-                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
-                self.revenue_surprises_cache[ticker] = result
-                return result
-
-            actual_revenue = actuals_data[0].get('revenue', 0)
-            actual_date = actuals_data[0].get('date', '')
-
-            if not actual_revenue or actual_revenue <= 0:
-                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
-                self.revenue_surprises_cache[ticker] = result
-                return result
-
-            # Calculate revenue surprise percentage
-            revenue_surprise_pct = ((actual_revenue - estimated_revenue) / estimated_revenue) * 100
-
-            # Check if beat is recent (last 30 days)
-            try:
-                actual_dt = datetime.strptime(actual_date, '%Y-%m-%d')
-                days_ago = (datetime.now(ET) - actual_dt).days
-            except Exception:
-                days_ago = 999  # Unknown date = too old
-
-            # Only count as catalyst if recent AND beat
-            has_revenue_beat = revenue_surprise_pct > 0 and days_ago <= 30
-
-            # Score: 0-50 points based on beat magnitude (scales with earnings beat)
-            if has_revenue_beat:
-                if revenue_surprise_pct >= 20:
-                    score = 50
-                elif revenue_surprise_pct >= 15:
-                    score = 40
-                elif revenue_surprise_pct >= 10:
-                    score = 30
-                else:
-                    score = 20
-            else:
-                score = 0
-
-            result = {
-                'has_revenue_beat': has_revenue_beat,
-                'revenue_surprise_pct': revenue_surprise_pct,
-                'actual_revenue': actual_revenue,
-                'estimated_revenue': estimated_revenue,
-                'days_ago': days_ago,
-                'score': score
+            # Use Finnhub earnings endpoint (includes revenue data)
+            url = 'https://finnhub.io/api/v1/stock/earnings'
+            params = {
+                'symbol': ticker,
+                'token': self.finnhub_key
             }
 
+            response = requests.get(url, params=params, timeout=30)
+            earnings = response.json()
+
+            if not isinstance(earnings, list) or not earnings:
+                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
+                self.revenue_surprises_cache[ticker] = result
+                return result
+
+            # Look at most recent earnings with revenue data (last 30 days)
+            for earning in earnings:
+                period = earning.get('period', '')
+                actual_revenue = earning.get('revenueActual')
+                estimated_revenue = earning.get('revenueEstimate')
+
+                if not period or actual_revenue is None or estimated_revenue is None:
+                    continue
+
+                if estimated_revenue <= 0:
+                    continue
+
+                try:
+                    earning_date = datetime.strptime(period, '%Y-%m-%d')
+                    days_ago = (datetime.now(ET) - earning_date).days
+
+                    if days_ago > 30 or days_ago < 0:
+                        continue
+
+                    # Calculate revenue surprise percentage
+                    revenue_surprise_pct = ((actual_revenue - estimated_revenue) / estimated_revenue) * 100
+
+                    # Only count as catalyst if recent AND beat
+                    has_revenue_beat = revenue_surprise_pct > 0
+
+                    # Score: 0-50 points based on beat magnitude
+                    if has_revenue_beat:
+                        if revenue_surprise_pct >= 20:
+                            score = 50
+                        elif revenue_surprise_pct >= 15:
+                            score = 40
+                        elif revenue_surprise_pct >= 10:
+                            score = 30
+                        else:
+                            score = 20
+                    else:
+                        score = 0
+
+                    result = {
+                        'has_revenue_beat': has_revenue_beat,
+                        'revenue_surprise_pct': round(revenue_surprise_pct, 1),
+                        'actual_revenue': actual_revenue,
+                        'estimated_revenue': estimated_revenue,
+                        'days_ago': days_ago,
+                        'score': score
+                    }
+
+                    self.revenue_surprises_cache[ticker] = result
+                    return result
+
+                except Exception:
+                    continue
+
+            # No recent revenue data found
+            result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
             self.revenue_surprises_cache[ticker] = result
-            time.sleep(0.15)  # Rate limit: 250 calls/day = ~17/min safe
             return result
 
-        except Exception as e:
+        except Exception:
             result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
             self.revenue_surprises_cache[ticker] = result
             return result
