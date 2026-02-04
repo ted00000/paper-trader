@@ -1,1 +1,3 @@
 Date,Time,Ticker,Event_Type,Score,Decision,Articles_Analyzed,Key_Findings,Entry_Price,Exit_Price,Outcome_Pct
+2026-02-04,09:04:26,RCL,VALIDATION,6,VALIDATED-LOW,1,FRESH earnings (0-2 days); WEAK momentum (1 articles in 24h),,,
+2026-02-04,09:04:26,DECK,VALIDATION,5,VALIDATED-LOW,2,FRESH earnings (0-2 days); FADING momentum (no articles in 24h),,,

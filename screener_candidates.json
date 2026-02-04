@@ -1,9 +1,3762 @@
 {
-  "scan_date": null,
-  "scan_time": null,
-  "universe_size": 0,
-  "candidates_found": 0,
-  "filters_applied": {},
-  "sector_rotation": {},
-  "candidates": []
+  "scan_date": "2026-02-04",
+  "scan_time": "07:28:33 ET",
+  "breadth_pct": 63.3,
+  "breadth_timestamp": "2026-02-04 07:28:33 ET",
+  "breadth_above_50d": 949,
+  "breadth_total": 1499,
+  "universe_size": 1499,
+  "candidates_found": 40,
+  "filters_applied": {
+    "min_rs_pct": null,
+    "min_price": 10.0,
+    "min_market_cap": 1000000000
+  },
+  "sector_rotation": {
+    "spy_return": 2.87,
+    "sector_performance": {
+      "Technology": {
+        "etf": "XLK",
+        "3m_return": -1.73,
+        "vs_spy": -4.6,
+        "is_leading": false,
+        "is_lagging": true
+      },
+      "Healthcare": {
+        "etf": "XLV",
+        "3m_return": 5.59,
+        "vs_spy": 2.72,
+        "is_leading": true,
+        "is_lagging": false
+      },
+      "Financials": {
+        "etf": "XLF",
+        "3m_return": 2.14,
+        "vs_spy": -0.73,
+        "is_leading": false,
+        "is_lagging": false
+      },
+      "Consumer Discretionary": {
+        "etf": "XLY",
+        "3m_return": 2.76,
+        "vs_spy": -0.11,
+        "is_leading": false,
+        "is_lagging": false
+      },
+      "Industrials": {
+        "etf": "XLI",
+        "3m_return": 10.71,
+        "vs_spy": 7.84,
+        "is_leading": true,
+        "is_lagging": false
+      },
+      "Consumer Staples": {
+        "etf": "XLP",
+        "3m_return": 13.58,
+        "vs_spy": 10.71,
+        "is_leading": true,
+        "is_lagging": false
+      },
+      "Energy": {
+        "etf": "XLE",
+        "3m_return": 17.07,
+        "vs_spy": 14.2,
+        "is_leading": true,
+        "is_lagging": false
+      },
+      "Utilities": {
+        "etf": "XLU",
+        "3m_return": -2.24,
+        "vs_spy": -5.11,
+        "is_leading": false,
+        "is_lagging": true
+      },
+      "Real Estate": {
+        "etf": "XLRE",
+        "3m_return": 0.2,
+        "vs_spy": -2.67,
+        "is_leading": false,
+        "is_lagging": true
+      },
+      "Materials": {
+        "etf": "XLB",
+        "3m_return": 19.58,
+        "vs_spy": 16.71,
+        "is_leading": true,
+        "is_lagging": false
+      },
+      "Communication Services": {
+        "etf": "XLC",
+        "3m_return": 4.75,
+        "vs_spy": 1.88,
+        "is_leading": false,
+        "is_lagging": false
+      }
+    },
+    "leading_sectors": [
+      "Materials",
+      "Energy",
+      "Consumer Staples",
+      "Industrials",
+      "Healthcare"
+    ],
+    "lagging_sectors": [
+      "Real Estate",
+      "Technology",
+      "Utilities"
+    ],
+    "sorted_sectors": [
+      [
+        "Materials",
+        {
+          "etf": "XLB",
+          "3m_return": 19.58,
+          "vs_spy": 16.71,
+          "is_leading": true,
+          "is_lagging": false
+        }
+      ],
+      [
+        "Energy",
+        {
+          "etf": "XLE",
+          "3m_return": 17.07,
+          "vs_spy": 14.2,
+          "is_leading": true,
+          "is_lagging": false
+        }
+      ],
+      [
+        "Consumer Staples",
+        {
+          "etf": "XLP",
+          "3m_return": 13.58,
+          "vs_spy": 10.71,
+          "is_leading": true,
+          "is_lagging": false
+        }
+      ],
+      [
+        "Industrials",
+        {
+          "etf": "XLI",
+          "3m_return": 10.71,
+          "vs_spy": 7.84,
+          "is_leading": true,
+          "is_lagging": false
+        }
+      ],
+      [
+        "Healthcare",
+        {
+          "etf": "XLV",
+          "3m_return": 5.59,
+          "vs_spy": 2.72,
+          "is_leading": true,
+          "is_lagging": false
+        }
+      ],
+      [
+        "Communication Services",
+        {
+          "etf": "XLC",
+          "3m_return": 4.75,
+          "vs_spy": 1.88,
+          "is_leading": false,
+          "is_lagging": false
+        }
+      ],
+      [
+        "Consumer Discretionary",
+        {
+          "etf": "XLY",
+          "3m_return": 2.76,
+          "vs_spy": -0.11,
+          "is_leading": false,
+          "is_lagging": false
+        }
+      ],
+      [
+        "Financials",
+        {
+          "etf": "XLF",
+          "3m_return": 2.14,
+          "vs_spy": -0.73,
+          "is_leading": false,
+          "is_lagging": false
+        }
+      ],
+      [
+        "Real Estate",
+        {
+          "etf": "XLRE",
+          "3m_return": 0.2,
+          "vs_spy": -2.67,
+          "is_leading": false,
+          "is_lagging": true
+        }
+      ],
+      [
+        "Technology",
+        {
+          "etf": "XLK",
+          "3m_return": -1.73,
+          "vs_spy": -4.6,
+          "is_leading": false,
+          "is_lagging": true
+        }
+      ],
+      [
+        "Utilities",
+        {
+          "etf": "XLU",
+          "3m_return": -2.24,
+          "vs_spy": -5.11,
+          "is_leading": false,
+          "is_lagging": true
+        }
+      ]
+    ]
+  },
+  "candidates": [
+    {
+      "ticker": "DVN",
+      "sector": "Energy",
+      "price": 41.11,
+      "volume_analysis": {
+        "volume_ratio": 2.63,
+        "avg_volume_20d": 9149824,
+        "median_volume_20d": 9149824,
+        "yesterday_volume": 24034977,
+        "score": 87.56079419883955
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 1.03,
+        "is_near_high": true,
+        "high_52w": 41.54,
+        "current_price": 41.11,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 10.74,
+        "distance_from_20ma_pct": 8.87,
+        "ema_5": 40.34,
+        "ema_20": 38.47,
+        "ema_5_above_20": true,
+        "rsi": 77.13,
+        "adx": 100.0,
+        "three_day_return_pct": 2.93,
+        "score": 97.94209555725683
+      },
+      "relative_strength": {
+        "rs_pct": 23.9,
+        "stock_return_3m": 26.77,
+        "sector_return_3m": 17.07,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLE",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 86
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 4,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Halper Sadeh LLC is Investigating PKST, DVN, CTRA on Behalf of Shareholders",
+            "description": "Investor rights law firm Halper Sadeh LLC is investigating three major corporate transactions for potential securities law violations and breaches of fiduciary duties: Peakstone Realty Trust's $21.00 ",
+            "published": "Feb 03",
+            "url": "https://www.globenewswire.com/news-release/2026/02/03/3231560/0/en/Halper-Sadeh-LLC-is-Investigating-PKST-DVN-CTRA-on-Behalf-of-Shareholders.html"
+          },
+          {
+            "title": "This $58 Billion Merger is Creating a New U.S. Oil and Gas Giant",
+            "description": "Devon Energy is acquiring Coterra Energy in a $58 billion all-stock merger, creating the second-largest independent U.S. oil and gas exploration and production company. The combined entity expects to ",
+            "published": "Feb 03",
+            "url": "https://www.fool.com/investing/2026/02/02/this-58-billion-merger-is-creating-a-new-us-oil-an/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Halper Sadeh LLC Reminds Shareholders of CTRA, PKST, CLBK of the Firm\u2019s Investigations",
+            "description": "Halper Sadeh LLC, an investor rights law firm, is investigating three companies for potential federal securities law violations and breaches of fiduciary duties related to their proposed mergers and a",
+            "published": "Feb 02",
+            "url": "https://www.globenewswire.com/news-release/2026/02/02/3230652/0/en/Halper-Sadeh-LLC-Reminds-Shareholders-of-CTRA-PKST-CLBK-of-the-Firm-s-Investigations.html"
+          },
+          {
+            "title": "Devon, Coterra Strike $58 Billion Merger To Dominate US Shale",
+            "description": "Devon Energy and Coterra Energy announced an all-stock merger creating a $58 billion combined enterprise value. Under the deal, Coterra shareholders will receive 0.70 Devon shares per Coterra share. T",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/m-a/26/02/50297757/devon-coterra-strike-58-billion-merger-to-dominate-us-shale?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": true,
+        "negative_reasons": [
+          "investigation (1d ago)"
+        ]
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Devon Energy is involved in a significant $58 billion all-stock merger with Coterra Energy, creating the second-largest independent U.S. oil and gas exploration company.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "M&A_Target: Devon Energy is involved in a significant $58 billion all-stock merger with Coterra Energy, creating the second-largest independent U.S. oil and gas exploration company.",
+      "composite_score": 86.41,
+      "rank": 1
+    },
+    {
+      "ticker": "GLW",
+      "sector": "Technology",
+      "price": 112.79,
+      "volume_analysis": {
+        "volume_ratio": 2.04,
+        "avg_volume_20d": 5673564,
+        "median_volume_20d": 5673564,
+        "yesterday_volume": 11596677,
+        "score": 68.13281139220325
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 3.84,
+        "is_near_high": true,
+        "high_52w": 117.3,
+        "current_price": 112.79,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 24.71,
+        "distance_from_20ma_pct": 17.77,
+        "ema_5": 108.91,
+        "ema_20": 98.59,
+        "ema_5_above_20": true,
+        "rsi": 77.53,
+        "adx": 100.0,
+        "three_day_return_pct": 9.5,
+        "score": 92.31031543052005
+      },
+      "relative_strength": {
+        "rs_pct": 25.5,
+        "stock_return_3m": 28.37,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 88
+      },
+      "catalyst_signals": {
+        "score": 6.0,
+        "count": 4,
+        "keywords": [
+          "upgrade"
+        ],
+        "scaled_score": 20.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "CapWealth Loads Up on Lumen Technologies (LUMN) By Purchasing 704,970 Shares",
+            "description": "CapWealth Advisors increased its Lumen Technologies stake by 704,970 shares worth approximately $9.92 million. Following the purchase, Lumen represents 3.3% of CapWealth's portfolio. The investment co",
+            "published": "Feb 02",
+            "url": "https://www.fool.com/coverage/filings/2026/02/02/capwealth-loads-up-on-lumen-technologies-lumn-by-purchasing-704-970-shares/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Trump Reportedly Set To Launch $12 Billion Critical Mineral Stockpile To Counter China: AAPL, GM, GOOG, BA In Focus",
+            "description": "President Trump is reportedly unveiling Project Vault, a $12 billion critical minerals stockpile initiative combining $10 billion in Ex-Im Bank loans and $1.67 billion in private capital. The program ",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/markets/tech/26/02/50297645/trump-reportedly-set-to-launch-12-billion-critical-mineral-stockpile-to-counter-china-aapl-gm-goog-b?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Corning Cashes In On AI Boom With 24% Optical Revenue Surge",
+            "description": "Corning Inc. reported strong Q4 fiscal 2025 results, beating earnings estimates with adjusted EPS of 72 cents and core sales of $4.41 billion. The company's Optical Communications segment surged 24% Y",
+            "published": "Jan 28",
+            "url": "https://www.benzinga.com/markets/earnings/26/01/50196285/corning-cashes-in-on-ai-boom-with-24-optical-revenue-surge?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Why Corning Stock Soared Today",
+            "description": "Corning stock jumped 15.72% after securing a $6 billion deal with Meta Platforms to supply advanced optical fiber and connectivity products for AI data centers. Corning will expand its North Carolina ",
+            "published": "Jan 28",
+            "url": "https://www.fool.com/investing/2026/01/27/why-corning-stock-is-up-today/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Contract_Win",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Secured $6 billion deal with Meta Platforms for advanced optical fiber and connectivity products for AI data centers, representing a significant revenue opportunity in the high-growth AI infrastructure market.",
+        "catalyst_age_days": 3,
+        "multi_catalyst": true,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "Contract_Win: Secured $6 billion deal with Meta Platforms for advanced optical fiber and connectivity products for AI data centers, representing a significant revenue opportunity in the high-growth AI infrastructure market.",
+      "composite_score": 84.93,
+      "rank": 2
+    },
+    {
+      "ticker": "MNST",
+      "sector": "Utilities",
+      "price": 81.97,
+      "volume_analysis": {
+        "volume_ratio": 2.04,
+        "avg_volume_20d": 5616458,
+        "median_volume_20d": 5616458,
+        "yesterday_volume": 11444602,
+        "score": 67.92300403062416
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 1.53,
+        "is_near_high": true,
+        "high_52w": 83.24,
+        "current_price": 81.97,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 6.72,
+        "distance_from_20ma_pct": 3.18,
+        "ema_5": 81.26,
+        "ema_20": 79.69,
+        "ema_5_above_20": true,
+        "rsi": 66.42,
+        "adx": 100.0,
+        "three_day_return_pct": 2.41,
+        "score": 96.94858241230179
+      },
+      "relative_strength": {
+        "rs_pct": 20.75,
+        "stock_return_3m": 23.62,
+        "sector_return_3m": -2.24,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLU",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 82
+      },
+      "catalyst_signals": {
+        "score": 4.0,
+        "count": 1,
+        "keywords": [
+          "partnership"
+        ],
+        "scaled_score": 13.333333333333334,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "You'll Never Guess the Top-Performing Stock of the 21st Century",
+            "description": "Monster Beverage has emerged as the top-performing stock of the 21st century with a 197,800% return, surpassing tech giants like Nvidia, Apple, and Amazon. The energy drink company's success is attrib",
+            "published": "Feb 03",
+            "url": "https://www.fool.com/investing/2026/02/03/never-guess-top-performing-stock-21st-century-mnst/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Monster Beverage's recognition as the top-performing stock of the 21st century with a 197,800% return signals strong fundamental momentum and investor confidence.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "Earnings_Beat: Monster Beverage's recognition as the top-performing stock of the 21st century with a 197,800% return signals strong fundamental momentum and investor confidence.",
+      "composite_score": 83.92,
+      "rank": 3
+    },
+    {
+      "ticker": "DECK",
+      "sector": "Technology",
+      "price": 113.34,
+      "volume_analysis": {
+        "volume_ratio": 1.7,
+        "avg_volume_20d": 2737111,
+        "median_volume_20d": 2737111,
+        "yesterday_volume": 4649678,
+        "score": 56.6251198267468
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 10.4,
+        "is_near_high": false,
+        "high_52w": 126.5,
+        "current_price": 113.34,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 13.01,
+        "distance_from_20ma_pct": 8.99,
+        "ema_5": 110.78,
+        "ema_20": 105.08,
+        "ema_5_above_20": true,
+        "rsi": 62.72,
+        "adx": 100.0,
+        "three_day_return_pct": 13.45,
+        "score": 79.19367588932806
+      },
+      "relative_strength": {
+        "rs_pct": 39.14,
+        "stock_return_3m": 42.01,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 95
+      },
+      "catalyst_signals": {
+        "score": 2.2,
+        "count": 4,
+        "keywords": [
+          "analyst"
+        ],
+        "scaled_score": 7.333333333333333,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Deckers\u2019 Surprise Blowout Has Wall Street Repricing the Story",
+            "description": "Deckers Outdoor Corp. surged 14.2% after-hours following record Q3 FY2026 earnings with raised full-year guidance for both EPS ($6.80-$6.85 vs. prior $6.30-$6.39) and net sales ($5.40-$5.425B vs. prio",
+            "published": "Feb 02",
+            "url": "https://www.investing.com/analysis/deckers-surprise-blowout-has-wall-street-repricing-the-story-200674288"
+          },
+          {
+            "title": "Stock Market Today: Dow Jones, Nasdaq, S&P 500 Futures Slip As Trump Names Kevin Warsh As New Fed Chair Pick\u2014 SanDisk, Robinhood In Focus (UPDATED)",
+            "description": "U.S. stock futures declined on Friday as investors awaited President Trump's announcement of his Federal Reserve Chair pick. Major indices fell, with the Nasdaq 100 down 1.13% and Russell 2000 down 1.",
+            "published": "Jan 30",
+            "url": "https://www.benzinga.com/markets/equities/26/01/50257945/stock-market-today-nasdaq-sp-500-futures-decline-as-investors-await-trumps-new-fed-chair-pick-sa?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Deckers Stock Climbs After Q3 Earnings: Here's Why",
+            "description": "Deckers Outdoor reported strong Q3 earnings, beating estimates with EPS of $3.33 (vs. $2.80 estimate) and revenue of $1.96 billion (vs. $1.87 billion estimate). The company raised its fiscal 2026 guid",
+            "published": "Jan 29",
+            "url": "https://www.benzinga.com/markets/earnings/26/01/50252184/deckers-stock-climbs-after-q3-earnings-heres-why?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Best Consumer Stock to Buy Right Now: Nike or TJX Companies?\u200b",
+            "description": "The consumer discretionary sector has underperformed the S&P 500, but presents buying opportunities. Nike faces challenges with slumping sales, weak direct revenue, and intense competition despite man",
+            "published": "Jan 28",
+            "url": "https://www.fool.com/investing/2026/01/28/best-consumer-stock-to-buy-right-now-nike-or-tjx/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Significant earnings beat with 19% EPS surprise and raised full-year guidance signals strong fundamental momentum and potential continued short-term price appreciation.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": true,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "Earnings_Beat: Significant earnings beat with 19% EPS surprise and raised full-year guidance signals strong fundamental momentum and potential continued short-term price appreciation.",
+      "composite_score": 83.46,
+      "rank": 4
+    },
+    {
+      "ticker": "BKR",
+      "sector": "Industrials",
+      "price": 58,
+      "volume_analysis": {
+        "volume_ratio": 0.95,
+        "avg_volume_20d": 9634913,
+        "median_volume_20d": 9634913,
+        "yesterday_volume": 9199744,
+        "score": 31.827803470506854
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 0.85,
+        "is_near_high": true,
+        "high_52w": 58.5,
+        "current_price": 58,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 16.81,
+        "distance_from_20ma_pct": 9.55,
+        "ema_5": 56.95,
+        "ema_20": 53.48,
+        "ema_5_above_20": true,
+        "rsi": 84.81,
+        "adx": 100.0,
+        "three_day_return_pct": 2.24,
+        "score": 98.2905982905983
+      },
+      "relative_strength": {
+        "rs_pct": 19.78,
+        "stock_return_3m": 22.65,
+        "sector_return_3m": 10.71,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLI",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 81
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 3,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Chart Industries Exit Comes With a $210 Takeout Clock and $6 Billion Backlog",
+            "description": "Paradice Investment Management fully exited its Chart Industries position, selling 58,813 shares worth $11.77 million in Q4. Chart Industries is being acquired by Baker Hughes at $210 per share, with ",
+            "published": "Jan 29",
+            "url": "https://www.fool.com/coverage/filings/2026/01/29/chart-industries-exit-comes-with-a-usd210-takeout-clock-and-usd6-billion-backlog/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Trump's Iran Threat Reignites Oil Rally \u2014 These Energy Stocks Are Surging",
+            "description": "Oil prices surged following President Trump's escalatory rhetoric toward Iran, with WTI crude rising to nearly $63/barrel and Brent crude reaching $68/barrel. Geopolitical tensions over the Strait of ",
+            "published": "Jan 28",
+            "url": "https://www.benzinga.com/markets/commodities/26/01/50187440/oil-wti-rallies-after-trump-tweet-on-iran-massive-armada-energy-stocks-moving-this-month?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Oil and Gas Production Monitoring Software Industry Research 2026 - Global Market Size, Share, Trends, Opportunities, and Forecasts, 2021-2025 & 2026-2031",
+            "description": "The global Oil and Gas Production Monitoring Software Market is expected to expand at a 9.19% CAGR from 2025 to 2031, driven by Industrial IoT, AI adoption, and environmental regulations. However, int",
+            "published": "Jan 28",
+            "url": "https://www.globenewswire.com/news-release/2026/01/28/3227310/28124/en/Oil-and-Gas-Production-Monitoring-Software-Industry-Research-2026-Global-Market-Size-Share-Trends-Opportunities-and-Forecasts-2021-2025-2026-2031.html"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Chart Industries acquisition by Baker Hughes at $210 per share represents a significant premium and potential catalyst for BKR stock movement in near term.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "M&A_Target: Chart Industries acquisition by Baker Hughes at $210 per share represents a significant premium and potential catalyst for BKR stock movement in near term.",
+      "composite_score": 82.84,
+      "rank": 5
+    },
+    {
+      "ticker": "OVV",
+      "sector": "Energy",
+      "price": 44.11,
+      "volume_analysis": {
+        "volume_ratio": 3.28,
+        "avg_volume_20d": 4348784,
+        "median_volume_20d": 4348784,
+        "yesterday_volume": 14250880,
+        "score": 100
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 0.85,
+        "is_near_high": true,
+        "high_52w": 44.49,
+        "current_price": 44.11,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 10.05,
+        "distance_from_20ma_pct": 8.5,
+        "ema_5": 43.32,
+        "ema_20": 41.37,
+        "ema_5_above_20": true,
+        "rsi": 77.49,
+        "adx": 100.0,
+        "three_day_return_pct": 1.47,
+        "score": 98.29175095527084
+      },
+      "relative_strength": {
+        "rs_pct": 14.57,
+        "stock_return_3m": 17.44,
+        "sector_return_3m": 17.07,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLE",
+        "passed_filter": true,
+        "score": 97.13333333333334,
+        "rs_score_points": 5,
+        "rs_percentile": 72
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "NuVista and Ovintiv Announce Receipt of Investment Canada Act Approval",
+            "description": "Ovintiv Inc. has received Investment Canada Act approval for its acquisition of NuVista Energy Ltd. The transaction, which was previously approved by shareholders on January 23, 2026, and cleared unde",
+            "published": "Jan 28",
+            "url": "https://www.benzinga.com/pressreleases/26/01/g50211695/nuvista-and-ovintiv-announce-receipt-of-investment-canada-act-approval?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "NuVista acquisition received Investment Canada Act approval, signaling final stages of a strategic merger that could drive stock momentum in near term.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "M&A_Target: NuVista acquisition received Investment Canada Act approval, signaling final stages of a strategic merger that could drive stock momentum in near term.",
+      "composite_score": 81.57,
+      "rank": 6
+    },
+    {
+      "ticker": "RCL",
+      "sector": "Industrials",
+      "price": 326.29,
+      "volume_analysis": {
+        "volume_ratio": 0.99,
+        "avg_volume_20d": 2322804,
+        "median_volume_20d": 2322804,
+        "yesterday_volume": 2291903,
+        "score": 32.88988232400388
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 10.97,
+        "is_near_high": false,
+        "high_52w": 366.5,
+        "current_price": 326.29,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 15.0,
+        "distance_from_20ma_pct": 9.35,
+        "ema_5": 322.73,
+        "ema_20": 301.43,
+        "ema_5_above_20": true,
+        "rsi": 62.23,
+        "adx": 100.0,
+        "three_day_return_pct": -5.69,
+        "score": 78.05729877216918
+      },
+      "relative_strength": {
+        "rs_pct": 25.81,
+        "stock_return_3m": 28.68,
+        "sector_return_3m": 10.71,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLI",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 88
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 2,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Why Royal Caribbean Stock Is Skyrocketing This Week",
+            "description": "Royal Caribbean Group surged 16% this week after reporting record Q4 earnings with 13% revenue growth and 72% adjusted EPS growth. The company issued strong 2026 guidance projecting double-digit sales",
+            "published": "Jan 29",
+            "url": "https://www.fool.com/investing/2026/01/29/why-royal-caribbean-stock-is-skyrocketing-this-wee/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Microsoft Stock's Worst Day Since March 2020, Bitcoin Plunges 5%: What's Moving Markets Thursday?",
+            "description": "Microsoft experienced its worst trading day since March 2020, plunging 12% and erasing $400 billion in market cap despite beating earnings expectations, as investors focused on slowing Azure cloud gro",
+            "published": "Jan 29",
+            "url": "https://www.benzinga.com/markets/market-summary/26/01/50241405/microsoft-stocks-worst-day-since-march-2020-market-news-thursday-earnings-meta-bitcoin-plu?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Royal Caribbean reported record Q4 earnings with 13% revenue growth and 72% adjusted EPS growth, significantly exceeding expectations and providing strong forward guidance for 2026.",
+        "catalyst_age_days": 0,
+        "multi_catalyst": true,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "Earnings_Beat: Royal Caribbean reported record Q4 earnings with 13% revenue growth and 72% adjusted EPS growth, significantly exceeding expectations and providing strong forward guidance for 2026.",
+      "composite_score": 79.61,
+      "rank": 7
+    },
+    {
+      "ticker": "CTRA",
+      "sector": "Energy",
+      "price": 28.94,
+      "volume_analysis": {
+        "volume_ratio": 2.85,
+        "avg_volume_20d": 9471384,
+        "median_volume_20d": 9471384,
+        "yesterday_volume": 27039491,
+        "score": 95.1620551618081
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 0.65,
+        "is_near_high": true,
+        "high_52w": 29.13,
+        "current_price": 28.94,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 9.69,
+        "distance_from_20ma_pct": 8.89,
+        "ema_5": 28.33,
+        "ema_20": 27.13,
+        "ema_5_above_20": true,
+        "rsi": 81.59,
+        "adx": 100.0,
+        "three_day_return_pct": 3.14,
+        "score": 98.69550291795402
+      },
+      "relative_strength": {
+        "rs_pct": 6.88,
+        "stock_return_3m": 9.75,
+        "sector_return_3m": 17.07,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLE",
+        "passed_filter": true,
+        "score": 45.86666666666667,
+        "rs_score_points": 5,
+        "rs_percentile": 55
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 4,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Halper Sadeh LLC is Investigating PKST, DVN, CTRA on Behalf of Shareholders",
+            "description": "Investor rights law firm Halper Sadeh LLC is investigating three major corporate transactions for potential securities law violations and breaches of fiduciary duties: Peakstone Realty Trust's $21.00 ",
+            "published": "Feb 03",
+            "url": "https://www.globenewswire.com/news-release/2026/02/03/3231560/0/en/Halper-Sadeh-LLC-is-Investigating-PKST-DVN-CTRA-on-Behalf-of-Shareholders.html"
+          },
+          {
+            "title": "This $58 Billion Merger is Creating a New U.S. Oil and Gas Giant",
+            "description": "Devon Energy is acquiring Coterra Energy in a $58 billion all-stock merger, creating the second-largest independent U.S. oil and gas exploration and production company. The combined entity expects to ",
+            "published": "Feb 03",
+            "url": "https://www.fool.com/investing/2026/02/02/this-58-billion-merger-is-creating-a-new-us-oil-an/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Halper Sadeh LLC Reminds Shareholders of CTRA, PKST, CLBK of the Firm\u2019s Investigations",
+            "description": "Halper Sadeh LLC, an investor rights law firm, is investigating three companies for potential federal securities law violations and breaches of fiduciary duties related to their proposed mergers and a",
+            "published": "Feb 02",
+            "url": "https://www.globenewswire.com/news-release/2026/02/02/3230652/0/en/Halper-Sadeh-LLC-Reminds-Shareholders-of-CTRA-PKST-CLBK-of-the-Firm-s-Investigations.html"
+          },
+          {
+            "title": "Devon, Coterra Strike $58 Billion Merger To Dominate US Shale",
+            "description": "Devon Energy and Coterra Energy announced an all-stock merger creating a $58 billion combined enterprise value. Under the deal, Coterra shareholders will receive 0.70 Devon shares per Coterra share. T",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/m-a/26/02/50297757/devon-coterra-strike-58-billion-merger-to-dominate-us-shale?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": true,
+        "negative_reasons": [
+          "investigation (1d ago)"
+        ]
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Devon Energy is acquiring Coterra Energy in a $58 billion all-stock merger, creating a significant consolidation opportunity in the U.S. oil and gas sector with potential premium for Coterra shareholders.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "M&A_Target: Devon Energy is acquiring Coterra Energy in a $58 billion all-stock merger, creating a significant consolidation opportunity in the U.S. oil and gas sector with potential premium for Coterra shareholders.",
+      "composite_score": 74.46,
+      "rank": 8
+    },
+    {
+      "ticker": "OXY",
+      "sector": "Energy",
+      "price": 45.26,
+      "volume_analysis": {
+        "volume_ratio": 1.01,
+        "avg_volume_20d": 11236165,
+        "median_volume_20d": 11236165,
+        "yesterday_volume": 11361037,
+        "score": 33.703780011537155
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 8.47,
+        "is_near_high": false,
+        "high_52w": 49.45,
+        "current_price": 45.26,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 7.51,
+        "distance_from_20ma_pct": 3.9,
+        "ema_5": 44.85,
+        "ema_20": 43.63,
+        "ema_5_above_20": true,
+        "rsi": 59.35,
+        "adx": 100.0,
+        "three_day_return_pct": -0.35,
+        "score": 83.05358948432759
+      },
+      "relative_strength": {
+        "rs_pct": 9.44,
+        "stock_return_3m": 12.31,
+        "sector_return_3m": 17.07,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLE",
+        "passed_filter": true,
+        "score": 62.933333333333344,
+        "rs_score_points": 5,
+        "rs_percentile": 61
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 2,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Before Retiring, Warren Buffett Made a $58 Billion-Plus Bet on One Sector. Now, That Investment Is Starting to Work.",
+            "description": "Warren Buffett's Berkshire Hathaway invested over $58 billion in oil and gas before his retirement, including major stakes in Chevron and Occidental Petroleum, acquisitions of energy assets, and the p",
+            "published": "Feb 01",
+            "url": "https://www.fool.com/investing/2026/02/01/before-retiring-warren-buffett-made-a-58-billion-p/?source=iedfolrf0000001"
+          },
+          {
+            "title": "The Best Warren Buffett Stocks to Buy With $3,000 Right Now",
+            "description": "The article recommends three Warren Buffett-backed stocks for investors with $3,000: Amazon, valued for its massive Prime membership base and profitable cloud computing segment; Constellation Brands, ",
+            "published": "Jan 29",
+            "url": "https://www.fool.com/investing/2026/01/28/the-best-warren-buffett-stocks-to-buy-with-3000-ri/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Warren Buffett's significant investment in Occidental Petroleum signals strong institutional confidence and potential strategic value in the energy sector.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "M&A_Target: Warren Buffett's significant investment in Occidental Petroleum signals strong institutional confidence and potential strategic value in the energy sector.",
+      "composite_score": 70.33,
+      "rank": 9
+    },
+    {
+      "ticker": "GTLS",
+      "sector": "Energy",
+      "price": 207.4,
+      "volume_analysis": {
+        "volume_ratio": 1.53,
+        "avg_volume_20d": 578748,
+        "median_volume_20d": 578748,
+        "yesterday_volume": 887871,
+        "score": 51.13741115527729
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 0.4,
+        "is_near_high": true,
+        "high_52w": 208.24,
+        "current_price": 207.4,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 0.69,
+        "distance_from_20ma_pct": 0.14,
+        "ema_5": 207.35,
+        "ema_20": 207.05,
+        "ema_5_above_20": true,
+        "rsi": 64.54,
+        "adx": 100.0,
+        "three_day_return_pct": 0.1,
+        "score": 99.19323857087976
+      },
+      "relative_strength": {
+        "rs_pct": 1.19,
+        "stock_return_3m": 4.06,
+        "sector_return_3m": 17.07,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLE",
+        "passed_filter": true,
+        "score": 7.93333333333333,
+        "rs_score_points": 2,
+        "rs_percentile": 39
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Chart Industries Exit Comes With a $210 Takeout Clock and $6 Billion Backlog",
+            "description": "Paradice Investment Management fully exited its Chart Industries position, selling 58,813 shares worth $11.77 million in Q4. Chart Industries is being acquired by Baker Hughes at $210 per share, with ",
+            "published": "Jan 29",
+            "url": "https://www.fool.com/coverage/filings/2026/01/29/chart-industries-exit-comes-with-a-usd210-takeout-clock-and-usd6-billion-backlog/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Chart Industries is being acquired by Baker Hughes at $210 per share, creating a clear M&A premium catalyst with potential for near-term price appreciation.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "M&A_Target: Chart Industries is being acquired by Baker Hughes at $210 per share, creating a clear M&A premium catalyst with potential for near-term price appreciation.",
+      "composite_score": 66.89,
+      "rank": 10
+    },
+    {
+      "ticker": "PB",
+      "sector": "Financials",
+      "price": 70.78,
+      "volume_analysis": {
+        "volume_ratio": 1.87,
+        "avg_volume_20d": 836144,
+        "median_volume_20d": 836144,
+        "yesterday_volume": 1561213,
+        "score": 62.23856442676276
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 6.97,
+        "is_near_high": false,
+        "high_52w": 76.08,
+        "current_price": 70.78,
+        "above_50d_sma": false,
+        "distance_from_50ma_pct": -0.0,
+        "distance_from_20ma_pct": -0.97,
+        "ema_5": 70.09,
+        "ema_20": 71.02,
+        "ema_5_above_20": false,
+        "rsi": 48.44,
+        "adx": 100.0,
+        "three_day_return_pct": 3.43,
+        "score": 86.06729758149316
+      },
+      "relative_strength": {
+        "rs_pct": 4.06,
+        "stock_return_3m": 6.93,
+        "sector_return_3m": 2.14,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLF",
+        "passed_filter": true,
+        "score": 27.066666666666666,
+        "rs_score_points": 3,
+        "rs_percentile": 47
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 2,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "SHAREHOLDER ALERT: The M&A Class Action Firm Announces An Investigation of Stellar Bancorp, Inc. (NYSE: STEL)",
+            "description": "Monteverde & Associates PC, a class action securities firm, has announced an investigation into Stellar Bancorp's proposed sale to Prosperity Bancshares. Under the deal terms, Stellar shareholders wou",
+            "published": "Jan 29",
+            "url": "https://www.benzinga.com/pressreleases/26/01/n50242835/shareholder-alert-the-m-a-class-action-firm-announces-an-investigation-of-stellar-bancorp-inc-nyse?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Prosperity-Stellar Merger Set To Create Second Largest Texas Bank",
+            "description": "Prosperity Bancshares and Stellar Bancorp announced a merger deal valued at approximately $2.002 billion, creating the second largest bank by deposits headquartered in Texas with over 330 banking cent",
+            "published": "Jan 28",
+            "url": "https://www.benzinga.com/m-a/26/01/50201971/prosperity-stellar-merger-set-to-create-second-largest-texas-bank?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": true,
+        "negative_reasons": [
+          "class action (5d ago)",
+          "investigation (5d ago)"
+        ]
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Stellar Bancorp is being acquired by Prosperity Bancshares in a $2.002 billion deal, creating the second largest Texas bank by deposits. Merger premium and strategic consolidation present a clear swing trading opportunity.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "M&A_Target: Stellar Bancorp is being acquired by Prosperity Bancshares in a $2.002 billion deal, creating the second largest Texas bank by deposits. Merger premium and strategic consolidation present a clear swing trading opportunity.",
+      "composite_score": 66.49,
+      "rank": 11
+    },
+    {
+      "ticker": "MP",
+      "sector": "Materials",
+      "price": 64.61,
+      "volume_analysis": {
+        "volume_ratio": 1.17,
+        "avg_volume_20d": 10224932,
+        "median_volume_20d": 10224932,
+        "yesterday_volume": 11931839,
+        "score": 38.897857434918684
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 35.55,
+        "is_near_high": false,
+        "high_52w": 100.25,
+        "current_price": 64.61,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 8.09,
+        "distance_from_20ma_pct": -0.01,
+        "ema_5": 62.72,
+        "ema_20": 63.09,
+        "ema_5_above_20": false,
+        "rsi": 50.91,
+        "adx": 100.0,
+        "three_day_return_pct": 3.94,
+        "score": 28.897112732604825
+      },
+      "relative_strength": {
+        "rs_pct": 21.5,
+        "stock_return_3m": 24.37,
+        "sector_return_3m": 19.58,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLB",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 83
+      },
+      "catalyst_signals": {
+        "score": 5.8,
+        "count": 8,
+        "keywords": [
+          "analyst",
+          "partnership"
+        ],
+        "scaled_score": 19.333333333333332,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Project Vault 'Puts America's Best Foot Forward'\u2014Rare Earth Stocks Dig It",
+            "description": "The Trump administration launched Project Vault, a $12 billion public-private partnership to secure U.S. rare earth and critical mineral supplies independent of China. The U.S. Export-Import Bank appr",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/trading-ideas/movers/26/02/50342606/project-vault-puts-americas-best-foot-forward-rare-earth-stocks-dig-it?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "US $12 Billion Critical Minerals Stockpile Puts Rare Earth ETFs Back In Focus",
+            "description": "President Trump plans to launch a $12 billion strategic critical minerals stockpile to strengthen domestic supply chains for materials essential to national security and advanced technologies. The ini",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/etfs/sector-etfs/26/02/50308593/us-12-billion-critical-minerals-stockpile-puts-rare-earth-etfs-back-in-focus?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Trump Reportedly Set To Launch $12 Billion Critical Mineral Stockpile To Counter China: AAPL, GM, GOOG, BA In Focus",
+            "description": "President Trump is reportedly unveiling Project Vault, a $12 billion critical minerals stockpile initiative combining $10 billion in Ex-Im Bank loans and $1.67 billion in private capital. The program ",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/markets/tech/26/02/50297645/trump-reportedly-set-to-launch-12-billion-critical-mineral-stockpile-to-counter-china-aapl-gm-goog-b?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Why Shares in MP Materials Slumped This Week",
+            "description": "MP Materials stock declined 10.7% this week as investor sentiment toward rare-earth stocks shifted. While USA Rare Earth secured a favorable $277 million federal funding and $1.3 billion loan deal, MP",
+            "published": "Jan 30",
+            "url": "https://www.fool.com/investing/2026/01/30/why-shares-in-mp-materials-slumped-this-week/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Why USA Rare Earth Soared and Then Crashed This Week",
+            "description": "USA Rare Earth announced a transformative government deal including $277 million in federal funding and a $1.3 billion loan, plus a $1.5 billion private investment. Despite positive fundamentals with ",
+            "published": "Jan 30",
+            "url": "https://www.fool.com/investing/2026/01/30/why-usa-rare-earth-soared-and-then-crashed-this-we/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Contract_Win",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Project Vault represents a $12 billion strategic initiative to secure U.S. rare earth mineral supplies, directly benefiting domestic rare earth producers like MP Materials by creating a government-backed market opportunity.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "Contract_Win: Project Vault represents a $12 billion strategic initiative to secure U.S. rare earth mineral supplies, directly benefiting domestic rare earth producers like MP Materials by creating a government-backed market opportunity.",
+      "composite_score": 63.04,
+      "rank": 12
+    },
+    {
+      "ticker": "ESAB",
+      "sector": "Industrials",
+      "price": 117.87,
+      "volume_analysis": {
+        "volume_ratio": 3.29,
+        "avg_volume_20d": 290246,
+        "median_volume_20d": 290246,
+        "yesterday_volume": 953959,
+        "score": 100
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 13.23,
+        "is_near_high": false,
+        "high_52w": 135.84,
+        "current_price": 117.87,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 2.56,
+        "distance_from_20ma_pct": -0.99,
+        "ema_5": 117.76,
+        "ema_20": 118.18,
+        "ema_5_above_20": false,
+        "rsi": 47.38,
+        "adx": 100.0,
+        "three_day_return_pct": -1.59,
+        "score": 73.54240282685512
+      },
+      "relative_strength": {
+        "rs_pct": 2.39,
+        "stock_return_3m": 5.26,
+        "sector_return_3m": 10.71,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLI",
+        "passed_filter": true,
+        "score": 15.93333333333333,
+        "rs_score_points": 2,
+        "rs_percentile": 43
+      },
+      "catalyst_signals": {
+        "score": 9.6,
+        "count": 1,
+        "keywords": [
+          "acquisition"
+        ],
+        "scaled_score": 32.0,
+        "catalyst_type_news": "M&A_news",
+        "catalyst_news_age_days": 1,
+        "top_articles": [
+          {
+            "title": "ESAB Targets $5 Billion TAM Growth Through Eddyfi Buyout",
+            "description": "ESAB Corporation announced the acquisition of Canada-based Eddyfi Technologies for $1.45 billion to expand its total addressable market by approximately $5 billion. The deal, expected to close mid-202",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/m-a/26/02/50310557/esab-targets-5-billion-tam-growth-through-eddyfi-buyout?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": "INFERRED",
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "ESAB's $1.45B acquisition of Eddyfi Technologies expands total addressable market by $5B, representing a significant strategic growth move with potential to drive near-term stock appreciation.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "M&A_Target: ESAB's $1.45B acquisition of Eddyfi Technologies expands total addressable market by $5B, representing a significant strategic growth move with potential to drive near-term stock appreciation.",
+      "composite_score": 62.55,
+      "rank": 13
+    },
+    {
+      "ticker": "APO",
+      "sector": "Financials",
+      "price": 126.85,
+      "volume_analysis": {
+        "volume_ratio": 3.23,
+        "avg_volume_20d": 2920688,
+        "median_volume_20d": 2920688,
+        "yesterday_volume": 9421451,
+        "score": 100
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 19.35,
+        "is_near_high": false,
+        "high_52w": 157.28,
+        "current_price": 126.85,
+        "above_50d_sma": false,
+        "distance_from_50ma_pct": -9.79,
+        "distance_from_20ma_pct": -8.99,
+        "ema_5": 131.19,
+        "ema_20": 137.57,
+        "ema_5_above_20": false,
+        "rsi": 18.9,
+        "adx": 100.0,
+        "three_day_return_pct": -5.68,
+        "score": 61.30467955239063
+      },
+      "relative_strength": {
+        "rs_pct": -4.52,
+        "stock_return_3m": -1.65,
+        "sector_return_3m": 2.14,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLF",
+        "passed_filter": true,
+        "score": 0,
+        "rs_score_points": 0,
+        "rs_percentile": 24
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Apollo Commercial Real Estate Finance, Inc. Announces Entry Into Definitive Agreement to Sell Commercial Real Estate Loan Portfolio",
+            "description": "Apollo Commercial Real Estate Finance (ARI) announced a definitive agreement to sell its approximately $9 billion commercial real estate loan portfolio to Athene Holding Ltd. for 99.7% of total loan c",
+            "published": "Jan 28",
+            "url": "https://www.globenewswire.com/news-release/2026/01/28/3227448/0/en/Apollo-Commercial-Real-Estate-Finance-Inc-Announces-Entry-Into-Definitive-Agreement-to-Sell-Commercial-Real-Estate-Loan-Portfolio.html"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Apollo Commercial Real Estate Finance announced a definitive agreement to sell its $9 billion commercial real estate loan portfolio at 99.7% of total loan value, representing a significant strategic transaction.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "M&A_Target: Apollo Commercial Real Estate Finance announced a definitive agreement to sell its $9 billion commercial real estate loan portfolio at 99.7% of total loan value, representing a significant strategic transaction.",
+      "composite_score": 51.22,
+      "rank": 14
+    },
+    {
+      "ticker": "KBR",
+      "sector": "Industrials",
+      "price": 41.63,
+      "volume_analysis": {
+        "volume_ratio": 0.94,
+        "avg_volume_20d": 1253866,
+        "median_volume_20d": 1253866,
+        "yesterday_volume": 1184494,
+        "score": 31.48911712522178
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 23.44,
+        "is_near_high": false,
+        "high_52w": 54.38,
+        "current_price": 41.63,
+        "above_50d_sma": false,
+        "distance_from_50ma_pct": -2.18,
+        "distance_from_20ma_pct": -4.5,
+        "ema_5": 42.46,
+        "ema_20": 43.14,
+        "ema_5_above_20": false,
+        "rsi": 31.41,
+        "adx": 100.0,
+        "three_day_return_pct": -3.7,
+        "score": 53.12183908045978
+      },
+      "relative_strength": {
+        "rs_pct": -2.99,
+        "stock_return_3m": -0.12,
+        "sector_return_3m": 10.71,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLI",
+        "passed_filter": true,
+        "score": 0,
+        "rs_score_points": 0,
+        "rs_percentile": 28
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 2,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "KBR Awarded New $149 Million Contract for Air Force Life Cycle Management Center Project",
+            "description": "KBR has been awarded a $149 million cost-plus-fixed-fee contract by the Air Force Life Cycle Management Center to deliver digital transformation solutions, advanced analytics, and software development",
+            "published": "Feb 03",
+            "url": "https://www.globenewswire.com/news-release/2026/02/03/3230821/0/en/KBR-Awarded-New-149-Million-Contract-for-Air-Force-Life-Cycle-Management-Center-Project.html"
+          },
+          {
+            "title": "KBR to Hold Fourth Quarter and FY 2025 Earnings Conference Call",
+            "description": "KBR has been awarded the FEED (Front-End Engineering Design) contract for Coastal Bend's planned natural gas liquefaction and export facility on the Texas Gulf Coast. The company also announced it wil",
+            "published": "Feb 02",
+            "url": "https://www.globenewswire.com/news-release/2026/02/02/3230064/0/en/KBR-to-Hold-Fourth-Quarter-and-FY-2025-Earnings-Conference-Call.html"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Contract_Win",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "KBR secured a substantial $149 million cost-plus-fixed-fee contract with Air Force Life Cycle Management Center, demonstrating strong government/enterprise contract momentum in digital transformation solutions.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "Contract_Win: KBR secured a substantial $149 million cost-plus-fixed-fee contract with Air Force Life Cycle Management Center, demonstrating strong government/enterprise contract momentum in digital transformation solutions.",
+      "composite_score": 48.08,
+      "rank": 15
+    },
+    {
+      "ticker": "TTWO",
+      "sector": "Technology",
+      "price": 212.17,
+      "volume_analysis": {
+        "volume_ratio": 4.26,
+        "avg_volume_20d": 1236356,
+        "median_volume_20d": 1236356,
+        "yesterday_volume": 5266499,
+        "score": 100
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 19.87,
+        "is_near_high": false,
+        "high_52w": 264.79,
+        "current_price": 212.17,
+        "above_50d_sma": false,
+        "distance_from_50ma_pct": -13.37,
+        "distance_from_20ma_pct": -12.22,
+        "ema_5": 224.63,
+        "ema_20": 238.03,
+        "ema_5_above_20": false,
+        "rsi": 17.46,
+        "adx": 100.0,
+        "three_day_return_pct": -11.33,
+        "score": 60.25832279018824
+      },
+      "relative_strength": {
+        "rs_pct": -18.81,
+        "stock_return_3m": -15.94,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 0,
+        "rs_score_points": 0,
+        "rs_percentile": 8
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Take-Two Interactive: Blowout Q3 Earnings And More",
+            "description": "Take-Two Interactive reported strong third-quarter earnings, beating estimates with EPS of $1.23 (vs. $0.83 consensus) and revenue of $1.76 billion (vs. $1.59 billion expected). The company raised its",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/markets/earnings/26/02/50359672/take-two-interactive-blowout-q3-earnings-and-more?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Significant earnings beat with EPS of $1.23 vs $0.83 consensus and revenue of $1.76B vs $1.59B expected, indicating strong fundamental performance and potential near-term momentum.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "Earnings_Beat: Significant earnings beat with EPS of $1.23 vs $0.83 consensus and revenue of $1.76B vs $1.59B expected, indicating strong fundamental performance and potential near-term momentum.",
+      "composite_score": 45.54,
+      "rank": 16
+    },
+    {
+      "ticker": "BAH",
+      "sector": "Technology",
+      "price": 83,
+      "volume_analysis": {
+        "volume_ratio": 1.31,
+        "avg_volume_20d": 2131786,
+        "median_volume_20d": 2131786,
+        "yesterday_volume": 2793413,
+        "score": 43.67875887479637
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 30.86,
+        "is_near_high": false,
+        "high_52w": 120.05,
+        "current_price": 83,
+        "above_50d_sma": false,
+        "distance_from_50ma_pct": -6.63,
+        "distance_from_20ma_pct": -10.89,
+        "ema_5": 86.77,
+        "ema_20": 91.08,
+        "ema_5_above_20": false,
+        "rsi": 33.41,
+        "adx": 100.0,
+        "three_day_return_pct": -6.46,
+        "score": 38.28147777916614
+      },
+      "relative_strength": {
+        "rs_pct": -5.87,
+        "stock_return_3m": -3.0,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 0,
+        "rs_score_points": 0,
+        "rs_percentile": 22
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Palantir Changes the AI Debate as Margins and Growth Break Old Models",
+            "description": "Palantir delivered exceptional Q4 2026 results with $1.41B revenue (70% YoY growth) and 57% adjusted operating margins, beating expectations and raising full-year guidance to $7.18-7.20B (61% growth).",
+            "published": "Feb 03",
+            "url": "https://www.investing.com/analysis/palantir-changes-the-ai-debate-as-margins-and-growth-break-old-models-200674377"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier1",
+        "confidence": "High",
+        "reasoning": "Palantir delivered exceptional Q4 results with 70% YoY revenue growth and raised full-year guidance, demonstrating strong momentum in AI and enterprise software markets.",
+        "catalyst_age_days": 3,
+        "multi_catalyst": true,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 1",
+      "why_selected": "Earnings_Beat: Palantir delivered exceptional Q4 results with 70% YoY revenue growth and raised full-year guidance, demonstrating strong momentum in AI and enterprise software markets.",
+      "composite_score": 41.59,
+      "rank": 17
+    },
+    {
+      "ticker": "TER",
+      "sector": "Utilities",
+      "price": 282.98,
+      "volume_analysis": {
+        "volume_ratio": 4.29,
+        "avg_volume_20d": 2750919,
+        "median_volume_20d": 2750919,
+        "yesterday_volume": 11794993,
+        "score": 100
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 1.06,
+        "is_near_high": true,
+        "high_52w": 286,
+        "current_price": 282.98,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 35.67,
+        "distance_from_20ma_pct": 20.79,
+        "ema_5": 258.32,
+        "ema_20": 235.71,
+        "ema_5_above_20": true,
+        "rsi": 78.52,
+        "adx": 100.0,
+        "three_day_return_pct": 12.35,
+        "score": 97.8881118881119
+      },
+      "relative_strength": {
+        "rs_pct": 50.08,
+        "stock_return_3m": 52.95,
+        "sector_return_3m": -2.24,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLU",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 97
+      },
+      "catalyst_signals": {
+        "score": 1.2,
+        "count": 2,
+        "keywords": [
+          "analyst"
+        ],
+        "scaled_score": 4.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Nvidia Stock Investors Got Great News From Palantir and Teradyne",
+            "description": "Palantir Technologies and Teradyne reported strong fourth-quarter results that exceeded Wall Street expectations, signaling robust demand for AI-related products and services. Since both companies are",
+            "published": "Feb 04",
+            "url": "https://www.fool.com/investing/2026/02/03/nvda-stock-pltr-stock-ter-stock-earnings/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Stock Market Today: Dow Futures Pare Losses, S&P 500 Gain Amid Gold, Silver Rebound\u2014 Palantir Technologies, SanDisk, PepsiCo In Focus (UPDATED)",
+            "description": "U.S. stock futures advanced on Tuesday following Monday's positive close, with major indices gaining ground. Gold and silver rebounded while crude oil declined. Key movers included Palantir Technologi",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/markets/equities/26/02/50323627/stock-market-today-sp-500-nasdaq-100-futures-gain-amid-gold-silver-rebound-palantir-technologies?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": false,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "Teradyne reported strong Q4 results that exceeded Wall Street expectations, indicating robust demand for AI-related products and potential near-term momentum.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Earnings_Beat: Teradyne reported strong Q4 results that exceeded Wall Street expectations, indicating robust demand for AI-related products and potential near-term momentum.",
+      "composite_score": 82.46,
+      "rank": 18
+    },
+    {
+      "ticker": "WWD",
+      "sector": "Industrials",
+      "price": 371.17,
+      "volume_analysis": {
+        "volume_ratio": 4.64,
+        "avg_volume_20d": 517317,
+        "median_volume_20d": 517317,
+        "yesterday_volume": 2398568,
+        "score": 100
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 3.51,
+        "is_near_high": true,
+        "high_52w": 384.66,
+        "current_price": 371.17,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 19.61,
+        "distance_from_20ma_pct": 12.61,
+        "ema_5": 339.92,
+        "ema_20": 327.94,
+        "ema_5_above_20": true,
+        "rsi": 70.51,
+        "adx": 100.0,
+        "three_day_return_pct": 16.2,
+        "score": 92.98380614374504
+      },
+      "relative_strength": {
+        "rs_pct": 37.67,
+        "stock_return_3m": 40.54,
+        "sector_return_3m": 10.71,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLI",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 94
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 3,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Why Woodward Stock Popped Today",
+            "description": "Woodward, an aerospace and defense supplier, saw its stock surge 13.42% after reporting strong fiscal Q1 2026 results with 29% year-over-year sales growth to $996 million and adjusted earnings per sha",
+            "published": "Feb 04",
+            "url": "https://www.fool.com/investing/2026/02/03/why-woodward-stock-is-up-today/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Woodward Reports Strong First Quarter Fiscal Year 2026 Results",
+            "description": "Woodward, Inc. reported first quarter fiscal 2026 results with net sales of $996M (+29% YoY) and net earnings of $134M (+54% YoY), driven by strong demand across both Aerospace and Industrial segments",
+            "published": "Feb 02",
+            "url": "https://www.globenewswire.com/news-release/2026/02/02/3230590/32326/en/Woodward-Reports-Strong-First-Quarter-Fiscal-Year-2026-Results.html"
+          },
+          {
+            "title": "Woodward Increases Quarterly Dividend by 14 Percent",
+            "description": "Woodward Inc. announced a 14% increase in its quarterly dividend to $0.32 per share, up from $0.28 in the prior quarter. The dividend will be paid on March 5, 2026, to shareholders of record as of Feb",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/pressreleases/26/02/g50294065/woodward-increases-quarterly-dividend-by-14-percent?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier2",
+        "confidence": "High",
+        "reasoning": "Strong Q1 earnings with 29% YoY sales growth and 54% YoY net earnings increase, coupled with a dividend increase, signals robust business performance.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": true,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Earnings_Beat: Strong Q1 earnings with 29% YoY sales growth and 54% YoY net earnings increase, coupled with a dividend increase, signals robust business performance.",
+      "composite_score": 80.14,
+      "rank": 19
+    },
+    {
+      "ticker": "WDC",
+      "sector": "Technology",
+      "price": 290.24,
+      "volume_analysis": {
+        "volume_ratio": 1.67,
+        "avg_volume_20d": 9209476,
+        "median_volume_20d": 9209476,
+        "yesterday_volume": 15380102,
+        "score": 55.66766652443999
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 2.11,
+        "is_near_high": true,
+        "high_52w": 296.5,
+        "current_price": 290.24,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 48.26,
+        "distance_from_20ma_pct": 23.53,
+        "ema_5": 273.05,
+        "ema_20": 239.62,
+        "ema_5_above_20": true,
+        "rsi": 75.39,
+        "adx": 100.0,
+        "three_day_return_pct": 4.25,
+        "score": 95.77740303541316
+      },
+      "relative_strength": {
+        "rs_pct": 74.54,
+        "stock_return_3m": 77.41,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 99
+      },
+      "catalyst_signals": {
+        "score": 10.8,
+        "count": 7,
+        "keywords": [
+          "earnings beat",
+          "price target",
+          "analyst"
+        ],
+        "scaled_score": 36.00000000000001,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Up 1,500%, Should You Buy Sandisk Right Now?",
+            "description": "Sandisk has surged 1,500% since its February 2025 spinoff from Western Digital, driven by strong demand for AI storage infrastructure. While the company delivered impressive Q2 results with 61% revenu",
+            "published": "Feb 04",
+            "url": "https://www.fool.com/investing/2026/02/03/up-1500-should-you-buy-sandisk-right-now/?source=iedfolrf0000001"
+          },
+          {
+            "title": "This SanDisk's Stock Chart Is Shocking Every Trader: 380% Above The 200-Day Average",
+            "description": "SanDisk stock has surged dramatically, up 1,700% over the past year and currently trading 380% above its 200-day moving average\u2014an 8-sigma statistical anomaly. The explosive gains are driven by boomin",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/markets/equities/26/02/50318715/sandisk-stock-chart-technical-analysis-200-day-moving-average-deviation?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Sandisk Stock Is Up 1,500% in the Past Year Due to AI -- Is It Still a Buy? Wall Street Has a Surprising Answer for Investors.",
+            "description": "Sandisk stock has surged 1,500% over the past year driven by AI infrastructure demand and a severe memory chip shortage. Wall Street analysts see the stock as undervalued with a median target price of",
+            "published": "Feb 01",
+            "url": "https://www.fool.com/investing/2026/02/01/sandisk-stock-up-1500-ai-buy-wall-street-invest/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Trump's Warsh Pick Shakes Markets, Microsoft Plunges After Earnings: This Week On Wall Street",
+            "description": "President Trump nominated Kevin Warsh as the next Federal Reserve Chair, signaling a less dovish monetary policy stance. This triggered a sharp reversal in market trends: precious metals crashed (silv",
+            "published": "Jan 30",
+            "url": "https://www.benzinga.com/markets/market-summary/26/01/50283279/trumps-warsh-pick-shakes-markets-microsoft-plunges-after-earnings-this-week-on-wall-street?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Why One of the Best Stocks of 2025 Looks Unstoppable in 2026",
+            "description": "Seagate Technology surged 20% after reporting blowout fiscal Q2 earnings with 22% revenue growth and 76% net income increase. The company, which dominates the high-capacity hard disk drive market for ",
+            "published": "Jan 29",
+            "url": "https://www.fool.com/investing/2026/01/29/why-best-stock-2025-unstoppable-2026-stx/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "Strong AI-driven demand for storage infrastructure is creating tailwinds for Western Digital, with recent news highlighting significant revenue growth in memory and storage segments.",
+        "catalyst_age_days": 3,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Earnings_Beat: Strong AI-driven demand for storage infrastructure is creating tailwinds for Western Digital, with recent news highlighting significant revenue growth in memory and storage segments.",
+      "composite_score": 80.0,
+      "rank": 20
+    },
+    {
+      "ticker": "CENX",
+      "sector": "Technology",
+      "price": 50.51,
+      "volume_analysis": {
+        "volume_ratio": 1.16,
+        "avg_volume_20d": 2142003,
+        "median_volume_20d": 2142003,
+        "yesterday_volume": 2479558,
+        "score": 38.58628271451223
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 2.87,
+        "is_near_high": true,
+        "high_52w": 52,
+        "current_price": 50.51,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 30.35,
+        "distance_from_20ma_pct": 7.7,
+        "ema_5": 48.42,
+        "ema_20": 45.93,
+        "ema_5_above_20": true,
+        "rsi": 60.03,
+        "adx": 100.0,
+        "three_day_return_pct": 3.23,
+        "score": 94.26923076923076
+      },
+      "relative_strength": {
+        "rs_pct": 71.42,
+        "stock_return_3m": 74.29,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 99
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Strategic Mineral Stocks Gain Ground as Pentagon Pushes for Secure Defense Supply Chains",
+            "description": "The Pentagon allocated $4.5 billion to critical minerals in late 2025, with government backing for strategic mineral projects expected to reach record levels in 2026. This trend is driving investment ",
+            "published": "Jan 29",
+            "url": "https://www.benzinga.com/pressreleases/26/01/n50240310/strategic-mineral-stocks-gain-ground-as-pentagon-pushes-for-secure-defense-supply-chains?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Contract_Win",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "Pentagon's strategic minerals investment creates potential tailwind for CENX, with government-backed critical minerals projects expected to expand in 2026, suggesting potential near-term upside.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Contract_Win: Pentagon's strategic minerals investment creates potential tailwind for CENX, with government-backed critical minerals projects expected to expand in 2026, suggesting potential near-term upside.",
+      "composite_score": 79.04,
+      "rank": 21
+    },
+    {
+      "ticker": "VIAV",
+      "sector": "Technology",
+      "price": 25.88,
+      "volume_analysis": {
+        "volume_ratio": 1.34,
+        "avg_volume_20d": 4317768,
+        "median_volume_20d": 4317768,
+        "yesterday_volume": 5786299,
+        "score": 44.67044338605308
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 2.23,
+        "is_near_high": true,
+        "high_52w": 26.47,
+        "current_price": 25.88,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 38.06,
+        "distance_from_20ma_pct": 28.9,
+        "ema_5": 24.49,
+        "ema_20": 21.05,
+        "ema_5_above_20": true,
+        "rsi": 87.38,
+        "adx": 100.0,
+        "three_day_return_pct": 4.78,
+        "score": 95.54212315829241
+      },
+      "relative_strength": {
+        "rs_pct": 44.68,
+        "stock_return_3m": 47.55,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 97
+      },
+      "catalyst_signals": {
+        "score": 1.0,
+        "count": 1,
+        "keywords": [
+          "analyst"
+        ],
+        "scaled_score": 3.3333333333333335,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Why Viavi Solutions Stock Soared More Than 17% Higher Today",
+            "description": "Viavi Solutions stock surged 17.76% after the company reported strong fiscal Q2 2026 results, with revenue rising 36% year-over-year to $369 million and non-GAAP net income jumping 75% to $51.5 millio",
+            "published": "Jan 30",
+            "url": "https://www.fool.com/investing/2026/01/29/why-viavi-solutions-stock-soared-more-than-17-high/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "Strong Q2 earnings with 36% revenue growth and 75% net income increase suggests positive momentum for short-term swing trade potential.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Earnings_Beat: Strong Q2 earnings with 36% revenue growth and 75% net income increase suggests positive momentum for short-term swing trade potential.",
+      "composite_score": 78.8,
+      "rank": 22
+    },
+    {
+      "ticker": "STX",
+      "sector": "Technology",
+      "price": 444.45,
+      "volume_analysis": {
+        "volume_ratio": 1.46,
+        "avg_volume_20d": 4176082,
+        "median_volume_20d": 4176082,
+        "yesterday_volume": 6088770,
+        "score": 48.60033296755991
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 3.26,
+        "is_near_high": true,
+        "high_52w": 459.41,
+        "current_price": 444.45,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 44.03,
+        "distance_from_20ma_pct": 25.31,
+        "ema_5": 426.99,
+        "ema_20": 368.23,
+        "ema_5_above_20": true,
+        "rsi": 78.98,
+        "adx": 100.0,
+        "three_day_return_pct": -0.47,
+        "score": 93.48729892688446
+      },
+      "relative_strength": {
+        "rs_pct": 56.73,
+        "stock_return_3m": 59.6,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 98
+      },
+      "catalyst_signals": {
+        "score": 10.0,
+        "count": 8,
+        "keywords": [
+          "earnings beat",
+          "price target",
+          "analyst"
+        ],
+        "scaled_score": 33.33333333333333,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "This SanDisk's Stock Chart Is Shocking Every Trader: 380% Above The 200-Day Average",
+            "description": "SanDisk stock has surged dramatically, up 1,700% over the past year and currently trading 380% above its 200-day moving average\u2014an 8-sigma statistical anomaly. The explosive gains are driven by boomin",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/markets/equities/26/02/50318715/sandisk-stock-chart-technical-analysis-200-day-moving-average-deviation?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Consumer Tech News (Jan 26-30): Meta Faces Lawsuits Over Youth Addiction Claims, IMF Warns AI Could Eliminate Millions Of Jobs & More",
+            "description": "Meta faces lawsuits over youth addiction claims while doubling down on AI investments. The IMF warns AI could eliminate millions of jobs globally. Major tech companies report mixed earnings, with Micr",
+            "published": "Feb 01",
+            "url": "https://www.benzinga.com/markets/tech/26/02/50288634/consumer-tech-news-jan-26-30-meta-faces-lawsuits-over-youth-addiction-claims-imf-warns-ai-could-elim?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Trump's Warsh Pick Shakes Markets, Microsoft Plunges After Earnings: This Week On Wall Street",
+            "description": "President Trump nominated Kevin Warsh as the next Federal Reserve Chair, signaling a less dovish monetary policy stance. This triggered a sharp reversal in market trends: precious metals crashed (silv",
+            "published": "Jan 30",
+            "url": "https://www.benzinga.com/markets/market-summary/26/01/50283279/trumps-warsh-pick-shakes-markets-microsoft-plunges-after-earnings-this-week-on-wall-street?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Why One of the Best Stocks of 2025 Looks Unstoppable in 2026",
+            "description": "Seagate Technology surged 20% after reporting blowout fiscal Q2 earnings with 22% revenue growth and 76% net income increase. The company, which dominates the high-capacity hard disk drive market for ",
+            "published": "Jan 29",
+            "url": "https://www.fool.com/investing/2026/01/29/why-best-stock-2025-unstoppable-2026-stx/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Why Seagate Stock Soared Today",
+            "description": "Seagate Technology's stock surged 19.14% after reporting strong fiscal Q2 2026 results driven by AI data center demand. Revenue jumped 22% year-over-year to $2.83 billion, with gross margins expanding",
+            "published": "Jan 29",
+            "url": "https://www.fool.com/investing/2026/01/28/why-seagate-stock-is-up-today/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": true,
+        "negative_reasons": [
+          "lawsuit (2d ago)",
+          "investigation (2d ago)"
+        ]
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier2",
+        "confidence": "High",
+        "reasoning": "Seagate reported strong Q2 earnings with 22% revenue growth and 76% net income increase, driven by AI data center demand. Stock already responded positively with 19% surge.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Earnings_Beat: Seagate reported strong Q2 earnings with 22% revenue growth and 76% net income increase, driven by AI data center demand. Stock already responded positively with 19% surge.",
+      "composite_score": 78.71,
+      "rank": 23
+    },
+    {
+      "ticker": "TXN",
+      "sector": "Technology",
+      "price": 225.21,
+      "volume_analysis": {
+        "volume_ratio": 1.99,
+        "avg_volume_20d": 7630076,
+        "median_volume_20d": 7630076,
+        "yesterday_volume": 15206396,
+        "score": 66.4318240954175
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 1.58,
+        "is_near_high": true,
+        "high_52w": 228.83,
+        "current_price": 225.21,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 22.29,
+        "distance_from_20ma_pct": 13.32,
+        "ema_5": 218.76,
+        "ema_20": 201.69,
+        "ema_5_above_20": true,
+        "rsi": 80.81,
+        "adx": 100.0,
+        "three_day_return_pct": 2.85,
+        "score": 96.83607918542148
+      },
+      "relative_strength": {
+        "rs_pct": 36.68,
+        "stock_return_3m": 39.55,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 94
+      },
+      "catalyst_signals": {
+        "score": 13.0,
+        "count": 4,
+        "keywords": [
+          "price target",
+          "analyst",
+          "upgrade",
+          "analyst upgrade"
+        ],
+        "scaled_score": 43.333333333333336,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "1 Unstoppable Vanguard ETF That Could Crush the S&P 500 (Again) in 2026",
+            "description": "The Vanguard Information Technology ETF (VGT) returned 21.2% in 2025, outperforming the S&P 500's 16.4% return. The ETF has beaten the S&P 500 every year since 2004 by maintaining heavy exposure to AI",
+            "published": "Feb 01",
+            "url": "https://www.fool.com/investing/2026/02/01/1-vanguard-etf-that-could-crush-sp-500-in-2026/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Consumer Tech News (Jan 26-30): Meta Faces Lawsuits Over Youth Addiction Claims, IMF Warns AI Could Eliminate Millions Of Jobs & More",
+            "description": "Meta faces lawsuits over youth addiction claims while doubling down on AI investments. The IMF warns AI could eliminate millions of jobs globally. Major tech companies report mixed earnings, with Micr",
+            "published": "Feb 01",
+            "url": "https://www.benzinga.com/markets/tech/26/02/50288634/consumer-tech-news-jan-26-30-meta-faces-lawsuits-over-youth-addiction-claims-imf-warns-ai-could-elim?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "\"Gallium Nitride Semiconductor Devices Market Soars: Projected to Hit $24.53 Billion by 2030\"",
+            "description": "The gallium nitride (GaN) semiconductor market is experiencing rapid growth, estimated at $12.05 billion in 2025 and projected to reach $24.53 billion by 2030 with a CAGR of 15.2%. Growth is driven by",
+            "published": "Jan 30",
+            "url": "https://www.globenewswire.com/news-release/2026/01/30/3229330/28124/en/Gallium-Nitride-Semiconductor-Devices-Market-Soars-Projected-to-Hit-24-53-Billion-by-2030.html"
+          },
+          {
+            "title": "Why Texas Instruments\u2019 2026 Outlook Has Wall Street Re-Rating It",
+            "description": "Texas Instruments (TXN) is breaking out of a long-term trading range following strong Q4 2025 earnings and 2026 guidance. The company's recovery in analog semiconductor markets and critical role in AI",
+            "published": "Jan 30",
+            "url": "https://www.investing.com/analysis/why-texas-instruments-2026-outlook-has-wall-street-rerating-it-200674163"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": true,
+        "negative_reasons": [
+          "lawsuit (2d ago)",
+          "investigation (2d ago)"
+        ]
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Analyst_Upgrade",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "Texas Instruments is breaking out of a long-term trading range with strong Q4 earnings and positive 2026 outlook, driven by analog semiconductor market recovery and AI positioning.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Analyst_Upgrade: Texas Instruments is breaking out of a long-term trading range with strong Q4 earnings and positive 2026 outlook, driven by analog semiconductor market recovery and AI positioning.",
+      "composite_score": 78.64,
+      "rank": 24
+    },
+    {
+      "ticker": "GEV",
+      "sector": "Technology",
+      "price": 780.25,
+      "volume_analysis": {
+        "volume_ratio": 1.31,
+        "avg_volume_20d": 2954062,
+        "median_volume_20d": 2954062,
+        "yesterday_volume": 3855682,
+        "score": 43.50711379103635
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 1.48,
+        "is_near_high": true,
+        "high_52w": 791.95,
+        "current_price": 780.25,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 19.32,
+        "distance_from_20ma_pct": 14.9,
+        "ema_5": 744.39,
+        "ema_20": 694.11,
+        "ema_5_above_20": true,
+        "rsi": 81.72,
+        "adx": 100.0,
+        "three_day_return_pct": 8.76,
+        "score": 97.04526800934401
+      },
+      "relative_strength": {
+        "rs_pct": 38.95,
+        "stock_return_3m": 41.82,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 95
+      },
+      "catalyst_signals": {
+        "score": 10.0,
+        "count": 3,
+        "keywords": [
+          "analyst",
+          "partnership",
+          "strategic partnership"
+        ],
+        "scaled_score": 33.33333333333333,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "How Palantir and GE Aerospace Helped FTAI Aviation Stock Soar in January",
+            "description": "FTAI Aviation's stock surged 38.3% in January driven by three key developments: a strategic partnership with Palantir to implement AI-assisted decision-making for inventory and maintenance management,",
+            "published": "Feb 03",
+            "url": "https://www.fool.com/investing/2026/02/03/how-palantir-and-ge-aerospace-helped-ftai-aviation/?source=iedfolrf0000001"
+          },
+          {
+            "title": "I Correctly Predicted That 2024's Best-Performing Dow Jones Stock Would Beat the S&P 500 Again in 2025. Does 2025's Leading Dow Stock Have Room to Run in 2026?",
+            "description": "Caterpillar surged 57.9% in 2025 to become the top Dow performer and has continued gaining 14.7% year-to-date in 2026. The industrial giant is benefiting from AI infrastructure demand, data center pow",
+            "published": "Feb 02",
+            "url": "https://www.fool.com/investing/2026/02/02/nvidia-caterpillar-buy-dow-jones-stock-2026/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Is GE Vernova Stock a Buy Now?",
+            "description": "GE Vernova, spun off from General Electric in April 2024, has surged over 400% and boasts strong fundamentals including a $135 billion backlog expected to reach $200 billion by 2028. However, the stoc",
+            "published": "Jan 30",
+            "url": "https://www.fool.com/investing/2026/01/30/is-ge-vernova-stock-a-buy-now/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Contract_Win",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "GE Vernova has a strong $135 billion backlog expected to grow to $200 billion by 2028, indicating significant future revenue potential and industry momentum.",
+        "catalyst_age_days": 3,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Contract_Win: GE Vernova has a strong $135 billion backlog expected to grow to $200 billion by 2028, indicating significant future revenue potential and industry momentum.",
+      "composite_score": 78.42,
+      "rank": 25
+    },
+    {
+      "ticker": "VSH",
+      "sector": "Technology",
+      "price": 20.74,
+      "volume_analysis": {
+        "volume_ratio": 1.67,
+        "avg_volume_20d": 2183240,
+        "median_volume_20d": 2183240,
+        "yesterday_volume": 3637999,
+        "score": 55.54434388034909
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 2.12,
+        "is_near_high": true,
+        "high_52w": 21.19,
+        "current_price": 20.74,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 29.68,
+        "distance_from_20ma_pct": 14.5,
+        "ema_5": 20.19,
+        "ema_20": 18.41,
+        "ema_5_above_20": true,
+        "rsi": 80.62,
+        "adx": 100.0,
+        "three_day_return_pct": 2.83,
+        "score": 95.75271354412456
+      },
+      "relative_strength": {
+        "rs_pct": 39.38,
+        "stock_return_3m": 42.25,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 95
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Vishay Intertechnology 1200 V SiC MOSFET Power Modules in Industry-Standard SOT-227 Package Increase Power Efficiency",
+            "description": "Vishay Intertechnology introduced five new 1200 V silicon carbide MOSFET power modules in the SOT-227 package designed for automotive, energy, industrial, and telecom applications. The modules feature",
+            "published": "Jan 28",
+            "url": "https://www.globenewswire.com/news-release/2026/01/28/3227859/0/en/Vishay-Intertechnology-1200-V-SiC-MOSFET-Power-Modules-in-Industry-Standard-SOT-227-Package-Increase-Power-Efficiency.html"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": false,
+        "catalyst_type": "Product_Launch",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "New 1200V SiC MOSFET power modules represent a targeted product innovation in high-efficiency semiconductor technology for multiple industrial applications.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Product_Launch: New 1200V SiC MOSFET power modules represent a targeted product innovation in high-efficiency semiconductor technology for multiple industrial applications.",
+      "composite_score": 78.4,
+      "rank": 26
+    },
+    {
+      "ticker": "ALGM",
+      "sector": "Technology",
+      "price": 38.89,
+      "volume_analysis": {
+        "volume_ratio": 1.77,
+        "avg_volume_20d": 2351411,
+        "median_volume_20d": 2351411,
+        "yesterday_volume": 4153018,
+        "score": 58.87269554194718
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 2.51,
+        "is_near_high": true,
+        "high_52w": 39.89,
+        "current_price": 38.89,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 31.8,
+        "distance_from_20ma_pct": 16.32,
+        "ema_5": 37.08,
+        "ema_20": 33.71,
+        "ema_5_above_20": true,
+        "rsi": 78.94,
+        "adx": 100.0,
+        "three_day_return_pct": 2.4,
+        "score": 94.98865616264933
+      },
+      "relative_strength": {
+        "rs_pct": 40.06,
+        "stock_return_3m": 42.93,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 95
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Allegro MicroSystems Appoints Ian Kent, Senior Vice President, Operations and Jamie Haas Vice President, Chief Technology Officer",
+            "description": "Allegro MicroSystems promoted Ian Kent to Senior Vice President of Operations and Jamie Haas to Vice President and Chief Technology Officer. Kent will oversee worldwide manufacturing, quality, and sup",
+            "published": "Feb 03",
+            "url": "https://www.globenewswire.com/news-release/2026/02/03/3230959/0/en/Allegro-MicroSystems-Appoints-Ian-Kent-Senior-Vice-President-Operations-and-Jamie-Haas-Vice-President-Chief-Technology-Officer.html"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": false,
+        "catalyst_type": "Management_Change",
+        "tier": "Tier2",
+        "confidence": "Low",
+        "reasoning": "Internal leadership promotion suggests potential operational improvements, but lacks immediate market-moving significance for a short-term swing trade.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Management_Change: Internal leadership promotion suggests potential operational improvements, but lacks immediate market-moving significance for a short-term swing trade.",
+      "composite_score": 78.27,
+      "rank": 27
+    },
+    {
+      "ticker": "MRK",
+      "sector": "Healthcare",
+      "price": 115.84,
+      "volume_analysis": {
+        "volume_ratio": 2.08,
+        "avg_volume_20d": 12404261,
+        "median_volume_20d": 12404261,
+        "yesterday_volume": 25793360,
+        "score": 69.31317122935955
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 2.21,
+        "is_near_high": true,
+        "high_52w": 118.46,
+        "current_price": 115.84,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 10.19,
+        "distance_from_20ma_pct": 5.54,
+        "ema_5": 112.09,
+        "ema_20": 109.11,
+        "ema_5_above_20": true,
+        "rsi": 67.71,
+        "adx": 100.0,
+        "three_day_return_pct": 6.92,
+        "score": 95.57656592942767
+      },
+      "relative_strength": {
+        "rs_pct": 32.17,
+        "stock_return_3m": 35.04,
+        "sector_return_3m": 5.59,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLV",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 92
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 4,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Merck's Annual Outlook Falls Short But Keytruda, Animal Health Segments Grow",
+            "description": "Merck & Co. beat Q4 earnings expectations with $2.04 adjusted EPS versus $2.01 consensus and $16.40 billion in sales, up 5% YoY. Keytruda immunotherapy grew 7% to $8.37 billion, and Animal Health segm",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/markets/earnings/26/02/50339766/mercks-annual-outlook-falls-short-but-keytruda-animal-health-segments-grow?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Dynavax President and COO Sells 114,000 Shares on Sanofi Acquisition News",
+            "description": "David Novack, President & COO of Dynavax Technologies, exercised and sold 114,000 shares for approximately $1.8 million on January 15, 2026, netting about $680,000 after costs. The sale comes followin",
+            "published": "Jan 30",
+            "url": "https://www.fool.com/coverage/filings/2026/01/30/dynavax-president-and-coo-sells-114-000-shares-on-sanofi-acquisition-news/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Chromatography Research Report 2026 - Global $13.69 Bn Market Trends, Opportunities, and Forecasts to 2031",
+            "description": "The global chromatography market is projected to grow from USD 10.03 billion in 2025 to USD 13.69 billion by 2031 at a CAGR of 5.32%, driven by expanding R&D in pharma/biotech and strict food safety r",
+            "published": "Jan 30",
+            "url": "https://www.globenewswire.com/news-release/2026/01/30/3229335/28124/en/Chromatography-Research-Report-2026-Global-13-69-Bn-Market-Trends-Opportunities-and-Forecasts-to-2031.html"
+          },
+          {
+            "title": "FDA Accepts Summit's Lung Cancer Drug Application, Review Underway",
+            "description": "The FDA has accepted Summit Therapeutics' Biologics License Application for ivonescimab in combination with chemotherapy for EGFR-mutated non-small cell lung cancer patients. The drug will undergo com",
+            "published": "Jan 29",
+            "url": "https://www.benzinga.com/news/fda/26/01/50240244/fda-accepts-summits-lung-cancer-drug-application-review-underway?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "Merck beat Q4 earnings expectations with 5% YoY sales growth, driven by strong performance in Keytruda and Animal Health segments, indicating positive momentum.",
+        "catalyst_age_days": 3,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Earnings_Beat: Merck beat Q4 earnings expectations with 5% YoY sales growth, driven by strong performance in Keytruda and Animal Health segments, indicating positive momentum.",
+      "composite_score": 77.55,
+      "rank": 28
+    },
+    {
+      "ticker": "CIEN",
+      "sector": "Technology",
+      "price": 276.52,
+      "volume_analysis": {
+        "volume_ratio": 1.42,
+        "avg_volume_20d": 2251202,
+        "median_volume_20d": 2251202,
+        "yesterday_volume": 3186307,
+        "score": 47.179333415511636
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 2.9,
+        "is_near_high": true,
+        "high_52w": 284.79,
+        "current_price": 276.52,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 21.63,
+        "distance_from_20ma_pct": 12.98,
+        "ema_5": 263.72,
+        "ema_20": 246.17,
+        "ema_5_above_20": true,
+        "rsi": 67.41,
+        "adx": 100.0,
+        "three_day_return_pct": 9.07,
+        "score": 94.19221180518976
+      },
+      "relative_strength": {
+        "rs_pct": 34.39,
+        "stock_return_3m": 37.26,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 93
+      },
+      "catalyst_signals": {
+        "score": 1.0,
+        "count": 1,
+        "keywords": [
+          "analyst"
+        ],
+        "scaled_score": 3.3333333333333335,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "The Best AI Stock That Nobody's Talking About for 2026",
+            "description": "Ciena, an optical networking company, has outperformed major AI stocks like Nvidia and Broadcom with 140% gains in the past year. Driven by surging demand for high-speed data transmission in AI data c",
+            "published": "Jan 30",
+            "url": "https://www.fool.com/investing/2026/01/30/best-ai-stock-that-nobodys-talking-about-2026/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Analyst_Upgrade",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "AI-driven networking demand positions Ciena favorably, with recent analysis highlighting 140% gains and strong positioning in high-speed data transmission infrastructure for AI applications.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Analyst_Upgrade: AI-driven networking demand positions Ciena favorably, with recent analysis highlighting 140% gains and strong positioning in high-speed data transmission infrastructure for AI applications.",
+      "composite_score": 76.88,
+      "rank": 29
+    },
+    {
+      "ticker": "FCX",
+      "sector": "Materials",
+      "price": 64.67,
+      "volume_analysis": {
+        "volume_ratio": 1.41,
+        "avg_volume_20d": 22152278,
+        "median_volume_20d": 22152278,
+        "yesterday_volume": 31126870,
+        "score": 46.83772627507353
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 6.87,
+        "is_near_high": false,
+        "high_52w": 69.44,
+        "current_price": 64.67,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 24.18,
+        "distance_from_20ma_pct": 7.98,
+        "ema_5": 62.88,
+        "ema_20": 59.52,
+        "ema_5_above_20": true,
+        "rsi": 62.19,
+        "adx": 100.0,
+        "three_day_return_pct": -0.71,
+        "score": 86.2615207373272
+      },
+      "relative_strength": {
+        "rs_pct": 64.45,
+        "stock_return_3m": 67.32,
+        "sector_return_3m": 19.58,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLB",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 98
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 2,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "5 Commodity-Linked Stocks to Buy Amid Debasement Trade",
+            "description": "As commodity prices surge to record highs driven by currency debasement concerns, geopolitical instability, and supply deficits, five commodity-linked stocks are positioned to capitalize on these tren",
+            "published": "Jan 30",
+            "url": "https://www.investing.com/analysis/5-commoditylinked-stocks-to-buy-amid-debasement-trade-200674162"
+          },
+          {
+            "title": "Here's Why Southern Copper Shares Popped Higher This Week",
+            "description": "Southern Copper shares rose 12.8% this week as copper prices hit all-time highs above $6.50 per pound, driven by supply constraints and strong demand from data centers. With copper inventories at only",
+            "published": "Jan 30",
+            "url": "https://www.fool.com/investing/2026/01/30/heres-why-southern-copper-shares-popped-higher-thi/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Commodity_Price_Surge",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "Copper prices hitting all-time highs above $6.50/lb, driven by supply constraints and strong demand from data centers, creating a bullish environment for Freeport-McMoRan.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Commodity_Price_Surge: Copper prices hitting all-time highs above $6.50/lb, driven by supply constraints and strong demand from data centers, creating a bullish environment for Freeport-McMoRan.",
+      "composite_score": 76.49,
+      "rank": 30
+    },
+    {
+      "ticker": "SLB",
+      "sector": "Energy",
+      "price": 49.76,
+      "volume_analysis": {
+        "volume_ratio": 1.27,
+        "avg_volume_20d": 21340404,
+        "median_volume_20d": 21340404,
+        "yesterday_volume": 27106978,
+        "score": 42.340619855806544
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 3.7,
+        "is_near_high": true,
+        "high_52w": 51.67,
+        "current_price": 49.76,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 19.34,
+        "distance_from_20ma_pct": 5.39,
+        "ema_5": 49.11,
+        "ema_20": 46.89,
+        "ema_5_above_20": true,
+        "rsi": 67.9,
+        "adx": 100.0,
+        "three_day_return_pct": 2.7,
+        "score": 92.60692858525255
+      },
+      "relative_strength": {
+        "rs_pct": 33.98,
+        "stock_return_3m": 36.85,
+        "sector_return_3m": 17.07,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLE",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 93
+      },
+      "catalyst_signals": {
+        "score": 1.2,
+        "count": 2,
+        "keywords": [
+          "analyst"
+        ],
+        "scaled_score": 4.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "SLB Signs $1.5B Contract For Mutriba Field In Kuwait",
+            "description": "SLB secured a five-year, $1.5 billion contract with Kuwait Oil Company for the Mutriba field, covering field design, development, and production management. The contract focuses on cost efficiency and",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/markets/large-cap/26/02/50345492/slb-signs-1-5b-contract-for-mutriba-field-in-kuwait?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Oil and Gas Production Monitoring Software Industry Research 2026 - Global Market Size, Share, Trends, Opportunities, and Forecasts, 2021-2025 & 2026-2031",
+            "description": "The global Oil and Gas Production Monitoring Software Market is expected to expand at a 9.19% CAGR from 2025 to 2031, driven by Industrial IoT, AI adoption, and environmental regulations. However, int",
+            "published": "Jan 28",
+            "url": "https://www.globenewswire.com/news-release/2026/01/28/3227310/28124/en/Oil-and-Gas-Production-Monitoring-Software-Industry-Research-2026-Global-Market-Size-Share-Trends-Opportunities-and-Forecasts-2021-2025-2026-2031.html"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Contract_Win",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "SLB secured a significant $1.5B contract with Kuwait Oil Company, demonstrating strong enterprise-level business development in the energy sector with potential near-term revenue impact.",
+        "catalyst_age_days": 3,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Contract_Win: SLB secured a significant $1.5B contract with Kuwait Oil Company, demonstrating strong enterprise-level business development in the energy sector with potential near-term revenue impact.",
+      "composite_score": 76.25,
+      "rank": 31
+    },
+    {
+      "ticker": "SNEX",
+      "sector": "Technology",
+      "price": 113.11,
+      "volume_analysis": {
+        "volume_ratio": 1.24,
+        "avg_volume_20d": 245740,
+        "median_volume_20d": 245740,
+        "yesterday_volume": 304595,
+        "score": 41.31670329074089
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 1.8,
+        "is_near_high": true,
+        "high_52w": 115.18,
+        "current_price": 113.11,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 13.85,
+        "distance_from_20ma_pct": 5.51,
+        "ema_5": 112.12,
+        "ema_20": 107.45,
+        "ema_5_above_20": true,
+        "rsi": 67.53,
+        "adx": 100.0,
+        "three_day_return_pct": 0.78,
+        "score": 96.40562597673205
+      },
+      "relative_strength": {
+        "rs_pct": 28.55,
+        "stock_return_3m": 31.42,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 90
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "StoneX Group Inc. to Announce 2026 Fiscal First Quarter Earnings on February 4, 2026",
+            "description": "StoneX Group Inc. announced it will release its fiscal 2026 first quarter results on February 4, 2026, with a management conference call scheduled for February 5, 2026 at 9:00 a.m. Eastern Time. The c",
+            "published": "Jan 28",
+            "url": "https://www.globenewswire.com/news-release/2026/01/28/3228112/11961/en/StoneX-Group-Inc-to-Announce-2026-Fiscal-First-Quarter-Earnings-on-February-4-2026.html"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": false,
+        "catalyst_type": "Earnings_Announcement",
+        "tier": "Tier2",
+        "confidence": "Low",
+        "reasoning": "Upcoming earnings release provides potential volatility opportunity, but lacks specific pre-announcement details to confirm strong positive momentum.",
+        "catalyst_age_days": 7,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Earnings_Announcement: Upcoming earnings release provides potential volatility opportunity, but lacks specific pre-announcement details to confirm strong positive momentum.",
+      "composite_score": 76.16,
+      "rank": 32
+    },
+    {
+      "ticker": "MU",
+      "sector": "Technology",
+      "price": 419.44,
+      "volume_analysis": {
+        "volume_ratio": 1.19,
+        "avg_volume_20d": 35820078,
+        "median_volume_20d": 35820078,
+        "yesterday_volume": 42735403,
+        "score": 39.76857429884249
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 7.92,
+        "is_near_high": false,
+        "high_52w": 455.5,
+        "current_price": 419.44,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 38.3,
+        "distance_from_20ma_pct": 10.88,
+        "ema_5": 424.29,
+        "ema_20": 379.89,
+        "ema_5_above_20": true,
+        "rsi": 71.34,
+        "adx": 100.0,
+        "three_day_return_pct": -3.75,
+        "score": 84.1668496158068
+      },
+      "relative_strength": {
+        "rs_pct": 73.12,
+        "stock_return_3m": 75.99,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 99
+      },
+      "catalyst_signals": {
+        "score": 17.8,
+        "count": 20,
+        "keywords": [
+          "launches",
+          "price target",
+          "analyst"
+        ],
+        "scaled_score": 59.333333333333336,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Don't Know Which AI Stock To Buy? Here's the Easiest Way To Play the Once-in-a-Generation Tech Boom.",
+            "description": "The article recommends the VanEck Semiconductor ETF (SMH) as an easy way to gain diversified exposure to AI stocks without picking individual winners. The ETF has significantly outperformed the S&P 50",
+            "published": "Feb 04",
+            "url": "https://www.fool.com/investing/2026/02/03/dont-know-which-ai-stock-to-buy-heres-the-easiest/?source=iedfolrf0000001"
+          },
+          {
+            "title": "How Micron Technology Stock Soared 45% Last Month",
+            "description": "Micron Technology's stock surged 45% in January 2026 driven by soaring demand for high-bandwidth memory (HBM) chips used in AI servers. The company's 2026 HBM production sold out before the year start",
+            "published": "Feb 03",
+            "url": "https://www.fool.com/investing/2026/02/03/how-micron-technology-stock-soared-45-last-month/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Semiconductor Rally Continues\u2014 3 Stocks In The Spotlight Ahead Of Earnings",
+            "description": "The semiconductor sector continues its rally with the SOX index up 10.14% year-to-date. AMD is poised to beat Q4 earnings and raise guidance, supported by data center strength and AI demand. Qualcomm ",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/markets/tech/26/02/50323508/semiconductor-rally-continues-3-stocks-in-the-spotlight-ahead-of-earnings?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "This SanDisk's Stock Chart Is Shocking Every Trader: 380% Above The 200-Day Average",
+            "description": "SanDisk stock has surged dramatically, up 1,700% over the past year and currently trading 380% above its 200-day moving average\u2014an 8-sigma statistical anomaly. The explosive gains are driven by boomin",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/markets/equities/26/02/50318715/sandisk-stock-chart-technical-analysis-200-day-moving-average-deviation?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Why Micron Stock Popped Again Today",
+            "description": "Micron stock surged 5.6% after Phillip Securities initiated buy coverage with a $500 price target. The rally is driven by strong demand for high-bandwidth memory (HBM) chips used in Nvidia and AMD GPU",
+            "published": "Feb 02",
+            "url": "https://www.fool.com/investing/2026/02/02/why-micron-stock-popped-again-today/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": true,
+        "negative_reasons": [
+          "lawsuit (2d ago)",
+          "investigation (2d ago)"
+        ]
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Analyst_Upgrade",
+        "tier": "Tier2",
+        "confidence": "High",
+        "reasoning": "Phillip Securities initiated buy coverage with a $500 price target, signaling strong bullish sentiment around Micron's AI-driven memory chip demand. The stock has momentum from HBM chip sales for AI servers.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Analyst_Upgrade: Phillip Securities initiated buy coverage with a $500 price target, signaling strong bullish sentiment around Micron's AI-driven memory chip demand. The stock has momentum from HBM chip sales for AI servers.",
+      "composite_score": 76.04,
+      "rank": 33
+    },
+    {
+      "ticker": "LMT",
+      "sector": "Industrials",
+      "price": 628.26,
+      "volume_analysis": {
+        "volume_ratio": 1.15,
+        "avg_volume_20d": 1994828,
+        "median_volume_20d": 1994828,
+        "yesterday_volume": 2300675,
+        "score": 38.443999516081924
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 2.83,
+        "is_near_high": true,
+        "high_52w": 646.59,
+        "current_price": 628.26,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 22.34,
+        "distance_from_20ma_pct": 8.65,
+        "ema_5": 623.87,
+        "ema_20": 581.14,
+        "ema_5_above_20": true,
+        "rsi": 78.51,
+        "adx": 100.0,
+        "three_day_return_pct": 0.92,
+        "score": 94.33025564886557
+      },
+      "relative_strength": {
+        "rs_pct": 31.11,
+        "stock_return_3m": 33.98,
+        "sector_return_3m": 10.71,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLI",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 91
+      },
+      "catalyst_signals": {
+        "score": 4.8,
+        "count": 9,
+        "keywords": [
+          "launches"
+        ],
+        "scaled_score": 16.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Nano Drones Market Size to Reach USD 12.69 Billion by 2033, Driven by Defense, Surveillance, and Smart Commercial Applications \u2013 SNS Insider",
+            "description": "The global nano drones market is projected to grow from USD 3.22 billion in 2025 to USD 12.69 billion by 2033, with a CAGR of 18.73%. Growth is driven by increasing adoption in military intelligence, ",
+            "published": "Feb 04",
+            "url": "https://www.globenewswire.com/news-release/2026/02/04/3231857/0/en/Nano-Drones-Market-Size-to-Reach-USD-12-69-Billion-by-2033-Driven-by-Defense-Surveillance-and-Smart-Commercial-Applications-SNS-Insider.html"
+          },
+          {
+            "title": "Move Over SpaceX: This Startup Launches Rockets From Supersonic Fighter Jets | EXCLUSIVE",
+            "description": "Starfighters Space (FJET) operates a commercial fleet of F-104 Starfighter jets from NASA's Kennedy Space Center to launch rockets using an air-launch-to-orbit method. The company's STARLAUNCH 1 syste",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/markets/tech/26/02/50337112/move-over-spacex-this-startup-launches-rockets-from-supersonic-fighter-jets-exclusive?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Ondas Eyes NATO, UK Expansion With Rotron Aero Deal",
+            "description": "Ondas Inc. (NASDAQ:ONDS) announced the acquisition of U.K.-based unmanned-systems developer Rotron Aero to expand its defense capabilities with long-range autonomous aircraft and strike systems. The d",
+            "published": "Feb 02",
+            "url": "https://www.benzinga.com/m-a/26/02/50307313/ondas-eyes-nato-uk-expansion-with-rotron-aero-deal?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "These 10 Stocks Just Had Their Best Or Worst Month Ever \u2014 And You Might Not Know Why",
+            "description": "January 2026 saw extreme stock movements driven by earnings surprises and sector disruptions. Top gainers included SanDisk (up 150%), Cameco (up 37%), and Lockheed Martin (up 30%), while software stoc",
+            "published": "Jan 30",
+            "url": "https://www.benzinga.com/markets/equities/26/01/50279866/january-2026-stocks-best-worst-month-ever-market-extremes?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Microsoft Stock's Worst Day Since March 2020, Bitcoin Plunges 5%: What's Moving Markets Thursday?",
+            "description": "Microsoft experienced its worst trading day since March 2020, plunging 12% and erasing $400 billion in market cap despite beating earnings expectations, as investors focused on slowing Azure cloud gro",
+            "published": "Jan 29",
+            "url": "https://www.benzinga.com/markets/market-summary/26/01/50241405/microsoft-stocks-worst-day-since-march-2020-market-news-thursday-earnings-meta-bitcoin-plu?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Contract_Win",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "Nano drone market growth and defense sector expansion suggest positive momentum for Lockheed Martin, with increasing opportunities in autonomous systems and defense technologies.",
+        "catalyst_age_days": 4,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Contract_Win: Nano drone market growth and defense sector expansion suggest positive momentum for Lockheed Martin, with increasing opportunities in autonomous systems and defense technologies.",
+      "composite_score": 75.85,
+      "rank": 34
+    },
+    {
+      "ticker": "XOM",
+      "sector": "Energy",
+      "price": 143.73,
+      "volume_analysis": {
+        "volume_ratio": 2.05,
+        "avg_volume_20d": 18360488,
+        "median_volume_20d": 18360488,
+        "yesterday_volume": 37577553,
+        "score": 68.22177416466887
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 0.88,
+        "is_near_high": true,
+        "high_52w": 145.01,
+        "current_price": 143.73,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 16.43,
+        "distance_from_20ma_pct": 9.18,
+        "ema_5": 140.57,
+        "ema_20": 133.07,
+        "ema_5_above_20": true,
+        "rsi": 83.59,
+        "adx": 100.0,
+        "three_day_return_pct": 2.29,
+        "score": 98.23460451003379
+      },
+      "relative_strength": {
+        "rs_pct": 22.66,
+        "stock_return_3m": 25.53,
+        "sector_return_3m": 17.07,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLE",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 85
+      },
+      "catalyst_signals": {
+        "score": 4.0,
+        "count": 10,
+        "keywords": [
+          "partnership"
+        ],
+        "scaled_score": 13.333333333333334,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "All It Takes Is $3,000 in ExxonMobil to Generate Hundreds in Annual Passive Income",
+            "description": "ExxonMobil is highlighted as an elite dividend stock with a nearly 3% yield, the second-highest dividend payer among S&P 500 companies. A $3,000 investment could generate hundreds in annual passive in",
+            "published": "Feb 04",
+            "url": "https://www.fool.com/investing/2026/02/04/all-it-takes-is-3000-in-exxonmobil-to-generate-hun/?source=iedfolrf0000001"
+          },
+          {
+            "title": "This 6.7%-Yielding Dividend Stock is Coming Off a Record Year With Plenty of Fuel to Continue Growing",
+            "description": "Enterprise Products Partners (EPD) reported record financial results for 2025, including record cash flows and volumes across its operations. The master limited partnership raised its distribution for",
+            "published": "Feb 04",
+            "url": "https://www.fool.com/investing/2026/02/04/this-67-yielding-dividend-stock-is-coming-off-a-re/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Stocks Fall, Gold Rallies On Best Day Since 2008: What's Moving Markets Tuesday?",
+            "description": "U.S. stocks declined midday Tuesday amid Middle East geopolitical tensions, while gold surged over 6% to its best day since November 2008, rebounding from a brutal two-day sell-off triggered by concer",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/markets/equities/26/02/50346317/stock-market-news-tuesday-wall-street-drops-gold-rallied-best-day-since-2008-palantir-earnings?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Is Chevron the Smartest Dividend Investment You Can Make in 2026?",
+            "description": "Chevron is highlighted as an attractive dividend investment with a 4% yield and 38 years of consecutive dividend increases. Its vertical integration across upstream, midstream, and downstream energy o",
+            "published": "Feb 03",
+            "url": "https://www.fool.com/investing/2026/02/03/is-chevron-the-smartest-dividend-investment-you-ca/?source=iedfolrf0000001"
+          },
+          {
+            "title": "ExxonMobil Continues to Prove It's in a League of Its Own",
+            "description": "ExxonMobil delivered industry-leading financial results in 2025 with $28.8 billion in earnings and $52 billion in operating cash flow. The company achieved record production volumes of 4.7 million bar",
+            "published": "Feb 02",
+            "url": "https://www.fool.com/investing/2026/02/02/exxonmobil-continues-to-prove-its-in-a-league-of-i/?source=iedfolrf0000001"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "ExxonMobil delivered strong 2025 financial results with $28.8B in earnings and record production volumes, indicating positive momentum in the energy sector.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Earnings_Beat: ExxonMobil delivered strong 2025 financial results with $28.8B in earnings and record production volumes, indicating positive momentum in the energy sector.",
+      "composite_score": 75.52,
+      "rank": 35
+    },
+    {
+      "ticker": "DAN",
+      "sector": "Technology",
+      "price": 30.15,
+      "volume_analysis": {
+        "volume_ratio": 0.77,
+        "avg_volume_20d": 1843142,
+        "median_volume_20d": 1843142,
+        "yesterday_volume": 1422497,
+        "score": 25.725943343847984
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 4.99,
+        "is_near_high": true,
+        "high_52w": 31.73,
+        "current_price": 30.15,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 20.4,
+        "distance_from_20ma_pct": 6.05,
+        "ema_5": 29.6,
+        "ema_20": 28.28,
+        "ema_5_above_20": true,
+        "rsi": 66.12,
+        "adx": 100.0,
+        "three_day_return_pct": 3.97,
+        "score": 90.02959167273312
+      },
+      "relative_strength": {
+        "rs_pct": 37.75,
+        "stock_return_3m": 40.62,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 94
+      },
+      "catalyst_signals": {
+        "score": 0,
+        "count": 1,
+        "keywords": [],
+        "scaled_score": 0.0,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "MiddleGround Capital Completes Add-On for New Eagle Platform with Acquisition of Pi Innovo",
+            "description": "MiddleGround Capital has acquired Pi Innovo from Dana Incorporated and integrated it into its portfolio company New Eagle. Pi Innovo, a designer of electronic control systems and software, will combin",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/pressreleases/26/02/g50329387/middleground-capital-completes-add-on-for-new-eagle-platform-with-acquisition-of-pi-innovo?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": false,
+        "catalyst_type": "M&A_Related",
+        "tier": "Tier2",
+        "confidence": "Low",
+        "reasoning": "MiddleGround Capital's acquisition of Pi Innovo from Dana suggests some strategic repositioning, but lacks direct material impact on DAN's core business or valuation.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "M&A_Related: MiddleGround Capital's acquisition of Pi Innovo from Dana suggests some strategic repositioning, but lacks direct material impact on DAN's core business or valuation.",
+      "composite_score": 75.38,
+      "rank": 36
+    },
+    {
+      "ticker": "WMT",
+      "sector": "Consumer Discretionary",
+      "price": 127.71,
+      "volume_analysis": {
+        "volume_ratio": 1.35,
+        "avg_volume_20d": 23663187,
+        "median_volume_20d": 23663187,
+        "yesterday_volume": 32016866,
+        "score": 45.10080760111742
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 0.36,
+        "is_near_high": true,
+        "high_52w": 128.16,
+        "current_price": 127.71,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 11.33,
+        "distance_from_20ma_pct": 8.0,
+        "ema_5": 122.46,
+        "ema_20": 118.71,
+        "ema_5_above_20": true,
+        "rsi": 71.33,
+        "adx": 100.0,
+        "three_day_return_pct": 8.77,
+        "score": 99.28997776303983
+      },
+      "relative_strength": {
+        "rs_pct": 22.73,
+        "stock_return_3m": 25.6,
+        "sector_return_3m": 2.76,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLY",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 85
+      },
+      "catalyst_signals": {
+        "score": 7.0,
+        "count": 14,
+        "keywords": [
+          "collaboration",
+          "partnership"
+        ],
+        "scaled_score": 23.333333333333332,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Why Walmart, Verizon, Altria, and Other Safe Dividend Stocks Jumped Today",
+            "description": "Investors rotated out of volatile tech stocks into defensive dividend stocks on Tuesday amid concerns about an AI bubble and market volatility. Walmart, Verizon, and Altria each rose approximately 3% ",
+            "published": "Feb 04",
+            "url": "https://www.fool.com/investing/2026/02/03/why-walmart-verizon-altria-safe-dividend-stocks/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Warren Buffett Knocked Out Of Top 10 Richest People List Thanks To Walmart",
+            "description": "Warren Buffett has dropped out of the top 10 richest people in the world, falling to 11th place with a net worth of $147 billion. Walmart heir Jim Walton has replaced him at 10th place with $149 billi",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/markets/large-cap/26/02/50360732/warren-buffett-knocked-out-of-top-10-richest-people-list-thanks-to-walmart?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "Stock Market Today, Feb. 3: Nasdaq Tumbles 1.4% as AI Fears Grow",
+            "description": "Major U.S. stock indexes declined on February 3, 2026, with the Nasdaq dropping 1.4% amid growing AI concerns and rising bond yields. Tech stocks led the selloff, while defensive sectors like retail o",
+            "published": "Feb 03",
+            "url": "https://www.fool.com/coverage/stock-market-today/2026/02/03/stock-market-today-feb-3-nasdaq-tumbles-1-4-as-ai-fears-grow/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Walmart Joins the Trillion Club as the Market Backs Its Digital Shift",
+            "description": "Walmart reached a historic $1 trillion market capitalization on February 3, 2026, joining an exclusive group of ten U.S. public companies at this valuation threshold. The achievement reflects investor",
+            "published": "Feb 03",
+            "url": "https://www.investing.com/analysis/walmart-joins-the-trillion-club-as-the-market-backs-its-digital-shift-200674386"
+          },
+          {
+            "title": "Walmart Hits Historic $1 Trillion Value, Joins Big Tech On Nasdaq As AI Takes Over",
+            "description": "Walmart has reached a historic $1 trillion market capitalization, joining an exclusive group of tech-dominated companies. The retailer's milestone was driven by strong e-commerce growth, AI integratio",
+            "published": "Feb 03",
+            "url": "https://www.benzinga.com/markets/large-cap/26/02/50343948/walmart-hits-historic-1-trillion-value-joins-big-tech-on-nasdaq-as-ai-takes-over?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "M&A_Target",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "Walmart reaching $1 trillion market cap signals strong investor confidence and potential strategic positioning in AI-driven retail transformation.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "M&A_Target: Walmart reaching $1 trillion market cap signals strong investor confidence and potential strategic positioning in AI-driven retail transformation.",
+      "composite_score": 75.14,
+      "rank": 37
+    },
+    {
+      "ticker": "JNJ",
+      "sector": "Healthcare",
+      "price": 233.1,
+      "volume_analysis": {
+        "volume_ratio": 1.01,
+        "avg_volume_20d": 9251648,
+        "median_volume_20d": 9251648,
+        "yesterday_volume": 9345967,
+        "score": 33.67316107717602
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 0.89,
+        "is_near_high": true,
+        "high_52w": 235.2,
+        "current_price": 233.1,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 10.33,
+        "distance_from_20ma_pct": 6.7,
+        "ema_5": 229.64,
+        "ema_20": 220.72,
+        "ema_5_above_20": true,
+        "rsi": 91.37,
+        "adx": 100.0,
+        "three_day_return_pct": 2.56,
+        "score": 98.21428571428572
+      },
+      "relative_strength": {
+        "rs_pct": 21.8,
+        "stock_return_3m": 24.67,
+        "sector_return_3m": 5.59,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLV",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 84
+      },
+      "catalyst_signals": {
+        "score": 3.2,
+        "count": 7,
+        "keywords": [
+          "launches"
+        ],
+        "scaled_score": 10.666666666666668,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Johnson & Johnson Launches the First and Only Daily Disposable Multifocal Toric Contact Lens for Astigmatic Patients with Presbyopia in United Kingdom and Ireland",
+            "description": "Johnson & Johnson has launched ACUVUE\u00ae OASYS MAX 1-Day MULTIFOCAL for ASTIGMATISM in the UK and Ireland, marking the first and only daily disposable multifocal toric contact lens designed for patients",
+            "published": "Feb 03",
+            "url": "https://www.globenewswire.com/news-release/2026/02/03/3230760/0/en/Johnson-Johnson-Launches-the-First-and-Only-Daily-Disposable-Multifocal-Toric-Contact-Lens-for-Astigmatic-Patients-with-Presbyopia-in-United-Kingdom-and-Ireland.html"
+          },
+          {
+            "title": "Targeted Cancer Therapy Market to Reach US$ 175.48 Billion by 2035 Driven by Precision Oncology Adoption, ADC Innovation, and Regulatory Productivity Says Astute Analytica",
+            "description": "The global targeted cancer therapy market is projected to grow from USD 90.89 billion in 2025 to USD 175.48 billion by 2035 at a CAGR of 6.80%. Growth is driven by antibody-drug conjugates (ADCs), KRA",
+            "published": "Feb 03",
+            "url": "https://www.globenewswire.com/news-release/2026/02/03/3230738/0/en/Targeted-Cancer-Therapy-Market-to-Reach-US-175-48-Billion-by-2035-Driven-by-Precision-Oncology-Adoption-ADC-Innovation-and-Regulatory-Productivity-Says-Astute-Analytica.html"
+          },
+          {
+            "title": "[Latest] Global Advanced Wound Closure Market Size/Share Worth USD 32.54 Billion by 2035 at a 6.9% CAGR: Custom Market Insights (Analysis, Outlook, Leaders, Report, Trends, Forecast, Segmentation, Growth Rate, Value, SWOT Analysis)",
+            "description": "The global advanced wound closure market is projected to grow from USD 18.47 billion in 2025 to USD 32.54 billion by 2035, at a CAGR of 6.9%. Growth is driven by increasing surgical procedures, rising",
+            "published": "Feb 02",
+            "url": "https://www.globenewswire.com/news-release/2026/02/02/3230558/0/en/Latest-Global-Advanced-Wound-Closure-Market-Size-Share-Worth-USD-32-54-Billion-by-2035-at-a-6-9-CAGR-Custom-Market-Insights-Analysis-Outlook-Leaders-Report-Trends-Forecast-Segmenta.html"
+          },
+          {
+            "title": "This Top Dividend Stock Could Achieve a Major Milestone This Year. Is It a Buy?",
+            "description": "Johnson & Johnson is projected to achieve $100 billion in annual sales in 2026, becoming only the second biopharma company to reach this milestone. Despite facing patent cliffs (Stelara) and Medicare ",
+            "published": "Jan 31",
+            "url": "https://www.fool.com/investing/2026/01/30/this-top-dividend-stock-could-achieve-a-major-mile/?source=iedfolrf0000001"
+          },
+          {
+            "title": "Automated Sample Preparation Research Report 2026 - Global $4.31 Bn Market Trends, Opportunities, and Forecasts to 2031",
+            "description": "The global automated sample preparation market is expected to expand at a 10.10% CAGR from 2025 to 2031, driven by pharmaceutical R&D investments, need for reproducibility, and AI/ML adoption. However",
+            "published": "Jan 30",
+            "url": "https://www.globenewswire.com/news-release/2026/01/30/3229328/28124/en/Automated-Sample-Preparation-Research-Report-2026-Global-4-31-Bn-Market-Trends-Opportunities-and-Forecasts-to-2031.html"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": false,
+        "catalyst_type": "Product_Launch",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "JNJ launched a novel contact lens product in the UK market, demonstrating continued innovation in medical devices with potential market expansion opportunity.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Product_Launch: JNJ launched a novel contact lens product in the UK market, demonstrating continued innovation in medical devices with potential market expansion opportunity.",
+      "composite_score": 74.07,
+      "rank": 38
+    },
+    {
+      "ticker": "LRCX",
+      "sector": "Industrials",
+      "price": 230.1,
+      "volume_analysis": {
+        "volume_ratio": 0.95,
+        "avg_volume_20d": 14160066,
+        "median_volume_20d": 14160066,
+        "yesterday_volume": 13491270,
+        "score": 31.758962140430704
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 8.64,
+        "is_near_high": false,
+        "high_52w": 251.87,
+        "current_price": 230.1,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 22.53,
+        "distance_from_20ma_pct": 3.35,
+        "ema_5": 235.75,
+        "ema_20": 220.42,
+        "ema_5_above_20": true,
+        "rsi": 58.44,
+        "adx": 100.0,
+        "three_day_return_pct": -7.28,
+        "score": 82.7133044824711
+      },
+      "relative_strength": {
+        "rs_pct": 39.0,
+        "stock_return_3m": 41.87,
+        "sector_return_3m": 10.71,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLI",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 95
+      },
+      "catalyst_signals": {
+        "score": 2.2,
+        "count": 2,
+        "keywords": [
+          "analyst"
+        ],
+        "scaled_score": 7.333333333333333,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Lam Research Beats Q2 Estimates, Strong Q3 Guidance",
+            "description": "Lam Research (NASDAQ: LRCX) reported Q2 earnings of $1.27 per share, beating analyst estimates of $1.17 by 8.45%, with quarterly revenue of $5.35 billion exceeding the consensus estimate of $5.24 bill",
+            "published": "Jan 28",
+            "url": "https://www.benzinga.com/markets/earnings/26/01/50211138/lam-research-beats-q2-estimates-strong-q3-guidance?utm_source=benzinga_taxonomy&utm_medium=rss_feed_free&utm_content=taxonomy_rss&utm_campaign=channel"
+          },
+          {
+            "title": "ASML Orders Double Estimates at \u20ac13.2B: Why the AI Chip Boom Has Legs",
+            "description": "ASML reported record Q4 orders of \u20ac13.2 billion, more than double analyst expectations of \u20ac6.32 billion, signaling sustained AI infrastructure demand. The company announced a \u20ac12 billion share buyback",
+            "published": "Jan 28",
+            "url": "https://www.investing.com/analysis/asml-orders-double-estimates-at-132b-why-the-ai-chip-boom-has-legs-200674044"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Earnings_Beat",
+        "tier": "Tier2",
+        "confidence": "High",
+        "reasoning": "Strong Q2 earnings beat of 8.45% with revenue exceeding estimates, coupled with positive Q3 guidance suggests continued semiconductor equipment strength driven by AI infrastructure demand.",
+        "catalyst_age_days": 1,
+        "multi_catalyst": true,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Earnings_Beat: Strong Q2 earnings beat of 8.45% with revenue exceeding estimates, coupled with positive Q3 guidance suggests continued semiconductor equipment strength driven by AI infrastructure demand.",
+      "composite_score": 73.76,
+      "rank": 39
+    },
+    {
+      "ticker": "AMAT",
+      "sector": "Technology",
+      "price": 318.67,
+      "volume_analysis": {
+        "volume_ratio": 1.45,
+        "avg_volume_20d": 7379725,
+        "median_volume_20d": 7379725,
+        "yesterday_volume": 10686891,
+        "score": 48.271402506773455
+      },
+      "technical_setup": {
+        "distance_from_52w_high_pct": 7.52,
+        "is_near_high": false,
+        "high_52w": 344.6,
+        "current_price": 318.67,
+        "above_50d_sma": true,
+        "distance_from_50ma_pct": 13.37,
+        "distance_from_20ma_pct": 0.92,
+        "ema_5": 326.65,
+        "ema_20": 313.86,
+        "ema_5_above_20": true,
+        "rsi": 56.08,
+        "adx": 100.0,
+        "three_day_return_pct": -6.64,
+        "score": 84.95066744051073
+      },
+      "relative_strength": {
+        "rs_pct": 33.59,
+        "stock_return_3m": 36.46,
+        "sector_return_3m": -1.73,
+        "spy_return_3m": 2.87,
+        "sector_etf": "XLK",
+        "passed_filter": true,
+        "score": 100,
+        "rs_score_points": 5,
+        "rs_percentile": 92
+      },
+      "catalyst_signals": {
+        "score": 1.0,
+        "count": 2,
+        "keywords": [
+          "analyst"
+        ],
+        "scaled_score": 3.3333333333333335,
+        "catalyst_type_news": null,
+        "catalyst_news_age_days": null,
+        "top_articles": [
+          {
+            "title": "Prediction: SOXX Will Outperform S&P 500 and Nasdaq 100 in 2026",
+            "description": "The semiconductor sector, led by the iShares Semiconductor ETF (SOXX), is expected to outperform the S&P 500 and Nasdaq 100 in 2026 due to accelerating AI infrastructure spending. Beyond Nvidia and Br",
+            "published": "Jan 30",
+            "url": "https://www.fool.com/investing/2026/01/30/1-prediction-for-soxx-in-2026/?source=iedfolrf0000001"
+          },
+          {
+            "title": "ASML Orders Double Estimates at \u20ac13.2B: Why the AI Chip Boom Has Legs",
+            "description": "ASML reported record Q4 orders of \u20ac13.2 billion, more than double analyst expectations of \u20ac6.32 billion, signaling sustained AI infrastructure demand. The company announced a \u20ac12 billion share buyback",
+            "published": "Jan 28",
+            "url": "https://www.investing.com/analysis/asml-orders-double-estimates-at-132b-why-the-ai-chip-boom-has-legs-200674044"
+          }
+        ],
+        "contract_value": null,
+        "guidance_magnitude": null,
+        "ma_premium": null,
+        "fda_approval_type": null,
+        "ma_detection_confidence": null,
+        "has_negative_flag": false,
+        "negative_reasons": []
+      },
+      "passed_binary_gates": true,
+      "claude_catalyst": {
+        "has_tier1_catalyst": true,
+        "catalyst_type": "Contract_Win",
+        "tier": "Tier2",
+        "confidence": "Medium",
+        "reasoning": "ASML's record semiconductor orders signal strong AI infrastructure demand, which directly benefits Applied Materials as a key semiconductor equipment provider. The \u20ac13.2B order volume suggests sustained momentum in the semiconductor supply chain.",
+        "catalyst_age_days": 2,
+        "multi_catalyst": false,
+        "negative_flags": []
+      },
+      "catalyst_tier": "Tier 2",
+      "why_selected": "Contract_Win: ASML's record semiconductor orders signal strong AI infrastructure demand, which directly benefits Applied Materials as a key semiconductor equipment provider. The \u20ac13.2B order volume suggests sustained momentum in the semiconductor supply chain.",
+      "composite_score": 73.74,
+      "rank": 40
+    }
+  ]
 }
