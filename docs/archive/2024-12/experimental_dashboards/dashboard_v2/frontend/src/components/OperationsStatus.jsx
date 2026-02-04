@@ -123,7 +123,7 @@ function OperationsStatus({ isSuperUser = false }) {
     }
   }
 
-  // Define operation order (RECHECK follows EXECUTE as it's the 10:15 AM gap re-check, EXIT at 3:45 PM before ANALYZE)
+  // Define operation order (RECHECK follows EXECUTE as it's the 10:15 AM gap re-check)
   const operationOrder = ['SCREENER', 'GO', 'EXECUTE', 'RECHECK', 'EXIT', 'ANALYZE']
 
   // Sort operations by defined order

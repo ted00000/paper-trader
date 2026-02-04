@@ -61,7 +61,7 @@ function ScreeningDecisions() {
     } else if (status === 'SKIPPED') {
       return <PauseCircle size={18} className="text-yellow-500" />
     } else if (status === 'OWNED') {
-      return <CheckCircle size={18} className="text-tedbot-accent" />
+      return <CheckCircle size={18} className="text-owned" />
     }
     return <XCircle size={18} className="text-loss" />
   }
@@ -72,7 +72,7 @@ function ScreeningDecisions() {
     } else if (status === 'SKIPPED') {
       return 'bg-yellow-500/10 border-yellow-500/30'
     } else if (status === 'OWNED') {
-      return 'bg-tedbot-accent/10 border-tedbot-accent/30'
+      return 'bg-owned/10 border-owned/30'
     }
     return 'bg-loss/5 border-loss/20'
   }
@@ -94,7 +94,7 @@ function ScreeningDecisions() {
     } else if (status === 'SKIPPED') {
       return 'bg-yellow-500/20 text-yellow-500'
     } else if (status === 'OWNED') {
-      return 'bg-tedbot-accent/20 text-tedbot-accent'
+      return 'bg-owned/20 text-owned'
     }
     return 'bg-loss/10 text-loss'
   }
