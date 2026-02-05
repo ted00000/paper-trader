@@ -1286,7 +1286,7 @@ Stagnation = position hasn't moved as expected given time held and volatility.
             'pnl_dollars': round(pnl_dollars, 2),
             'exit_reason': reason,
             'catalyst': position.get('catalyst', ''),
-            'catalyst_tier': position.get('catalyst_tier', 'Unknown'),
+            'catalyst_tier': position.get('catalyst_tier', 'Tier2'),  # Default to Tier2, never Unknown
             'catalyst_age_days': position.get('catalyst_age_days', 0),
             'news_validation_score': position.get('news_validation_score', 0),
             'news_exit_triggered': position.get('news_exit_triggered', False),
@@ -1480,7 +1480,7 @@ Stagnation = position hasn't moved as expected given time held and volatility.
             'exit_reason': trade['exit_reason'],
             'exit_type': exit_type,
             'catalyst_type': trade.get('catalyst', ''),
-            'catalyst_tier': trade.get('catalyst_tier', 'Unknown'),
+            'catalyst_tier': trade.get('catalyst_tier', 'Tier2'),  # Default to Tier2, never Unknown
             'catalyst_age_days': trade.get('catalyst_age_days', 0),
             'news_validation_score': trade.get('news_validation_score', 0),
             'news_exit_triggered': trade.get('news_exit_triggered', False),
@@ -2480,6 +2480,17 @@ Stagnation = position hasn't moved as expected given time held and volatility.
         """
 
         details = catalyst_details or {}
+
+        # Safety check: Handle None or empty catalyst type
+        if not catalyst_type or catalyst_type.strip() == '':
+            return {
+                'tier': 'Tier2',
+                'tier_name': 'Medium Conviction - Unspecified Catalyst',
+                'reasoning': 'No catalyst type provided - defaulting to Tier2',
+                'position_size_pct': 8.0,
+                'expected_hold_days': '2-5 days',
+                'target_pct': 9.0
+            }
 
         # TIER 1: HIGH CONVICTION CATALYSTS
 
@@ -6321,7 +6332,7 @@ CURRENT PORTFOLIO
                 trade_data.get('exit_reason', ''),
                 trade_data.get('exit_type', ''),
                 trade_data.get('catalyst_type', ''),
-                trade_data.get('catalyst_tier', 'Unknown'),
+                trade_data.get('catalyst_tier', 'Tier2'),  # Default to Tier2, never Unknown
                 trade_data.get('catalyst_age_days', 0),
                 trade_data.get('news_validation_score', 0),
                 trade_data.get('news_exit_triggered', False),
