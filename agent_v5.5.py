@@ -642,14 +642,17 @@ class TradingAgent:
             # Calculate stagnation score (v8.8)
             stagnation_result = self._calculate_position_stagnation(data)
             stagnation_line = ""
-            if stagnation_result:
-                score = stagnation_result.stagnation_score
-                state = stagnation_result.state.value
-                if stagnation_result.state == StagnationState.EXIT_CANDIDATE:
-                    stagnation_line = f"\n  ⚠️ STAGNATION ALERT: Score {score:.2f} ({state}) - consider exiting to free capital"
-                    stagnation_alerts.append((ticker, stagnation_result))
-                elif stagnation_result.state == StagnationState.WATCH:
-                    stagnation_line = f"\n  📊 Stagnation: Score {score:.2f} ({state}) - underperforming expected move"
+            try:
+                if stagnation_result and STAGNATION_AVAILABLE:
+                    score = stagnation_result.stagnation_score
+                    state = stagnation_result.state.value
+                    if stagnation_result.state == StagnationState.EXIT_CANDIDATE:
+                        stagnation_line = f"\n  ⚠️ STAGNATION ALERT: Score {score:.2f} ({state}) - consider exiting to free capital"
+                        stagnation_alerts.append((ticker, stagnation_result))
+                    elif stagnation_result.state == StagnationState.WATCH:
+                        stagnation_line = f"\n  📊 Stagnation: Score {score:.2f} ({state}) - underperforming expected move"
+            except Exception as e:
+                print(f"   ⚠️ Stagnation display error for {ticker}: {e}")
 
             lines.append(f"""
 POSITION {i}: {ticker}
@@ -8071,7 +8074,7 @@ CURRENT PORTFOLIO
 
                         # v8.8: Place stop-loss order via Alpaca for real-time protection (Bug #5 fix)
                         stop_loss_price = pos.get('stop_loss', entry_price * 0.93)
-                        shares_for_stop = int(actual_shares) if actual_shares > 0 else int(pos['shares'])
+                        shares_for_stop = int(actual_shares) if actual_shares > 0 else int(pos.get('shares', 0))
                         if shares_for_stop > 0:
                             sl_success, sl_msg, sl_order_id = self.broker.place_stop_loss_order(
                                 ticker=ticker,
@@ -8598,7 +8601,7 @@ CURRENT PORTFOLIO
 
                         # v8.8: Place stop-loss order via Alpaca for real-time protection (Bug #5 fix)
                         stop_loss_price = new_position.get('stop_loss', current_price * 0.95)
-                        shares_for_stop = int(actual_shares) if actual_shares > 0 else int(new_position['shares'])
+                        shares_for_stop = int(actual_shares) if actual_shares > 0 else int(new_position.get('shares', 0))
                         if shares_for_stop > 0:
                             sl_success, sl_msg, sl_order_id = self.broker.place_stop_loss_order(
                                 ticker=ticker,
@@ -8905,11 +8908,12 @@ CURRENT PORTFOLIO
             ticker = pos['ticker']
 
             # Calculate stagnation score
+            entry_price = pos.get('entry_price', 0)
             stagnation_result = self._calculate_position_stagnation({
-                'entry_price': pos['entry_price'],
-                'current_price': pr['current_price'],
+                'entry_price': entry_price,
+                'current_price': pr.get('current_price', entry_price),
                 'days_held': pos.get('days_held', 0),
-                'atr': pos.get('atr', pos['entry_price'] * 0.03)
+                'atr': pos.get('atr', entry_price * 0.03 if entry_price > 0 else 1.0)
             })
 
             position_summary += f"\n### {ticker}\n"
@@ -8920,16 +8924,19 @@ CURRENT PORTFOLIO
             position_summary += f"  Thesis: {pos.get('thesis', 'N/A')}\n"
 
             # Add stagnation info for EXIT context (v8.8)
-            if stagnation_result:
-                score = stagnation_result.stagnation_score
-                state = stagnation_result.state.value
-                exp = stagnation_result.explain
-                if stagnation_result.state == StagnationState.EXIT_CANDIDATE:
-                    position_summary += f"  ⚠️ STAGNATION: Score {score:.2f} ({state}) - DEAD CAPITAL candidate\n"
-                    position_summary += f"     Only {exp['abs_return_pct']:.1f}% move in {exp['days_in_trade']:.0f} days (expected ${exp['expected_move']:.2f} based on ATR)\n"
-                    stagnation_alerts.append((ticker, stagnation_result))
-                elif stagnation_result.state == StagnationState.WATCH:
-                    position_summary += f"  📊 Stagnation: Score {score:.2f} ({state}) - underperforming\n"
+            try:
+                if stagnation_result and STAGNATION_AVAILABLE:
+                    score = stagnation_result.stagnation_score
+                    state = stagnation_result.state.value
+                    exp = stagnation_result.explain
+                    if stagnation_result.state == StagnationState.EXIT_CANDIDATE:
+                        position_summary += f"  ⚠️ STAGNATION: Score {score:.2f} ({state}) - DEAD CAPITAL candidate\n"
+                        position_summary += f"     Only {exp['abs_return_pct']:.1f}% move in {exp['days_in_trade']:.0f} days (expected ${exp['expected_move']:.2f} based on ATR)\n"
+                        stagnation_alerts.append((ticker, stagnation_result))
+                    elif stagnation_result.state == StagnationState.WATCH:
+                        position_summary += f"  📊 Stagnation: Score {score:.2f} ({state}) - underperforming\n"
+            except Exception as e:
+                print(f"   ⚠️ Stagnation display error for {ticker}: {e}")
 
             # Add news for this position
             articles = position_news.get(ticker, [])
