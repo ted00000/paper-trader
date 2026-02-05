@@ -7611,6 +7611,58 @@ CURRENT PORTFOLIO
         current_positions = current_portfolio.get('positions', [])
         print(f"   ✓ Loaded {len(current_positions)} current positions\n")
 
+        # STEP 2.5: Check for positions auto-sold by Alpaca trailing stops
+        # This detects positions that were sold between GO (9 AM) and EXECUTE (9:45 AM)
+        alpaca_auto_closed = []
+        if self.use_alpaca and self.broker and self.portfolio_file.exists():
+            print("2.5. Checking for Alpaca trailing stop fills...")
+
+            # Load JSON portfolio to get positions that HAD trailing stops active
+            try:
+                with open(self.portfolio_file, 'r') as f:
+                    json_portfolio = json.load(f)
+                json_positions = json_portfolio.get('positions', [])
+
+                # Get current Alpaca positions
+                alpaca_positions = {p.symbol: p for p in self.broker.get_positions()}
+
+                # Check for positions with trailing stops that are no longer in Alpaca
+                for position in json_positions:
+                    ticker = position.get('ticker')
+                    if position.get('trailing_stop_active') and ticker not in alpaca_positions:
+                        print(f"   🔔 {ticker} was AUTO-SOLD by Alpaca trailing stop!")
+
+                        # Try to get actual fill price from Alpaca
+                        exit_price = position.get('trailing_stop_price', position.get('current_price', 0))
+                        try:
+                            closed_orders = self.broker.get_orders_for_symbol(ticker, status='closed')
+                            for order in closed_orders:
+                                if order.type == 'trailing_stop' and order.status == 'filled':
+                                    exit_price = float(order.filled_avg_price)
+                                    print(f"      Fill price: ${exit_price:.2f}")
+                                    break
+                        except Exception as e:
+                            print(f"      ⚠️ Could not fetch fill price: {e}")
+
+                        peak_pct = position.get('peak_return_pct', 0)
+                        entry_price = position.get('entry_price', 0)
+                        return_pct = ((exit_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+                        exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
+
+                        # Log the trade
+                        trade_data = self.close_position(position, exit_price, exit_reason)
+                        self.log_completed_trade(trade_data)
+                        alpaca_auto_closed.append(trade_data)
+                        print(f"      ✓ Logged: {ticker} exited at ${exit_price:.2f} ({return_pct:+.1f}%)")
+
+                if alpaca_auto_closed:
+                    print(f"   ✓ {len(alpaca_auto_closed)} position(s) auto-closed by Alpaca trailing stops\n")
+                else:
+                    print("   ✓ No Alpaca trailing stop fills detected\n")
+
+            except Exception as e:
+                print(f"   ⚠️ Could not check trailing stop fills: {e}\n")
+
         # Process EXITS
         print("3. Processing EXITS...")
         closed_trades = []
@@ -8731,15 +8783,19 @@ CURRENT PORTFOLIO
             if response:
                 self.save_response('exit', response)
 
+                # Extract text content from API response (response is a dict, not string)
+                content_blocks = response.get('content', [])
+                response_text = content_blocks[0].get('text', '') if content_blocks else ''
+
                 # Parse JSON from Claude's response
                 try:
                     # Extract JSON block from response
-                    json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
+                    json_match = re.search(r'```json\s*(.*?)\s*```', response_text, re.DOTALL)
                     if json_match:
                         json_str = json_match.group(1)
                     else:
                         # Try to find raw JSON
-                        json_match = re.search(r'\{[\s\S]*"exit_recommendations"[\s\S]*\}', response)
+                        json_match = re.search(r'\{[\s\S]*"exit_recommendations"[\s\S]*\}', response_text)
                         json_str = json_match.group(0) if json_match else None
 
                     if json_str:
@@ -8774,7 +8830,8 @@ CURRENT PORTFOLIO
                                     if current_price is None:
                                         # Fetch current price
                                         try:
-                                            current_price = self.get_current_price(ticker)
+                                            prices = self.fetch_current_prices([ticker])
+                                            current_price = prices.get(ticker, position.get('current_price', 0))
                                         except:
                                             current_price = position.get('current_price', 0)
 
