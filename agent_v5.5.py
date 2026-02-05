@@ -5697,11 +5697,43 @@ If conditions have changed, adjust recommendations accordingly and explain why.
             'last_updated': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         }
 
+        # v8.8: Sync with Alpaca to detect/correct discrepancies
+        if self.use_alpaca and self.broker:
+            try:
+                alpaca_account = self.broker.get_account()
+                alpaca_cash = float(alpaca_account.cash)
+                alpaca_equity = float(alpaca_account.equity)
+
+                cash_diff = abs(alpaca_cash - cash_available)
+                equity_diff = abs(alpaca_equity - account_value)
+
+                # If significant discrepancy (>$1), use Alpaca values as source of truth
+                if cash_diff > 1.0 or equity_diff > 1.0:
+                    print(f"   ⚠️ Alpaca sync: Cash discrepancy ${cash_diff:.2f}, Equity discrepancy ${equity_diff:.2f}")
+                    print(f"      JSON: Cash ${cash_available:.2f}, Equity ${account_value:.2f}")
+                    print(f"      Alpaca: Cash ${alpaca_cash:.2f}, Equity ${alpaca_equity:.2f}")
+                    print(f"      → Using Alpaca values as source of truth")
+
+                    # Update with Alpaca values
+                    account['cash_available'] = round(alpaca_cash, 2)
+                    account['account_value'] = round(alpaca_equity, 2)
+                    account['alpaca_synced'] = True
+                    account['json_cash_before_sync'] = round(cash_available, 2)
+                    account['json_equity_before_sync'] = round(account_value, 2)
+                else:
+                    account['alpaca_synced'] = True
+
+            except Exception as e:
+                print(f"   ⚠️ Could not sync with Alpaca: {e}")
+                account['alpaca_synced'] = False
+
         with open(self.account_file, 'w') as f:
             json.dump(account, f, indent=2)
 
+        final_cash = account['cash_available']
+        final_equity = account['account_value']
         unrealized_pl = portfolio_value - cost_basis
-        print(f"   ✓ Updated account status: ${account_value:.2f} (Positions: ${portfolio_value:.2f} + Cash: ${cash_available:.2f}, Realized P&L: ${realized_pl:+.2f}, Unrealized P&L: ${unrealized_pl:+.2f})")
+        print(f"   ✓ Updated account status: ${final_equity:.2f} (Positions: ${portfolio_value:.2f} + Cash: ${final_cash:.2f}, Realized P&L: ${realized_pl:+.2f}, Unrealized P&L: ${unrealized_pl:+.2f})")
     
     # =====================================================================
     # VALIDATION AND LOGGING
