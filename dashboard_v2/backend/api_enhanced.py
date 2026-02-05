@@ -315,8 +315,10 @@ def get_overview():
     today_trades = [t for t in trades if t.get('Exit_Date', '').startswith(today_str)]
     today_returns_pct = [float(t.get('Return_Percent', 0)) for t in today_trades]
     today_returns_dollars = [float(t.get('Return_Dollars', 0)) for t in today_trades]
-    today_pnl_pct = sum(today_returns_pct) if today_returns_pct else 0
     today_pnl_dollars = sum(today_returns_dollars) if today_returns_dollars else 0
+    # v8.9: Calculate weighted return % (P&L / capital deployed), not sum of percentages
+    today_capital_deployed = sum(float(t.get('Position_Size', 0)) for t in today_trades)
+    today_pnl_pct = (today_pnl_dollars / today_capital_deployed * 100) if today_capital_deployed > 0 else 0
     today_wins = sum(1 for r in today_returns_pct if r > 0)
     today_losses = sum(1 for r in today_returns_pct if r < 0)
     return jsonify({
@@ -437,8 +439,10 @@ def get_performance():
     today_trades = [t for t in trades if t.get('Exit_Date', '').startswith(today_str)]
     today_returns_pct = [float(t.get('Return_Percent', 0)) for t in today_trades]
     today_returns_dollars = [float(t.get('Return_Dollars', 0)) for t in today_trades]
-    today_pnl_pct = sum(today_returns_pct) if today_returns_pct else 0
     today_pnl_dollars = sum(today_returns_dollars) if today_returns_dollars else 0
+    # v8.9: Calculate weighted return % (P&L / capital deployed), not sum of percentages
+    today_capital_deployed = sum(float(t.get('Position_Size', 0)) for t in today_trades)
+    today_pnl_pct = (today_pnl_dollars / today_capital_deployed * 100) if today_capital_deployed > 0 else 0
     today_wins = sum(1 for r in today_returns_pct if r > 0)
     today_losses = sum(1 for r in today_returns_pct if r < 0)
 
