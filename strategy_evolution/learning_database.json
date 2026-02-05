@@ -1,7 +1,8 @@
 {
   "version": "1.0.0",
-  "last_updated": "2026-02-04T09:45:08.535361",
+  "last_updated": "2026-02-05T12:00:00",
   "schema_version": 1,
+
   "critical_failures": {
     "description": "System failures that caused material losses. ACTIVE failures are surfaced prominently to Claude until resolved.",
     "failures": [
@@ -30,6 +31,7 @@
       }
     ]
   },
+
   "catalyst_performance": {
     "description": "Performance metrics by catalyst type. Updated automatically after each trade closes.",
     "catalysts": {
@@ -125,6 +127,7 @@
       }
     }
   },
+
   "market_regime_performance": {
     "description": "Performance by market regime. Helps adapt strategy to market conditions.",
     "regimes": {
@@ -158,6 +161,7 @@
       }
     }
   },
+
   "entry_timing_patterns": {
     "description": "Analysis of entry timing and outcomes",
     "gap_entries": {
@@ -181,14 +185,14 @@
       }
     }
   },
+
   "exit_timing_patterns": {
     "description": "Analysis of exit types and outcomes",
     "exit_types": {
       "stop_loss": {
-        "total": 1,
+        "total": 0,
         "avg_loss_pct": 0.0,
-        "notes": "Positions that hit -7% stop",
-        "avg_return_pct": -9.7
+        "notes": "Positions that hit -7% stop"
       },
       "trailing_stop": {
         "total": 0,
@@ -211,9 +215,17 @@
         "total": 0,
         "avg_return_pct": 0.0,
         "notes": "Rotated to better opportunity"
+      },
+      "stagnation_exit": {
+        "total": 0,
+        "avg_return_pct": 0.0,
+        "avg_days_held": 0.0,
+        "capital_redeployed_return": 0.0,
+        "notes": "Exited due to stagnation scoring (v8.8) - position failed to move as expected"
       }
     }
   },
+
   "position_sizing_outcomes": {
     "description": "How position sizing affected outcomes",
     "by_conviction": {
@@ -233,13 +245,14 @@
       },
       "MEDIUM": {
         "avg_size_pct": 8.0,
-        "total_trades": 1,
+        "total_trades": 0,
         "win_rate_pct": 0.0,
-        "avg_return_pct": -9.7,
+        "avg_return_pct": 0.0,
         "notes": "8% position size"
       }
     }
   },
+
   "hypotheses_under_test": {
     "description": "Trading hypotheses we are actively testing with real trades",
     "hypotheses": [
@@ -278,13 +291,50 @@
         "current_sample": 0,
         "current_result": null,
         "conclusion": null
+      },
+      {
+        "id": "H005",
+        "statement": "Placing stop-loss orders at entry via Alpaca (vs evaluation-based exits at price checks) reduces drawdowns without significantly impacting win rate",
+        "status": "TESTING",
+        "date_started": "2026-02-05",
+        "sample_required": 30,
+        "current_sample": 0,
+        "metrics_to_track": {
+          "stop_hits_that_recovered": 0,
+          "stop_hits_that_continued_down": 0,
+          "avg_drawdown_at_stop_hit": 0.0,
+          "trades_with_entry_stops": 0,
+          "win_rate_with_entry_stops": 0.0
+        },
+        "current_result": null,
+        "conclusion": null,
+        "notes": "v8.8 implementation places GTC stop orders via Alpaca at entry. The document 'Stagnation and Stop Loss.txt' suggests evaluation-based stops may be superior for swing trading (position sizing as risk control). Track outcomes to determine if entry stops cause premature exits on thesis-valid positions."
+      },
+      {
+        "id": "H006",
+        "statement": "Stagnation scoring (ATR-based expected move) identifies dead capital earlier than 21-day time stop",
+        "status": "TESTING",
+        "date_started": "2026-02-05",
+        "sample_required": 20,
+        "current_sample": 0,
+        "metrics_to_track": {
+          "stagnation_exits_that_freed_capital_for_winners": 0,
+          "stagnation_exits_that_later_moved": 0,
+          "avg_days_to_stagnation_flag": 0.0,
+          "capital_turnover_improvement": 0.0
+        },
+        "current_result": null,
+        "conclusion": null,
+        "notes": "v8.8 stagnation module arms Claude with data to exit underperforming positions before 21-day hard stop. Expected to improve capital efficiency."
       }
     ]
   },
+
   "excluded_patterns": {
     "description": "Patterns that have been excluded due to poor performance",
     "patterns": []
   },
+
   "actionable_insights": {
     "description": "Current actionable insights derived from learning data. Updated automatically.",
     "insights": [
@@ -293,6 +343,18 @@
         "priority": "RESOLVED",
         "message": "Trailing stops now placed via Alpaca at market open (EXECUTE phase) for real-time protection",
         "date_added": "2026-01-30"
+      },
+      {
+        "type": "NEW_FEATURE",
+        "priority": "ACTIVE",
+        "message": "Stagnation scoring now available in GO and EXIT commands. Positions flagged as EXIT_CANDIDATE have failed to move as expected given time held and volatility. Consider freeing this capital for better opportunities.",
+        "date_added": "2026-02-05"
+      },
+      {
+        "type": "HYPOTHESIS_TRACKING",
+        "priority": "ACTIVE",
+        "message": "Stop-loss orders now placed at entry via Alpaca (H005). Monitor if this causes premature exits on thesis-valid positions. The alternative approach is evaluation-based stops at price checks only.",
+        "date_added": "2026-02-05"
       }
     ]
   }

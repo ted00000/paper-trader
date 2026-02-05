@@ -1023,93 +1023,106 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     def get_earnings_date(self, ticker):
         """
-        Get upcoming earnings date for a ticker using Polygon Benzinga earnings API
+        Get upcoming earnings date for a ticker using Finnhub earnings calendar API
 
         Returns: Dict with earnings info or None if unavailable
         {
             'date': '2026-02-03',
-            'time': 'after-hours' | 'before-open' | 'during-market',
+            'timing': 'after-hours' | 'before-open' | 'unknown',
             'days_until': 0,  # negative if already passed
             'is_today': True/False,
             'warning': '⚠️ EARNINGS TODAY after-hours' | None
         }
         """
         try:
-            # Get earnings for next 30 days (and past 7 days to catch recent reports)
+            # Get Finnhub API key from environment
+            finnhub_key = os.environ.get('FINNHUB_API_KEY')
+            if not finnhub_key:
+                return None
+
+            # Query Finnhub earnings calendar (past 7 days to future 30 days)
             today = datetime.now(ET).date()
             start_date = today - timedelta(days=7)
             end_date = today + timedelta(days=30)
 
-            url = 'https://api.polygon.io/v3/reference/earnings'
+            url = 'https://finnhub.io/api/v1/calendar/earnings'
             params = {
-                'ticker': ticker,
-                'date.gte': start_date.strftime('%Y-%m-%d'),
-                'date.lte': end_date.strftime('%Y-%m-%d'),
-                'apiKey': self.api_key
+                'symbol': ticker,
+                'from': start_date.strftime('%Y-%m-%d'),
+                'to': end_date.strftime('%Y-%m-%d'),
+                'token': finnhub_key
             }
 
             response = requests.get(url, params=params, timeout=10)
+
+            if response.status_code != 200:
+                return None
+
             data = response.json()
+            earnings_list = data.get('earningsCalendar', [])
 
-            if response.status_code == 200 and 'results' in data and data['results']:
-                # Find the closest upcoming earnings date
-                upcoming = None
-                for earning in data['results']:
-                    earning_date_str = earning.get('date', earning.get('report_date'))
-                    if not earning_date_str:
-                        continue
+            if not earnings_list:
+                return None
 
-                    earning_date = datetime.strptime(earning_date_str, '%Y-%m-%d').date()
+            # Find closest earnings date (future preferred, then recent past)
+            upcoming = None
+            for earning in earnings_list:
+                earning_date_str = earning.get('date')
+                if not earning_date_str:
+                    continue
 
-                    if upcoming is None or earning_date < upcoming['date']:
-                        # Determine timing (before open, after hours, during market)
-                        time_str = earning.get('time', earning.get('report_time', ''))
-                        if time_str:
-                            time_str = time_str.lower()
-                            if 'before' in time_str or 'bmo' in time_str or '0' <= time_str[:2] < '09':
-                                timing = 'before-open'
-                            elif 'after' in time_str or 'amc' in time_str or time_str[:2] >= '16':
-                                timing = 'after-hours'
-                            else:
-                                timing = 'during-market'
-                        else:
-                            timing = 'unknown'
+                earning_date = datetime.strptime(earning_date_str, '%Y-%m-%d').date()
 
-                        upcoming = {
-                            'date': earning_date,
-                            'timing': timing,
-                            'confirmed': earning.get('confirmed', False)
-                        }
+                # Determine timing from 'hour' field (bmo = before market open, amc = after market close)
+                hour = earning.get('hour', '').lower()
+                if hour == 'bmo':
+                    timing = 'before-open'
+                elif hour == 'amc':
+                    timing = 'after-hours'
+                else:
+                    timing = 'unknown'
 
-                if upcoming:
-                    days_until = (upcoming['date'] - today).days
-                    is_today = days_until == 0
-                    is_tomorrow = days_until == 1
+                # Prefer upcoming dates, but track recent past if no upcoming
+                days_diff = (earning_date - today).days
+                if upcoming is None:
+                    upcoming = {'date': earning_date, 'timing': timing, 'days_diff': days_diff}
+                elif days_diff >= 0 and (upcoming['days_diff'] < 0 or days_diff < upcoming['days_diff']):
+                    # Prefer future date closer to today
+                    upcoming = {'date': earning_date, 'timing': timing, 'days_diff': days_diff}
+                elif days_diff < 0 and upcoming['days_diff'] < 0 and days_diff > upcoming['days_diff']:
+                    # If both past, prefer more recent
+                    upcoming = {'date': earning_date, 'timing': timing, 'days_diff': days_diff}
 
-                    # Generate warning message
-                    warning = None
-                    if is_today:
-                        warning = f"⚠️ EARNINGS TODAY ({upcoming['timing']})"
-                    elif is_tomorrow:
-                        warning = f"⚠️ EARNINGS TOMORROW ({upcoming['timing']})"
-                    elif days_until <= 3 and days_until > 0:
-                        warning = f"⚡ Earnings in {days_until} days"
-                    elif days_until < 0 and days_until >= -3:
-                        warning = f"📊 Reported {abs(days_until)} days ago"
+            if upcoming:
+                days_until = upcoming['days_diff']
+                is_today = days_until == 0
+                is_tomorrow = days_until == 1
 
-                    return {
-                        'date': upcoming['date'].strftime('%Y-%m-%d'),
-                        'timing': upcoming['timing'],
-                        'days_until': days_until,
-                        'is_today': is_today,
-                        'confirmed': upcoming['confirmed'],
-                        'warning': warning
-                    }
+                # Generate warning message
+                warning = None
+                if is_today:
+                    warning = f"⚠️ EARNINGS TODAY ({upcoming['timing']})"
+                elif is_tomorrow:
+                    warning = f"⚠️ EARNINGS TOMORROW ({upcoming['timing']})"
+                elif days_until == 2:
+                    warning = f"⚡ Earnings in 2 days"
+                elif days_until == 3:
+                    warning = f"⚡ Earnings in 3 days"
+                elif days_until < 0 and days_until >= -3:
+                    warning = f"📊 Reported {abs(days_until)} days ago"
+
+                return {
+                    'date': upcoming['date'].strftime('%Y-%m-%d'),
+                    'timing': upcoming['timing'],
+                    'days_until': days_until,
+                    'is_today': is_today,
+                    'warning': warning
+                }
 
             return None
 
-        except Exception as e:
-            logger.debug(f"Earnings lookup failed for {ticker}: {e}")
+        except Exception:
+            # Silently fail - earnings data is supplementary
             return None
 
     def get_3month_return(self, ticker):
@@ -2611,15 +2624,13 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     def get_revenue_surprise_fmp(self, ticker):
         """
-        PHASE 2.2: Get revenue surprise using FMP free tier (250 calls/day)
+        PHASE 2.2: Get revenue surprise using Finnhub (replaces FMP which now requires premium)
 
-        Uses 2 API calls per stock:
-        1. /analyst-estimates - Get estimated revenue
-        2. /income-statement - Get actual revenue
+        Uses Finnhub /calendar/earnings endpoint which includes revenueActual and revenueEstimate.
 
         Returns: Dict with revenue surprise data
         """
-        if not self.fmp_key:
+        if not self.finnhub_key:
             return {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
 
         # Check cache first
@@ -2627,84 +2638,86 @@ Return ONLY valid JSON (no markdown, no explanation):
             return self.revenue_surprises_cache[ticker]
 
         try:
-            # Call 1: Get analyst revenue estimates (most recent quarter)
-            estimates_url = f"https://financialmodelingprep.com/api/v3/analyst-estimates/{ticker}"
-            estimates_params = {'apikey': self.fmp_key, 'limit': 1}
-            estimates_response = requests.get(estimates_url, params=estimates_params, timeout=30)
-            estimates_data = estimates_response.json()
+            # Use Finnhub calendar/earnings endpoint (includes revenue data)
+            today = datetime.now(ET).date()
+            start_date = today - timedelta(days=30)
 
-            if not isinstance(estimates_data, list) or not estimates_data:
-                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
-                self.revenue_surprises_cache[ticker] = result
-                return result
-
-            estimated_revenue = estimates_data[0].get('estimatedRevenueAvg', 0)
-            estimate_date = estimates_data[0].get('date', '')
-
-            if not estimated_revenue or estimated_revenue <= 0:
-                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
-                self.revenue_surprises_cache[ticker] = result
-                return result
-
-            # Call 2: Get actual revenue from income statement (most recent quarter)
-            actuals_url = f"https://financialmodelingprep.com/api/v3/income-statement/{ticker}"
-            actuals_params = {'apikey': self.fmp_key, 'period': 'quarter', 'limit': 1}
-            actuals_response = requests.get(actuals_url, params=actuals_params, timeout=30)
-            actuals_data = actuals_response.json()
-
-            if not isinstance(actuals_data, list) or not actuals_data:
-                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
-                self.revenue_surprises_cache[ticker] = result
-                return result
-
-            actual_revenue = actuals_data[0].get('revenue', 0)
-            actual_date = actuals_data[0].get('date', '')
-
-            if not actual_revenue or actual_revenue <= 0:
-                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
-                self.revenue_surprises_cache[ticker] = result
-                return result
-
-            # Calculate revenue surprise percentage
-            revenue_surprise_pct = ((actual_revenue - estimated_revenue) / estimated_revenue) * 100
-
-            # Check if beat is recent (last 30 days)
-            try:
-                actual_dt = datetime.strptime(actual_date, '%Y-%m-%d')
-                days_ago = (datetime.now(ET) - actual_dt).days
-            except Exception:
-                days_ago = 999  # Unknown date = too old
-
-            # Only count as catalyst if recent AND beat
-            has_revenue_beat = revenue_surprise_pct > 0 and days_ago <= 30
-
-            # Score: 0-50 points based on beat magnitude (scales with earnings beat)
-            if has_revenue_beat:
-                if revenue_surprise_pct >= 20:
-                    score = 50
-                elif revenue_surprise_pct >= 15:
-                    score = 40
-                elif revenue_surprise_pct >= 10:
-                    score = 30
-                else:
-                    score = 20
-            else:
-                score = 0
-
-            result = {
-                'has_revenue_beat': has_revenue_beat,
-                'revenue_surprise_pct': revenue_surprise_pct,
-                'actual_revenue': actual_revenue,
-                'estimated_revenue': estimated_revenue,
-                'days_ago': days_ago,
-                'score': score
+            url = 'https://finnhub.io/api/v1/calendar/earnings'
+            params = {
+                'symbol': ticker,
+                'from': start_date.strftime('%Y-%m-%d'),
+                'to': today.strftime('%Y-%m-%d'),
+                'token': self.finnhub_key
             }
 
+            response = requests.get(url, params=params, timeout=30)
+            data = response.json()
+            earnings = data.get('earningsCalendar', [])
+
+            if not earnings:
+                result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
+                self.revenue_surprises_cache[ticker] = result
+                return result
+
+            # Look at most recent earnings with revenue data
+            for earning in earnings:
+                date_str = earning.get('date', '')
+                actual_revenue = earning.get('revenueActual')
+                estimated_revenue = earning.get('revenueEstimate')
+
+                if not date_str or actual_revenue is None or estimated_revenue is None:
+                    continue
+
+                if estimated_revenue <= 0:
+                    continue
+
+                try:
+                    earning_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    days_ago = (today - earning_date).days
+
+                    if days_ago > 30 or days_ago < 0:
+                        continue
+
+                    # Calculate revenue surprise percentage
+                    revenue_surprise_pct = ((actual_revenue - estimated_revenue) / estimated_revenue) * 100
+
+                    # Only count as catalyst if beat
+                    has_revenue_beat = revenue_surprise_pct > 0
+
+                    # Score: 0-50 points based on beat magnitude
+                    if has_revenue_beat:
+                        if revenue_surprise_pct >= 20:
+                            score = 50
+                        elif revenue_surprise_pct >= 15:
+                            score = 40
+                        elif revenue_surprise_pct >= 10:
+                            score = 30
+                        else:
+                            score = 20
+                    else:
+                        score = 0
+
+                    result = {
+                        'has_revenue_beat': has_revenue_beat,
+                        'revenue_surprise_pct': round(revenue_surprise_pct, 1),
+                        'actual_revenue': actual_revenue,
+                        'estimated_revenue': estimated_revenue,
+                        'days_ago': days_ago,
+                        'score': score
+                    }
+
+                    self.revenue_surprises_cache[ticker] = result
+                    return result
+
+                except Exception:
+                    continue
+
+            # No recent revenue data found
+            result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
             self.revenue_surprises_cache[ticker] = result
-            time.sleep(0.15)  # Rate limit: 250 calls/day = ~17/min safe
             return result
 
-        except Exception as e:
+        except Exception:
             result = {'has_revenue_beat': False, 'revenue_surprise_pct': 0, 'score': 0}
             self.revenue_surprises_cache[ticker] = result
             return result
@@ -3132,18 +3145,16 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     def get_price_target_changes(self, ticker):
         """
-        PHASE 1.1: Track analyst price target increases using Finnhub FREE tier
+        PHASE 1.1: Track analyst price target consensus using FMP API
 
-        Detects significant price target raises (often more impactful than rating upgrades)
+        v8.6 (Feb 4, 2026): Switched from Finnhub (403 premium) to FMP /stable/price-target-consensus
 
-        Uses: Finnhub /stock/price-target endpoint (FREE tier, 60 calls/min limit)
+        Detects significant analyst upside potential:
+        - >20% upside: Tier 2 catalyst (12 points)
+        - 10-20% upside: 8 points
+        - 5-10% upside: 5 points
 
-        Catalyst Scoring:
-        - >20% target increase: Tier 2 catalyst (12 points)
-        - 10-20% target increase: 8 points
-        - 5-10% target increase: 5 points
-
-        Example: Price target raised from $150 → $200 (+33%) drives strong buying pressure
+        Example: Current $150, Consensus target $200 → +33% upside = bullish signal
 
         Returns: Dict with price target data and catalyst classification
         """
@@ -3152,16 +3163,16 @@ Return ONLY valid JSON (no markdown, no explanation):
             return self.price_target_cache[ticker]
 
         try:
-            if not self.finnhub_key:
+            if not self.fmp_key:
                 result = {'has_target_increase': False, 'score': 0, 'catalyst_type': None}
                 self.price_target_cache[ticker] = result
                 return result
 
-            # Finnhub price target endpoint
-            url = f'https://finnhub.io/api/v1/stock/price-target'
+            # FMP price target consensus endpoint (v8.6 - switched from Finnhub 403)
+            url = f'https://financialmodelingprep.com/stable/price-target-consensus'
             params = {
                 'symbol': ticker,
-                'token': self.finnhub_key
+                'apikey': self.fmp_key
             }
 
             response = requests.get(url, params=params, timeout=10)
@@ -3174,26 +3185,18 @@ Return ONLY valid JSON (no markdown, no explanation):
 
             data = response.json()
 
-            # Extract price targets
+            # FMP returns list, get first item
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
+
+            # Extract price targets (FMP uses targetConsensus instead of targetMean)
             target_high = data.get('targetHigh')
             target_low = data.get('targetLow')
-            target_mean = data.get('targetMean')
+            target_consensus = data.get('targetConsensus')
             target_median = data.get('targetMedian')
-            last_updated = data.get('lastUpdated')
 
-            # Check if data exists and is recent (within 30 days)
-            if not target_mean or not last_updated:
-                result = {'has_target_increase': False, 'score': 0, 'catalyst_type': None}
-                self.price_target_cache[ticker] = result
-                time.sleep(0.1)  # Rate limit
-                return result
-
-            # Parse last updated date (Unix timestamp)
-            update_date = datetime.fromtimestamp(last_updated, tz=ET)
-            days_ago = (datetime.now(ET) - update_date).days
-
-            # Only consider recent price targets (within RECENCY_PRICE_TARGET days)
-            if days_ago > RECENCY_PRICE_TARGET:
+            # Check if data exists
+            if not target_consensus:
                 result = {'has_target_increase': False, 'score': 0, 'catalyst_type': None}
                 self.price_target_cache[ticker] = result
                 time.sleep(0.1)  # Rate limit
@@ -3209,7 +3212,7 @@ Return ONLY valid JSON (no markdown, no explanation):
                 return result
 
             # Calculate upside percentage
-            upside_pct = ((target_mean - current_price) / current_price) * 100
+            upside_pct = ((target_consensus - current_price) / current_price) * 100
 
             # Score based on magnitude of upside
             has_target_increase = False
@@ -3233,12 +3236,12 @@ Return ONLY valid JSON (no markdown, no explanation):
                 'has_target_increase': has_target_increase,
                 'score': score,
                 'catalyst_type': catalyst_type,
-                'target_mean': target_mean,
+                'target_consensus': target_consensus,
                 'target_high': target_high,
                 'target_low': target_low,
+                'target_median': target_median,
                 'current_price': current_price,
-                'upside_pct': round(upside_pct, 1),
-                'days_ago': days_ago
+                'upside_pct': round(upside_pct, 1)
             }
 
             self.price_target_cache[ticker] = result
@@ -3417,6 +3420,10 @@ Return ONLY valid JSON (no markdown, no explanation):
         time.sleep(0.05)  # Light rate limit for earnings API
         earnings_info = self.get_earnings_date(ticker)
 
+        # STEP 4: Get analyst price target consensus (v8.6 - FMP integration)
+        time.sleep(0.05)  # Light rate limit for price target API
+        price_target_info = self.get_price_target_changes(ticker)
+
         # Return basic data + news for Claude to analyze
         return {
             'ticker': ticker,
@@ -3427,6 +3434,7 @@ Return ONLY valid JSON (no markdown, no explanation):
             'relative_strength': rs_result,
             'catalyst_signals': news_result,  # Raw news, no keyword filtering
             'earnings_calendar': earnings_info,  # v8.5: Earnings date for risk awareness
+            'price_targets': price_target_info,  # v8.6: Analyst consensus for upside evaluation
             'passed_binary_gates': True
         }
 
