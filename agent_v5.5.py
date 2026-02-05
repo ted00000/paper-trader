@@ -4714,6 +4714,12 @@ CRITICAL: When executing 'go' command, you MUST include a properly formatted JSO
             auto_exits_section += "2. The trade outcome (win/loss and magnitude)\n"
             auto_exits_section += "3. Any lessons learned for future similar setups\n"
 
+        # v8.8 ANALYZE → GO CONTINUITY: Include previous ANALYZE recommendations for GO command
+        # This ensures Claude can see overnight recommendations and verify against premarket data
+        previous_analyze_section = ""
+        if command == 'go':
+            previous_analyze_section = self.load_previous_analyze_response()
+
         context_str = f"""
 PROJECT INSTRUCTIONS:
 {context.get('instructions', 'Not found')}
@@ -4731,7 +4737,7 @@ The following patterns have shown poor results. You may still use them if you ha
 but explain your reasoning and consider what makes this situation different from past failures.
 Your decisions will be tracked for accountability.
 {context.get('exclusions', 'None')}
-{auto_exits_section}
+{auto_exits_section}{previous_analyze_section}
 CURRENT PORTFOLIO:
 {context.get('portfolio', 'Not initialized')}
 
@@ -4740,7 +4746,84 @@ ACCOUNT STATUS:
 """
 
         return context_str
-    
+
+    def load_previous_analyze_response(self):
+        """
+        Load the most recent ANALYZE command response for GO context continuity.
+
+        v8.8 ANALYZE → GO CONTINUITY:
+        The previous day's ANALYZE output contains recommendations that Claude made
+        after reviewing end-of-day data (price action, news, portfolio status).
+
+        By including this in GO context, Claude can:
+        1. See what recommendations were made overnight
+        2. Verify those recommendations against current premarket data
+        3. Act on or adjust recommendations based on new information
+
+        Returns formatted string with recommendations, or empty string if none found.
+        """
+        reviews_dir = self.project_dir / 'daily_reviews'
+        if not reviews_dir.exists():
+            return ""
+
+        # Find most recent analyze_*.json file
+        analyze_files = sorted(reviews_dir.glob('analyze_*.json'), reverse=True)
+
+        if not analyze_files:
+            return ""
+
+        # Get the most recent file
+        latest_file = analyze_files[0]
+
+        # Only include if it's from yesterday or today (within last 24 hours)
+        file_mtime = datetime.fromtimestamp(latest_file.stat().st_mtime)
+        hours_old = (datetime.now() - file_mtime).total_seconds() / 3600
+
+        if hours_old > 24:
+            return ""  # Too old, skip
+
+        try:
+            with open(latest_file, 'r') as f:
+                response = json.load(f)
+
+            # Extract the text content from Claude's response
+            content_blocks = response.get('content', [])
+            if not content_blocks:
+                return ""
+
+            response_text = content_blocks[0].get('text', '') if content_blocks else ''
+
+            if not response_text:
+                return ""
+
+            # Format for GO context
+            file_date = latest_file.stem.split('_')[1]  # analyze_YYYYMMDD_HHMMSS
+            formatted_date = f"{file_date[:4]}-{file_date[4:6]}-{file_date[6:8]}"
+
+            return f"""
+============================================================
+PREVIOUS ANALYZE RECOMMENDATIONS (from {formatted_date})
+============================================================
+⚠️ IMPORTANT: These are yesterday's recommendations. VERIFY against current
+premarket data before acting. Market conditions may have changed overnight.
+
+New Information Available Now:
+- Premarket prices (gap analysis)
+- Overnight news/developments
+- Pre-market volume patterns
+- Updated technical levels
+
+PREVIOUS ANALYSIS:
+{response_text[:6000]}
+
+ACTION REQUIRED: Review these recommendations against current premarket data.
+If conditions have changed, adjust recommendations accordingly and explain why.
+============================================================
+"""
+        except Exception as e:
+            print(f"   ⚠️ Warning: Could not load previous ANALYZE: {e}")
+            return ""
+
     def load_catalyst_exclusions(self):
         """Load list of catalysts to avoid based on learning"""
 
@@ -8188,7 +8271,7 @@ CURRENT PORTFOLIO
         print(f"\n📋 Found {len(stocks)} stock(s) skipped at 9:45 AM for gap re-evaluation:\n")
 
         # Load current portfolio
-        portfolio = self.load_portfolio()
+        portfolio = self.load_current_portfolio()
         current_account_value = portfolio.get('account_value', 10000)
         cash_available = portfolio.get('cash_available', current_account_value)
         positions = portfolio.get('positions', [])
@@ -8511,6 +8594,7 @@ CURRENT PORTFOLIO
         print("3. Checking automated exit rules...")
         auto_exits = []
         positions_for_claude_review = []
+        trailing_stops_active = []  # v8.7: Track trailing stops for dashboard visibility
 
         for position in positions:
             ticker = position['ticker']
@@ -8539,7 +8623,18 @@ CURRENT PORTFOLIO
                     'return_pct': return_pct,
                     'current_price': current_price
                 })
-                print(f"   ✓ {ticker}: HOLD - {exit_reason} ({return_pct:+.1f}%)")
+                # v8.7: Track trailing stops for dashboard visibility
+                if position.get('trailing_stop_active') or 'trailing' in exit_reason.lower():
+                    trailing_stops_active.append({
+                        'ticker': ticker,
+                        'return_pct': return_pct,
+                        'peak_return_pct': position.get('peak_return_pct', return_pct),
+                        'trailing_stop_price': position.get('trailing_stop_price'),
+                        'alpaca_order_id': position.get('alpaca_trailing_order_id')
+                    })
+                    print(f"   🎯 {ticker}: HOLD - {exit_reason} ({return_pct:+.1f}%) [TRAILING STOP ACTIVE]")
+                else:
+                    print(f"   ✓ {ticker}: HOLD - {exit_reason} ({return_pct:+.1f}%)")
 
         print()
 
@@ -8804,6 +8899,8 @@ CURRENT PORTFOLIO
             "positions_reviewed": len(positions) + len(all_closed),
             "positions_exited": len(all_closed),
             "positions_held": len(positions),
+            "trailing_stops_active": len(trailing_stops_active),  # v8.7: Trailing stop visibility
+            "trailing_stops": trailing_stops_active,  # v8.7: Details for dashboard
             "closed_trades": [
                 {
                     "ticker": t['ticker'],
@@ -8821,6 +8918,10 @@ CURRENT PORTFOLIO
         print(f"{'='*60}")
         print(f"   Positions exited: {len(all_closed)}")
         print(f"   Positions held:   {len(positions)}")
+        if trailing_stops_active:
+            print(f"   🎯 Trailing stops: {len(trailing_stops_active)}")
+            for ts in trailing_stops_active:
+                print(f"      - {ts['ticker']}: +{ts['return_pct']:.1f}% (peak +{ts['peak_return_pct']:.1f}%)")
         if not claude_used:
             print(f"   ⚠️ FAILSAFE MODE: Auto rules only (Claude timeout)")
         print()

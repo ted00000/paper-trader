@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v8.6 (Analyst Price Targets) - Live paper trading with real brokerage API execution
+**Current Version**: v8.8 (ANALYZE → GO Continuity) - Live paper trading with real brokerage API execution
 
 ---
 
@@ -66,6 +66,9 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │    - Catalyst performance stats by type                        │
 │    - Actionable insights from past trades                      │
 │  • Catalyst exclusions (<40% win rate triggers warnings)       │
+│  • Previous ANALYZE recommendations (v8.8):                    │
+│    - Overnight exit/hold recommendations from yesterday        │
+│    - Must verify against premarket data before acting          │
 │  • Current portfolio positions                                  │
 │  • Account status                                               │
 │                                                                  │
@@ -127,7 +130,8 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 │  • Creates daily activity summary                               │
 │  • Calls Claude for performance analysis                        │
 │  • Updates learning database                                    │
-│  OUTPUT: Daily summary, learning insights                       │
+│  • Recommendations saved for next GO command (v8.8)            │
+│  OUTPUT: Daily summary, learning insights, exit recommendations │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -874,10 +878,37 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 ---
 
 **Last Updated**: February 4, 2026
-**Version**: v8.6 (Analyst Price Targets)
+**Version**: v8.8 (ANALYZE → GO Continuity)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Update (v8.6 - Feb 4, 2026)**:
+**Latest Update (v8.8 - Feb 4, 2026)**:
+- **ANALYZE → GO Continuity**: Overnight recommendations now visible to morning GO command
+  - **Problem Solved**: ANALYZE makes recommendations (e.g., "EXIT WS at market open") but GO couldn't see them
+  - GO command now loads most recent ANALYZE output (within 24 hours)
+  - Claude sees overnight recommendations with clear framing: "VERIFY against premarket data"
+  - New information available at GO time:
+    - Premarket prices and gap analysis
+    - Overnight news developments
+    - Pre-market volume patterns
+    - Updated technical levels
+  - Claude must verify recommendations against current data before acting
+  - **Rationale**: Closes the loop between end-of-day analysis and morning execution
+
+**Previous Update (v8.7 - Feb 4, 2026)**:
+- **Trailing Stop Visibility in EXIT**: Dashboard and logs now show active trailing stops
+  - **Problem Solved**: WS at +12% wasn't sold, but no visibility into why (trailing stop was active)
+  - EXIT command now tracks and displays trailing stops:
+    - Console output: "🎯 TICKER: HOLD - Trailing stop (+X.X%) [TRAILING STOP ACTIVE]"
+    - JSON output: `trailing_stops_active` count and `trailing_stops` array with details
+  - Details captured per trailing stop:
+    - Current return percentage
+    - Peak return percentage
+    - Trailing stop price
+    - Alpaca order ID
+  - ANALYZE command already acknowledges trailing stops (existing behavior)
+  - **Rationale**: Transparency into why profitable positions aren't being sold
+
+**Previous Update (v8.6 - Feb 4, 2026)**:
 - **Analyst Price Target Integration**: Claude now sees Wall Street consensus targets
   - **Data Source**: FMP `/stable/price-target-consensus` API (switched from Finnhub which is 403 premium)
   - **Display in GO Command**: "🎯 Analyst Target: $265 (+47% upside) 🔥" for significant upside
