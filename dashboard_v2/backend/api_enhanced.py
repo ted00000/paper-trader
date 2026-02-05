@@ -504,11 +504,29 @@ def get_equity_curve():
             'peak': round(peak, 2)
         })
 
+    # v8.9: Add current account value as final point (includes unrealized P&L)
+    account = load_account()
+    current_value = account.get('account_value', cumulative)
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    # Only add today's point if it's different from the last trade date
+    if not equity_points or equity_points[-1]['date'] != today:
+        if current_value > peak:
+            peak = current_value
+        drawdown_pct = ((peak - current_value) / peak) * 100 if peak > 0 else 0
+
+        equity_points.append({
+            'date': today,
+            'value': round(current_value, 2),
+            'drawdown_pct': round(drawdown_pct, 2),
+            'peak': round(peak, 2)
+        })
+
     return jsonify({
         'equity_curve': equity_points,
         'starting_value': STARTING_CAPITAL,
-        'current_value': round(cumulative, 2),
-        'total_return_pct': round(((cumulative - STARTING_CAPITAL) / STARTING_CAPITAL) * 100, 2)
+        'current_value': round(current_value, 2),
+        'total_return_pct': round(((current_value - STARTING_CAPITAL) / STARTING_CAPITAL) * 100, 2)
     })
 
 @app.route('/api/v2/catalyst-performance', methods=['GET'])
