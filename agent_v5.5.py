@@ -2613,7 +2613,7 @@ Stagnation = position hasn't moved as expected given time held and volatility.
             }
 
         # G. Contract Win / M&A
-        elif catalyst_type in ['Contract_Win', 'M&A', 'Merger']:
+        elif catalyst_type in ['Contract_Win', 'M&A', 'M&A_Target', 'Merger']:
             return {
                 'tier': 'Tier1',
                 'tier_name': 'High Conviction - Contract/M&A',
@@ -2621,6 +2621,26 @@ Stagnation = position hasn't moved as expected given time held and volatility.
                 'position_size_pct': 10.0,
                 'expected_hold_days': '2-5 days',
                 'target_pct': 11.0
+            }
+
+        # H. Screener Validated catalysts (from hybrid screener)
+        elif 'Tier 1' in catalyst_type or 'Tier1' in catalyst_type:
+            return {
+                'tier': 'Tier1',
+                'tier_name': 'High Conviction - Screener Validated Tier 1',
+                'reasoning': f'Pre-validated by screener: {catalyst_type}',
+                'position_size_pct': 10.0,
+                'expected_hold_days': '3-5 days',
+                'target_pct': 10.0
+            }
+        elif 'Tier 2' in catalyst_type or 'Tier2' in catalyst_type:
+            return {
+                'tier': 'Tier2',
+                'tier_name': 'Medium Conviction - Screener Validated Tier 2',
+                'reasoning': f'Pre-validated by screener: {catalyst_type}',
+                'position_size_pct': 8.0,
+                'expected_hold_days': '2-4 days',
+                'target_pct': 8.0
             }
 
         # TIER 3: AUTO-EXCLUDE CATALYSTS
