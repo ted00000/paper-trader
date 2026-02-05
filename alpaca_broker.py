@@ -241,6 +241,66 @@ class AlpacaBroker:
         return self.api.cancel_all_orders()
 
     # =====================================================================
+    # STOP-LOSS ORDERS (Real-time protection by Alpaca)
+    # =====================================================================
+
+    def place_stop_loss_order(self, ticker: str, qty: int, stop_price: float) -> Tuple[bool, str, Optional[str]]:
+        """
+        Place stop-loss sell order - Alpaca monitors and executes in real-time
+
+        When the position's price drops to or below stop_price, Alpaca
+        automatically executes a market sell order.
+
+        Args:
+            ticker: Stock symbol (e.g., 'AAPL')
+            qty: Number of shares to sell
+            stop_price: Price at which to trigger the sell
+
+        Returns:
+            Tuple of (success: bool, message: str, order_id: str or None)
+        """
+        if qty <= 0:
+            return False, f"Invalid quantity: {qty}. Must be > 0", None
+
+        if stop_price <= 0:
+            return False, f"Invalid stop_price: {stop_price}. Must be > 0", None
+
+        try:
+            order = self.api.submit_order(
+                symbol=ticker,
+                qty=qty,
+                side='sell',
+                type='stop',
+                stop_price=stop_price,
+                time_in_force='gtc'  # Good til canceled - persists overnight
+            )
+
+            return True, f"Stop-loss order placed at ${stop_price:.2f}", order.id
+
+        except Exception as e:
+            return False, f"Failed to place stop-loss: {str(e)}", None
+
+    def has_stop_loss_order(self, ticker: str) -> Tuple[bool, Optional[str], Optional[float]]:
+        """
+        Check if ticker has an active stop-loss order
+
+        Returns:
+            Tuple of (has_order: bool, order_id: str or None, stop_price: float or None)
+        """
+        try:
+            orders = self.api.list_orders(status='open', symbols=[ticker])
+
+            for order in orders:
+                if order.type == 'stop' and order.side == 'sell':
+                    return True, order.id, float(order.stop_price)
+
+            return False, None, None
+
+        except Exception as e:
+            print(f"   ⚠️ Error checking stop-loss orders for {ticker}: {e}")
+            return False, None, None
+
+    # =====================================================================
     # TRAILING STOP ORDERS (Real-time execution by Alpaca)
     # =====================================================================
 

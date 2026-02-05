@@ -292,6 +292,14 @@ except ImportError:
     print("⚠️  AlpacaBroker not available - using JSON file portfolio tracking")
     ALPACA_AVAILABLE = False
 
+# Stagnation Scorer (v8.8 - Dead Capital Detection)
+try:
+    from stagnation_scorer import StagnationScorer, StagnationState, StagnationAction
+    STAGNATION_AVAILABLE = True
+except ImportError:
+    print("⚠️  StagnationScorer not available - stagnation analysis disabled")
+    STAGNATION_AVAILABLE = False
+
 # Configuration
 ET = pytz.timezone('America/New_York')  # Eastern Time for trading operations
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
@@ -587,13 +595,61 @@ class TradingAgent:
                     "last_updated": ""
                 }, f, indent=2)
 
+    def _calculate_position_stagnation(self, position_data):
+        """
+        Calculate stagnation score for a position (v8.8 - Dead Capital Detection)
+
+        Args:
+            position_data: Dict with entry_price, current_price, days_held, and optionally atr
+
+        Returns:
+            StagnationResult or None if stagnation module unavailable
+        """
+        if not STAGNATION_AVAILABLE:
+            return None
+
+        try:
+            entry_price = position_data.get('entry_price', 0)
+            current_price = position_data.get('premarket_price') or position_data.get('current_price', entry_price)
+            days_held = position_data.get('days_held', 0)
+
+            # Use stored ATR or calculate proxy (3% of entry price)
+            atr = position_data.get('atr', entry_price * 0.03)
+
+            scorer = StagnationScorer()
+            result = scorer.score(
+                entry_price=entry_price,
+                current_price=current_price,
+                entry_date=datetime.now() - timedelta(days=days_held),
+                atr=atr,
+                days_held=days_held,
+            )
+            return result
+        except Exception as e:
+            print(f"   ⚠️ Stagnation calculation error: {e}")
+            return None
+
     def _format_portfolio_review(self, premarket_data):
         """Format premarket data for Claude's portfolio review"""
         lines = []
+        stagnation_alerts = []  # Track positions needing attention
+
         for i, (ticker, data) in enumerate(premarket_data.items(), 1):
             # Check if using fallback price
             price_source = data.get('price_source', 'live')
             price_note = " ⚠️ (using yesterday's close - live data unavailable)" if price_source != 'live' else ""
+
+            # Calculate stagnation score (v8.8)
+            stagnation_result = self._calculate_position_stagnation(data)
+            stagnation_line = ""
+            if stagnation_result:
+                score = stagnation_result.stagnation_score
+                state = stagnation_result.state.value
+                if stagnation_result.state == StagnationState.EXIT_CANDIDATE:
+                    stagnation_line = f"\n  ⚠️ STAGNATION ALERT: Score {score:.2f} ({state}) - consider exiting to free capital"
+                    stagnation_alerts.append((ticker, stagnation_result))
+                elif stagnation_result.state == StagnationState.WATCH:
+                    stagnation_line = f"\n  📊 Stagnation: Score {score:.2f} ({state}) - underperforming expected move"
 
             lines.append(f"""
 POSITION {i}: {ticker}
@@ -605,8 +661,19 @@ POSITION {i}: {ticker}
   Stop Loss: ${data['stop_loss']:.2f} (-7% trigger)
   Target: ${data['price_target']:.2f} (+10% target)
   Catalyst: {data['catalyst']}
-  Thesis: {data['thesis']}
+  Thesis: {data['thesis']}{stagnation_line}
 """)
+
+        # Add stagnation summary if any positions flagged
+        if stagnation_alerts:
+            lines.insert(0, f"""
+{'='*60}
+STAGNATION ALERT: {len(stagnation_alerts)} position(s) may be dead capital
+{'='*60}
+Consider exiting stagnant positions to free capital for better opportunities.
+Stagnation = position hasn't moved as expected given time held and volatility.
+""")
+
         return "\n".join(lines)
 
     def analyze_premarket_gap(self, ticker, current_price, previous_close):
@@ -5892,6 +5959,17 @@ CURRENT PORTFOLIO
                 if self.use_alpaca and self.broker:
                     shares = position.get('shares', 0)
                     if shares > 0:
+                        # v8.8: Cancel existing stop-loss order before placing trailing stop
+                        # (avoid having both stop-loss and trailing stop active)
+                        existing_sl_order_id = position.get('alpaca_stop_loss_order_id')
+                        if existing_sl_order_id:
+                            try:
+                                self.broker.cancel_order(existing_sl_order_id)
+                                print(f"      🔄 Canceled stop-loss order (upgrading to trailing stop)")
+                                position['alpaca_stop_loss_order_id'] = None
+                            except Exception as e:
+                                print(f"      ⚠️ Could not cancel stop-loss: {e}")
+
                         success, msg, order_id = self.broker.place_trailing_stop_order(
                             ticker=ticker,
                             qty=int(shares),
@@ -7990,6 +8068,23 @@ CURRENT PORTFOLIO
                         # Update shares if Alpaca returned actual quantity
                         if actual_shares > 0:
                             pos['shares'] = actual_shares
+
+                        # v8.8: Place stop-loss order via Alpaca for real-time protection (Bug #5 fix)
+                        stop_loss_price = pos.get('stop_loss', entry_price * 0.93)
+                        shares_for_stop = int(actual_shares) if actual_shares > 0 else int(pos['shares'])
+                        if shares_for_stop > 0:
+                            sl_success, sl_msg, sl_order_id = self.broker.place_stop_loss_order(
+                                ticker=ticker,
+                                qty=shares_for_stop,
+                                stop_price=stop_loss_price
+                            )
+                            if sl_success:
+                                pos['alpaca_stop_loss_order_id'] = sl_order_id
+                                print(f"      ✓ Alpaca: Stop-loss placed at ${stop_loss_price:.2f} (Order: {sl_order_id})")
+                            else:
+                                print(f"      ⚠️ Alpaca stop-loss failed: {sl_msg}")
+                                print(f"      → Using JSON stop-loss tracking as fallback")
+
                     elif "not available" not in alpaca_msg:
                         # Log Alpaca failures (but don't block the entry if Alpaca fails)
                         print(f"      ⚠️ Alpaca: {alpaca_msg}")
@@ -8003,12 +8098,14 @@ CURRENT PORTFOLIO
         else:
             print("   No new entries\n")
 
-        # Save updated portfolio
+        # Save updated portfolio with consistent schema (includes account_value and cash_available)
         print("\n6. Saving updated portfolio...")
         portfolio = {
             'positions': updated_positions,
             'total_positions': len(updated_positions),
-            'portfolio_value': sum(p.get('position_size', 100) for p in updated_positions),
+            'portfolio_value': sum(p.get('position_size', 0) for p in updated_positions),
+            'account_value': current_account_value,
+            'cash_available': cash_available,
             'last_updated': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
             'portfolio_status': f"Active - {len(updated_positions)} positions"
         }
@@ -8049,6 +8146,20 @@ CURRENT PORTFOLIO
                     print(f"   ⚠️ {ticker}: Skipping - position was exited")
                     continue
 
+                # v8.8: Cancel existing stop-loss order before placing trailing stop
+                # (avoid having both stop-loss and trailing stop active)
+                for pos in updated_positions:
+                    if pos['ticker'] == ticker:
+                        existing_sl_order_id = pos.get('alpaca_stop_loss_order_id')
+                        if existing_sl_order_id:
+                            try:
+                                self.broker.cancel_order(existing_sl_order_id)
+                                print(f"   🔄 {ticker}: Canceled stop-loss order (upgrading to trailing stop)")
+                                pos['alpaca_stop_loss_order_id'] = None
+                            except Exception as e:
+                                print(f"   ⚠️ {ticker}: Could not cancel stop-loss: {e}")
+                        break
+
                 # Place the trailing stop order with Alpaca
                 success, msg, order_id = self.broker.place_trailing_stop_order(
                     ticker=ticker,
@@ -8071,13 +8182,16 @@ CURRENT PORTFOLIO
 
             print(f"   ✓ {trailing_stops_placed}/{len(trailing_stop_orders)} trailing stops placed")
 
-            # Re-save portfolio with trailing stop updates
+            # Re-save portfolio with trailing stop updates (use consistent schema)
             if trailing_stops_placed > 0:
                 updated_portfolio = {
-                    'account_value': portfolio_value,
-                    'cash_available': cash_available,
                     'positions': updated_positions,
-                    'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    'total_positions': len(updated_positions),
+                    'portfolio_value': sum(p.get('position_size', 0) for p in updated_positions),
+                    'account_value': current_account_value,
+                    'cash_available': cash_available,
+                    'last_updated': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
+                    'portfolio_status': f"Active - {len(updated_positions)} positions"
                 }
                 with open(self.portfolio_file, 'w') as f:
                     json.dump(updated_portfolio, f, indent=2)
@@ -8324,9 +8438,29 @@ CURRENT PORTFOLIO
 
         # Load current portfolio
         portfolio = self.load_current_portfolio()
-        current_account_value = portfolio.get('account_value', 10000)
-        cash_available = portfolio.get('cash_available', current_account_value)
         positions = portfolio.get('positions', [])
+
+        # Calculate current account value for position sizing (COMPOUND GROWTH)
+        # Must match EXECUTE logic to ensure consistent sizing
+        STARTING_CAPITAL = 10000.00
+        portfolio_value = sum(p.get('position_size', 0) for p in positions)
+
+        # Calculate realized P&L from completed trades
+        realized_pl = 0.00
+        if self.trades_csv.exists():
+            with open(self.trades_csv, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('Trade_ID'):
+                        realized_pl += float(row.get('Return_Dollars', 0))
+
+        # Current account value = starting capital + all profits/losses
+        current_account_value = STARTING_CAPITAL + realized_pl
+
+        # Cash available = account value - currently invested positions
+        cash_available = current_account_value - portfolio_value
+
+        print(f"   Account Value: ${current_account_value:.2f} (Cash: ${cash_available:.2f}, Invested: ${portfolio_value:.2f})")
 
         entered_count = 0
         still_skipped = []
@@ -8447,6 +8581,39 @@ CURRENT PORTFOLIO
                 else:
                     new_position['profit_target'] = round(current_price * 1.05, 2)
 
+                # Execute the actual Alpaca buy order (Bug #6 fix - RECHECK must place real orders)
+                alpaca_success = False
+                if self.use_alpaca and self.broker:
+                    alpaca_success, alpaca_msg, order_id, actual_shares = self._execute_alpaca_buy(
+                        ticker,
+                        position_size_dollars,
+                        current_price
+                    )
+                    if alpaca_success:
+                        print(f"      ✓ Alpaca: {alpaca_msg} (Order: {order_id})")
+                        # Update shares if Alpaca returned actual quantity
+                        if actual_shares > 0:
+                            new_position['shares'] = actual_shares
+                        new_position['alpaca_order_id'] = order_id
+
+                        # v8.8: Place stop-loss order via Alpaca for real-time protection (Bug #5 fix)
+                        stop_loss_price = new_position.get('stop_loss', current_price * 0.95)
+                        shares_for_stop = int(actual_shares) if actual_shares > 0 else int(new_position['shares'])
+                        if shares_for_stop > 0:
+                            sl_success, sl_msg, sl_order_id = self.broker.place_stop_loss_order(
+                                ticker=ticker,
+                                qty=shares_for_stop,
+                                stop_price=stop_loss_price
+                            )
+                            if sl_success:
+                                new_position['alpaca_stop_loss_order_id'] = sl_order_id
+                                print(f"      ✓ Alpaca: Stop-loss placed at ${stop_loss_price:.2f} (Order: {sl_order_id})")
+                            else:
+                                print(f"      ⚠️ Alpaca stop-loss failed: {sl_msg}")
+                    else:
+                        print(f"      ⚠️ Alpaca: {alpaca_msg}")
+                        print(f"      → Continuing with JSON portfolio tracking")
+
                 positions.append(new_position)
                 cash_available -= position_size_dollars
                 entered_count += 1
@@ -8513,6 +8680,12 @@ CURRENT PORTFOLIO
         }
         self.save_response("recheck", recheck_summary)
         print(f"\n   ✓ Recheck summary saved for dashboard")
+
+        # Bug #7 fix: Update daily activity summary so RECHECK entries show on Today page
+        if entered_count > 0:
+            print(f"\n   Updating daily activity summary...")
+            self.create_daily_activity_summary([])  # No closed trades, just new entries
+            print(f"   ✓ Daily activity updated with {entered_count} new entries")
 
         return True
 
@@ -8724,15 +8897,39 @@ CURRENT PORTFOLIO
             position_summary += f"  - {pos['ticker']}: {ae['exit_reason']} ({ae['return_pct']:+.1f}%)\n"
 
         position_summary += f"\nPositions to review: {len(positions_for_claude_review)}\n"
+
+        # v8.8: Calculate stagnation for all positions and build alert list
+        stagnation_alerts = []
         for pr in positions_for_claude_review:
             pos = pr['position']
             ticker = pos['ticker']
+
+            # Calculate stagnation score
+            stagnation_result = self._calculate_position_stagnation({
+                'entry_price': pos['entry_price'],
+                'current_price': pr['current_price'],
+                'days_held': pos.get('days_held', 0),
+                'atr': pos.get('atr', pos['entry_price'] * 0.03)
+            })
+
             position_summary += f"\n### {ticker}\n"
             position_summary += f"  Price: ${pr['current_price']:.2f} ({pr['return_pct']:+.1f}%)\n"
             position_summary += f"  Entry: ${pos['entry_price']:.2f} on {pos['entry_date']}\n"
             position_summary += f"  Days held: {pos.get('days_held', 0)}\n"
             position_summary += f"  Original Catalyst: {pos.get('catalyst_type', 'Unknown')}\n"
             position_summary += f"  Thesis: {pos.get('thesis', 'N/A')}\n"
+
+            # Add stagnation info for EXIT context (v8.8)
+            if stagnation_result:
+                score = stagnation_result.stagnation_score
+                state = stagnation_result.state.value
+                exp = stagnation_result.explain
+                if stagnation_result.state == StagnationState.EXIT_CANDIDATE:
+                    position_summary += f"  ⚠️ STAGNATION: Score {score:.2f} ({state}) - DEAD CAPITAL candidate\n"
+                    position_summary += f"     Only {exp['abs_return_pct']:.1f}% move in {exp['days_in_trade']:.0f} days (expected ${exp['expected_move']:.2f} based on ATR)\n"
+                    stagnation_alerts.append((ticker, stagnation_result))
+                elif stagnation_result.state == StagnationState.WATCH:
+                    position_summary += f"  📊 Stagnation: Score {score:.2f} ({state}) - underperforming\n"
 
             # Add news for this position
             articles = position_news.get(ticker, [])
@@ -8753,6 +8950,18 @@ CURRENT PORTFOLIO
                     position_summary += f"      ({age_hours:.0f}h ago, sentiment: {sentiment})\n"
             else:
                 position_summary += f"  Recent News: None found\n"
+
+        # v8.8: Add stagnation summary if any positions are flagged
+        if stagnation_alerts:
+            stagnation_summary = f"\n{'='*50}\n"
+            stagnation_summary += f"⚠️ STAGNATION ALERT: {len(stagnation_alerts)} position(s) flagged as DEAD CAPITAL\n"
+            stagnation_summary += f"{'='*50}\n"
+            stagnation_summary += "These positions have failed to move as expected given time held and volatility.\n"
+            stagnation_summary += "Consider exiting to free capital for better opportunities:\n"
+            for ticker, result in stagnation_alerts:
+                exp = result.explain
+                stagnation_summary += f"  - {ticker}: Score {result.stagnation_score:.2f}, only {exp['abs_return_pct']:.1f}% in {exp['days_in_trade']:.0f} days\n"
+            position_summary = stagnation_summary + position_summary
 
         exit_context += position_summary
 
