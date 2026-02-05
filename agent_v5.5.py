@@ -2623,6 +2623,17 @@ Stagnation = position hasn't moved as expected given time held and volatility.
                 'target_pct': 11.0
             }
 
+        # G2. Policy Change (tariffs, regulations, government action)
+        elif catalyst_type in ['Policy_Change', 'Tariff', 'Regulation']:
+            return {
+                'tier': 'Tier2',
+                'tier_name': 'Medium Conviction - Policy Change',
+                'reasoning': 'Government policy/tariff/regulation change - thesis-dependent',
+                'position_size_pct': 8.0,
+                'expected_hold_days': '3-7 days',
+                'target_pct': 9.0
+            }
+
         # H. Screener Validated catalysts (from hybrid screener)
         elif 'Tier 1' in catalyst_type or 'Tier1' in catalyst_type:
             return {
