@@ -1324,7 +1324,7 @@ Stagnation = position hasn't moved as expected given time held and volatility.
 
     def _execute_alpaca_sell(self, ticker, shares, reason):
         """
-        Execute sell order via Alpaca (v7.2 - Stage 3)
+        Execute sell order via Alpaca (v8.9 - Returns actual fill price)
 
         Args:
             ticker: Stock symbol
@@ -1332,38 +1332,57 @@ Stagnation = position hasn't moved as expected given time held and volatility.
             reason: Exit reason for logging
 
         Returns:
-            Tuple of (success: bool, message: str, order_id: str or None)
+            Tuple of (success: bool, message: str, order_id: str or None, fill_price: float or None)
         """
         if not self.use_alpaca or not self.broker:
-            return False, "Alpaca not available - using JSON tracking", None
+            return False, "Alpaca not available - using JSON tracking", None, None
 
         try:
             # Safety check: Verify we actually have this position in Alpaca
             position = self.broker.get_position(ticker)
             if not position:
-                return False, f"No Alpaca position found for {ticker}", None
+                return False, f"No Alpaca position found for {ticker}", None, None
 
             # Calculate shares to sell (use all if shares > position qty)
             shares_to_sell = min(int(shares), int(float(position.qty)))
 
             if shares_to_sell <= 0:
-                return False, f"Invalid quantity: {shares_to_sell}", None
+                return False, f"Invalid quantity: {shares_to_sell}", None, None
 
             # Place market sell order
             print(f"      📤 Placing Alpaca SELL order: {shares_to_sell} shares of {ticker}")
             order = self.broker.place_market_order(ticker, shares_to_sell, side='sell')
 
-            print(f"      ✓ Alpaca order placed: {order.id} (status: {order.status})")
-            return True, f"Sold {shares_to_sell} shares via Alpaca", order.id
+            # v8.9: Get actual fill price from Alpaca (source of truth)
+            fill_price = None
+            if order.filled_avg_price:
+                fill_price = float(order.filled_avg_price)
+            else:
+                # Wait briefly and re-fetch order to get fill price
+                import time
+                time.sleep(0.5)
+                try:
+                    filled_order = self.broker.get_order(order.id)
+                    if filled_order and filled_order.filled_avg_price:
+                        fill_price = float(filled_order.filled_avg_price)
+                except:
+                    pass
+
+            if fill_price:
+                print(f"      ✓ Alpaca order filled: {order.id} @ ${fill_price:.2f}")
+            else:
+                print(f"      ✓ Alpaca order placed: {order.id} (status: {order.status})")
+
+            return True, f"Sold {shares_to_sell} shares via Alpaca", order.id, fill_price
 
         except Exception as e:
             error_msg = f"Alpaca sell failed: {str(e)}"
             print(f"      ⚠️ {error_msg}")
-            return False, error_msg, None
+            return False, error_msg, None, None
 
     def _execute_alpaca_buy(self, ticker, position_size_dollars, entry_price):
         """
-        Execute buy order via Alpaca (v7.2 - Stage 3)
+        Execute buy order via Alpaca (v8.9 - Returns actual fill price)
 
         Args:
             ticker: Stock symbol
@@ -1371,36 +1390,55 @@ Stagnation = position hasn't moved as expected given time held and volatility.
             entry_price: Expected entry price (for share calculation)
 
         Returns:
-            Tuple of (success: bool, message: str, order_id: str or None, actual_shares: int)
+            Tuple of (success: bool, message: str, order_id: str or None, actual_shares: int, fill_price: float or None)
         """
         if not self.use_alpaca or not self.broker:
-            return False, "Alpaca not available - using JSON tracking", None, 0
+            return False, "Alpaca not available - using JSON tracking", None, 0, None
 
         try:
             # Calculate shares from dollar amount
             shares = int(position_size_dollars / entry_price)
 
             if shares <= 0:
-                return False, f"Invalid quantity: {shares} (${position_size_dollars:.2f} / ${entry_price:.2f})", None, 0
+                return False, f"Invalid quantity: {shares} (${position_size_dollars:.2f} / ${entry_price:.2f})", None, 0, None
 
             # Safety check: Verify we have enough buying power
             account = self.broker.get_account()
             buying_power = float(account.buying_power)
 
             if position_size_dollars > buying_power:
-                return False, f"Insufficient buying power: ${buying_power:.2f} < ${position_size_dollars:.2f}", None, 0
+                return False, f"Insufficient buying power: ${buying_power:.2f} < ${position_size_dollars:.2f}", None, 0, None
 
             # Place market buy order
             print(f"      📤 Placing Alpaca BUY order: {shares} shares of {ticker} (~${position_size_dollars:.2f})")
             order = self.broker.place_market_order(ticker, shares, side='buy')
 
-            print(f"      ✓ Alpaca order placed: {order.id} (status: {order.status})")
-            return True, f"Bought {shares} shares via Alpaca", order.id, shares
+            # v8.9: Get actual fill price from Alpaca (source of truth)
+            fill_price = None
+            if order.filled_avg_price:
+                fill_price = float(order.filled_avg_price)
+            else:
+                # Wait briefly and re-fetch order to get fill price
+                import time
+                time.sleep(0.5)
+                try:
+                    filled_order = self.broker.get_order(order.id)
+                    if filled_order and filled_order.filled_avg_price:
+                        fill_price = float(filled_order.filled_avg_price)
+                except:
+                    pass
+
+            if fill_price:
+                print(f"      ✓ Alpaca order filled: {order.id} @ ${fill_price:.2f}")
+            else:
+                print(f"      ✓ Alpaca order placed: {order.id} (status: {order.status})")
+
+            return True, f"Bought {shares} shares via Alpaca", order.id, shares, fill_price
 
         except Exception as e:
             error_msg = f"Alpaca buy failed: {str(e)}"
             print(f"      ⚠️ {error_msg}")
-            return False, error_msg, None, 0
+            return False, error_msg, None, 0, None
 
     def _log_trade_to_csv(self, trade):
         """
@@ -4154,6 +4192,27 @@ Stagnation = position hasn't moved as expected given time held and volatility.
             output += f"   Technical: {tech['distance_from_52w_high_pct']:.1f}% from 52w high "
             output += f"(${tech['current_price']:.2f} vs ${tech['high_52w']:.2f})\n"
 
+            # v8.9: Show premarket price comparison (screener price vs current Alpaca premarket)
+            premarket_prices = screener_data.get('premarket_prices', {})
+            premarket_price = premarket_prices.get(ticker)
+            screener_price = tech.get('current_price', 0)
+            if premarket_price and screener_price and screener_price > 0:
+                price_change = premarket_price - screener_price
+                price_change_pct = (price_change / screener_price) * 100
+                if abs(price_change_pct) >= 0.5:  # Only show if meaningful change
+                    change_label = ""
+                    if price_change_pct >= 5:
+                        change_label = " ⚠️ LARGE GAP - Consider waiting"
+                    elif price_change_pct >= 2:
+                        change_label = " ⚡ Gapping up"
+                    elif price_change_pct <= -2:
+                        change_label = " 📉 Gapping down"
+                    output += f"   💰 Price Update: Screener ${screener_price:.2f} → Premarket ${premarket_price:.2f} ({'+' if price_change_pct > 0 else ''}{price_change_pct:.1f}%){change_label}\n"
+                else:
+                    output += f"   💰 Price Update: Screener ${screener_price:.2f} → Premarket ${premarket_price:.2f} (stable)\n"
+            elif screener_price:
+                output += f"   💰 Screener Price: ${screener_price:.2f} (no premarket data yet)\n"
+
             # Add full technical indicators for holistic decision making
             output += f"   📊 Technical Indicators:\n"
             output += f"      RSI(14): {tech.get('rsi', 'N/A')}"
@@ -4253,6 +4312,17 @@ Stagnation = position hasn't moved as expected given time held and volatility.
 
                 if screener_data and vacant_slots > 0:
                     print(f"   ✅ DEBUG: Building screener section...")
+
+                    # v8.9: Fetch premarket prices for candidates from Alpaca (real-time)
+                    candidates = screener_data.get('candidates', [])[:15]
+                    if candidates:
+                        candidate_tickers = [c['ticker'] for c in candidates]
+                        print(f"   📈 Fetching premarket prices for {len(candidate_tickers)} candidates via Alpaca...")
+                        premarket_candidate_prices = self.fetch_alpaca_realtime_prices(candidate_tickers)
+
+                        # Store premarket prices in screener_data for format_screener_candidates
+                        screener_data['premarket_prices'] = premarket_candidate_prices
+
                     screener_section = f"\n\n{'='*70}\nAVAILABLE OPPORTUNITIES FOR {vacant_slots} VACANT SLOTS:\n{'='*70}\n\n"
                     formatted_candidates = self.format_screener_candidates(screener_data)
                     print(f"   ✅ DEBUG: Formatted candidates length: {len(formatted_candidates) if formatted_candidates else 0}")
@@ -6390,8 +6460,8 @@ CURRENT PORTFOLIO
             if should_close:
                 print(f"   🚪 CLOSING: {ticker} - {exit_reason} ({return_pct:+.2f}%)")
 
-                # v7.2 Stage 3b: Execute sell order via Alpaca (if available)
-                alpaca_success, alpaca_msg, order_id = self._execute_alpaca_sell(
+                # v8.9: Execute sell order via Alpaca and get actual fill price
+                alpaca_success, alpaca_msg, order_id, fill_price = self._execute_alpaca_sell(
                     ticker,
                     position.get('shares', 0),
                     exit_reason
@@ -6403,8 +6473,11 @@ CURRENT PORTFOLIO
                     print(f"      ⚠️ Alpaca: {alpaca_msg}")
                     print(f"      → Continuing with JSON portfolio tracking")
 
+                # v8.9: Use Alpaca fill price as source of truth, fallback to quote price
+                exit_price = fill_price if fill_price else current_price
+
                 # Create trade record
-                trade_data = self.close_position(position, current_price, exit_reason)
+                trade_data = self.close_position(position, exit_price, exit_reason)
 
                 # Log to CSV
                 self.log_completed_trade(trade_data)
@@ -7846,8 +7919,8 @@ CURRENT PORTFOLIO
                         # Standardize the exit reason (converts Claude's freeform text to consistent format)
                         standardized_reason = self.standardize_exit_reason(position, exit_price, claude_reason)
 
-                        # v7.2 Stage 3: Execute sell order via Alpaca (if available)
-                        alpaca_success, alpaca_msg, order_id = self._execute_alpaca_sell(
+                        # v8.9: Execute sell order via Alpaca and get actual fill price
+                        alpaca_success, alpaca_msg, order_id, fill_price = self._execute_alpaca_sell(
                             ticker,
                             position.get('shares', 0),
                             standardized_reason
@@ -7859,7 +7932,10 @@ CURRENT PORTFOLIO
                             print(f"      ⚠️ Alpaca: {alpaca_msg}")
                             print(f"      → Continuing with JSON portfolio tracking")
 
-                        closed_trade = self._close_position(position, exit_price, standardized_reason)
+                        # v8.9: Use Alpaca fill price as source of truth, fallback to quote price
+                        actual_exit_price = fill_price if fill_price else exit_price
+
+                        closed_trade = self._close_position(position, actual_exit_price, standardized_reason)
                         closed_trades.append(closed_trade)
                         exited_tickers.add(ticker)  # Track this ticker was exited
                         print(f"   ✓ CLOSED {ticker}: {standardized_reason}")
@@ -8092,8 +8168,8 @@ CURRENT PORTFOLIO
                     # Update cash available for next position
                     cash_available -= position_size_dollars
 
-                    # v7.2 Stage 3: Execute buy order via Alpaca (if available)
-                    alpaca_success, alpaca_msg, order_id, actual_shares = self._execute_alpaca_buy(
+                    # v8.9: Execute buy order via Alpaca and get actual fill price
+                    alpaca_success, alpaca_msg, order_id, actual_shares, fill_price = self._execute_alpaca_buy(
                         ticker,
                         position_size_dollars,
                         entry_price
@@ -8104,8 +8180,17 @@ CURRENT PORTFOLIO
                         if actual_shares > 0:
                             pos['shares'] = actual_shares
 
+                        # v8.9: Use Alpaca fill price as source of truth
+                        if fill_price:
+                            pos['entry_price'] = fill_price
+                            # Recalculate stop and target based on actual fill price
+                            pos['stop_loss'] = round(fill_price * (1 + pos.get('stop_pct', -7.0)/100), 2)
+                            pos['price_target'] = round(fill_price * (1 + pos.get('target_pct', 10)/100), 2)
+                            print(f"      → Entry price updated to Alpaca fill: ${fill_price:.2f}")
+
                         # v8.8: Place stop-loss order via Alpaca for real-time protection (Bug #5 fix)
-                        stop_loss_price = pos.get('stop_loss', entry_price * 0.93)
+                        actual_entry = fill_price if fill_price else entry_price
+                        stop_loss_price = pos.get('stop_loss', actual_entry * 0.93)
                         shares_for_stop = int(actual_shares) if actual_shares > 0 else int(pos.get('shares', 0))
                         if shares_for_stop > 0:
                             sl_success, sl_msg, sl_order_id = self.broker.place_stop_loss_order(
@@ -8126,7 +8211,8 @@ CURRENT PORTFOLIO
                         print(f"      → Continuing with JSON portfolio tracking")
 
                     updated_positions.append(pos)
-                    print(f"   ✓ ENTERED {ticker}: ${entry_price:.2f}, {pos['shares']:.2f} shares (${position_size_dollars:.2f} = {position_size_pct}% of ${current_account_value:.2f})")
+                    actual_entry = pos['entry_price']  # v8.9: Use actual fill price
+                    print(f"   ✓ ENTERED {ticker}: ${actual_entry:.2f}, {pos['shares']:.2f} shares (${position_size_dollars:.2f} = {position_size_pct}% of ${current_account_value:.2f})")
                     print(f"      Target: +{dynamic_target_pct}% (${pos['price_target']:.2f}) - {target_rationale}")
                 else:
                     print(f"   ⚠️ {ticker}: Failed to fetch price")
@@ -8616,10 +8702,10 @@ CURRENT PORTFOLIO
                 else:
                     new_position['profit_target'] = round(current_price * 1.05, 2)
 
-                # Execute the actual Alpaca buy order (Bug #6 fix - RECHECK must place real orders)
+                # v8.9: Execute the actual Alpaca buy order and get fill price
                 alpaca_success = False
                 if self.use_alpaca and self.broker:
-                    alpaca_success, alpaca_msg, order_id, actual_shares = self._execute_alpaca_buy(
+                    alpaca_success, alpaca_msg, order_id, actual_shares, fill_price = self._execute_alpaca_buy(
                         ticker,
                         position_size_dollars,
                         current_price
@@ -8631,8 +8717,22 @@ CURRENT PORTFOLIO
                             new_position['shares'] = actual_shares
                         new_position['alpaca_order_id'] = order_id
 
+                        # v8.9: Use Alpaca fill price as source of truth
+                        if fill_price:
+                            new_position['entry_price'] = fill_price
+                            new_position['current_price'] = fill_price
+                            # Recalculate stop and target based on actual fill price
+                            new_position['stop_loss'] = round(fill_price * 0.95, 2)
+                            catalyst_tier = pos_data.get('catalyst_tier', 'Tier2')
+                            if catalyst_tier == 'Tier1':
+                                new_position['profit_target'] = round(fill_price * 1.08, 2)
+                            else:
+                                new_position['profit_target'] = round(fill_price * 1.05, 2)
+                            print(f"      → Entry price updated to Alpaca fill: ${fill_price:.2f}")
+
                         # v8.8: Place stop-loss order via Alpaca for real-time protection (Bug #5 fix)
-                        stop_loss_price = new_position.get('stop_loss', current_price * 0.95)
+                        actual_entry = fill_price if fill_price else current_price
+                        stop_loss_price = new_position.get('stop_loss', actual_entry * 0.95)
                         shares_for_stop = int(actual_shares) if actual_shares > 0 else int(new_position.get('shares', 0))
                         if shares_for_stop > 0:
                             sl_success, sl_msg, sl_order_id = self.broker.place_stop_loss_order(
@@ -8654,7 +8754,7 @@ CURRENT PORTFOLIO
                 entered_count += 1
                 entered_positions.append(new_position)  # Track for dashboard
 
-                print(f"      ✓ ENTERED: {new_position['shares']:.2f} shares @ ${current_price:.2f}")
+                print(f"      ✓ ENTERED: {new_position['shares']:.2f} shares @ ${new_position['entry_price']:.2f}")
                 print(f"        Stop: ${new_position['stop_loss']:.2f}, Target: ${new_position['profit_target']:.2f}")
             else:
                 print(f"      ✗ Gap NOT settled: still {current_gap:+.1f}% (need <2% or pullback)")
@@ -9161,8 +9261,8 @@ CURRENT PORTFOLIO
 
             print(f"   Selling {ticker}...")
 
-            # Execute via Alpaca
-            alpaca_success, alpaca_msg, order_id = self._execute_alpaca_sell(
+            # v8.9: Execute via Alpaca and get actual fill price
+            alpaca_success, alpaca_msg, order_id, fill_price = self._execute_alpaca_sell(
                 ticker,
                 position.get('shares', 0),
                 exit_reason
@@ -9173,8 +9273,11 @@ CURRENT PORTFOLIO
             elif "not available" not in alpaca_msg:
                 print(f"      ⚠️ Alpaca: {alpaca_msg}")
 
+            # v8.9: Use Alpaca fill price as source of truth, fallback to quote price
+            actual_exit_price = fill_price if fill_price else current_price
+
             # Create and log trade record
-            trade_data = self.close_position(position, current_price, exit_reason)
+            trade_data = self.close_position(position, actual_exit_price, exit_reason)
             self.log_completed_trade(trade_data)
             closed_trades.append(trade_data)
 
