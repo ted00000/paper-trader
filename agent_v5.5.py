@@ -9178,6 +9178,11 @@ CURRENT PORTFOLIO
         }
         self.save_response("exit", exit_summary)
 
+        # Update daily activity summary so Today page shows EXIT trades
+        if all_closed:
+            self.create_daily_activity_summary(all_closed)
+            print(f"   ✓ Daily activity updated with {len(all_closed)} closed trade(s)")
+
         # Summary
         print(f"\n{'='*60}")
         print("EXIT COMMAND COMPLETE")
