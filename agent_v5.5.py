@@ -9379,7 +9379,7 @@ CURRENT PORTFOLIO
             "closed_trades": [
                 {
                     "ticker": t['ticker'],
-                    "return_pct": t['return_pct'],
+                    "return_pct": t.get('return_percent', t.get('return_pct', 0)),
                     "exit_reason": t['exit_reason']
                 }
                 for t in all_closed
