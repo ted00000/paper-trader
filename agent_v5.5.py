@@ -8582,8 +8582,14 @@ CURRENT PORTFOLIO
         skipped_file = self.project_dir / 'skipped_for_gap.json'
         if not skipped_file.exists():
             print("\n✓ No skipped stocks file found.")
-            print("   This is normal - no stocks were skipped for gaps during EXECUTE.")
-            print("   RECHECK completed successfully (nothing to do).")
+            print("   (No stocks were skipped for gaps during EXECUTE)")
+            print(f"\n{'='*60}")
+            print(f"RECHECK SUMMARY")
+            print(f"{'='*60}")
+            print(f"   Stocks checked:  0")
+            print(f"   Entered:         0")
+            print(f"   Still skipped:   0")
+            self.save_response("recheck", "No stocks skipped for gaps - nothing to recheck")
             return True  # SUCCESS - nothing to recheck is a valid outcome
 
         with open(skipped_file) as f:
@@ -8592,13 +8598,26 @@ CURRENT PORTFOLIO
         today = datetime.now().strftime('%Y-%m-%d')
         if skipped_data.get('date') != today:
             print(f"\n✓ Skipped stocks file is from {skipped_data.get('date')}, not today ({today}).")
-            print("   This is normal - the file is stale from a previous day.")
-            print("   RECHECK completed successfully (nothing to do today).")
+            print("   (Stale file from previous day - ignoring)")
+            print(f"\n{'='*60}")
+            print(f"RECHECK SUMMARY")
+            print(f"{'='*60}")
+            print(f"   Stocks checked:  0")
+            print(f"   Entered:         0")
+            print(f"   Still skipped:   0")
+            self.save_response("recheck", f"Skipped file from {skipped_data.get('date')} - stale, nothing to recheck today")
             return True  # SUCCESS - nothing to recheck today is a valid outcome
 
         stocks = skipped_data.get('stocks', [])
         if not stocks:
-            print("\n✓ No stocks were skipped for gaps today.")
+            print("\n✓ Skipped stocks file exists but is empty.")
+            print(f"\n{'='*60}")
+            print(f"RECHECK SUMMARY")
+            print(f"{'='*60}")
+            print(f"   Stocks checked:  0")
+            print(f"   Entered:         0")
+            print(f"   Still skipped:   0")
+            self.save_response("recheck", "Skipped file empty - nothing to recheck")
             return True
 
         print(f"\n📋 Found {len(stocks)} stock(s) skipped at 9:45 AM for gap re-evaluation:\n")
