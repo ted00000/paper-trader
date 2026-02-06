@@ -8811,7 +8811,9 @@ CURRENT PORTFOLIO
         if entered_count > 0:
             portfolio['positions'] = positions
             portfolio['cash_available'] = cash_available
-            self.save_portfolio(portfolio)
+            portfolio['last_updated'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+            with open(self.portfolio_file, 'w') as f:
+                json.dump(portfolio, f, indent=2)
             print(f"\n✓ Portfolio updated with {entered_count} new position(s)")
 
         # Clear the skipped file (processed for today)
