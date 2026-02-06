@@ -4509,7 +4509,9 @@ CRITICAL OUTPUT REQUIREMENT - JSON at end:
 **CRITICAL:** A ticker can ONLY appear in ONE array (hold, exit, or buy). Never put the same ticker in multiple arrays.
 Do not include tickers you are PASSing on in the buy array - simply omit them.
 
-Provide full analysis of each position BEFORE the JSON. Justify all exits against the rules above."""
+Provide full analysis of each position BEFORE the JSON. Justify all exits against the rules above.
+
+⚠️ **MANDATORY**: Your response MUST end with a valid ```json code block. Without this JSON block, the system cannot execute your decisions. The JSON block is NOT optional - it is the only way your analysis gets acted upon."""
 
             else:
                 # INITIAL BUILD MODE - No existing positions
@@ -4612,7 +4614,9 @@ CRITICAL OUTPUT REQUIREMENT - JSON at end:
 ```
 
 DO NOT include entry_price, stop_loss, or price_target - system will calculate from real market prices.
-Every position must have position_size: 100.00 exactly."""
+Every position must have position_size: 100.00 exactly.
+
+⚠️ **MANDATORY**: Your response MUST end with a valid ```json code block. Without this JSON block, the system cannot execute your decisions. The JSON block is NOT optional - it is the only way your analysis gets acted upon."""
         elif command == 'analyze':
             # ANALYZE command - best-in-class prompt with structured output
             today_date = datetime.now().strftime('%A, %B %d, %Y')
@@ -8807,7 +8811,9 @@ CURRENT PORTFOLIO
         if entered_count > 0:
             portfolio['positions'] = positions
             portfolio['cash_available'] = cash_available
-            self.save_portfolio(portfolio)
+            portfolio['last_updated'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+            with open(self.portfolio_file, 'w') as f:
+                json.dump(portfolio, f, indent=2)
             print(f"\n✓ Portfolio updated with {entered_count} new position(s)")
 
         # Clear the skipped file (processed for today)

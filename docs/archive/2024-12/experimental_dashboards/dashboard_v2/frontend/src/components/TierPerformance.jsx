@@ -1,10 +1,15 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 
 const COLORS = {
-  'Tier 1': '#00f5ff',  // tedbot-accent
-  'Tier 2': '#10b981',  // profit green
-  'Tier 3': '#f59e0b',  // yellow
-  'Unknown': '#6b7280'  // gray
+  // API format (no space)
+  'Tier1': '#00ff41',   // neon green (matches site profit color)
+  'Tier2': '#00f5ff',   // tedbot cyan/blue accent
+  'Tier3': '#f59e0b',   // amber/yellow
+  // Legacy format (with space)
+  'Tier 1': '#00ff41',
+  'Tier 2': '#00f5ff',
+  'Tier 3': '#f59e0b',
+  'Unknown': '#6b7280'  // gray fallback
 }
 
 function TierPerformance({ tierData }) {
@@ -75,9 +80,9 @@ function TierPerformance({ tierData }) {
         <Pie
           data={chartData}
           cx="50%"
-          cy="40%"
-          innerRadius={60}
-          outerRadius={80}
+          cy="45%"
+          innerRadius={55}
+          outerRadius={75}
           paddingAngle={2}
           dataKey="value"
         >

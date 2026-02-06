@@ -1,5 +1,5 @@
 import React from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 function CatalystPerformanceChart({ data }) {
   if (!data || data.length === 0) {
@@ -65,11 +65,6 @@ function CatalystPerformanceChart({ data }) {
           label={{ value: 'Win Rate (%)', angle: -90, position: 'insideLeft', fill: '#a3a3a3' }}
         />
         <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(38, 38, 38, 0.5)' }} />
-        <Legend
-          wrapperStyle={{ paddingTop: '20px' }}
-          iconType="circle"
-          formatter={(value) => <span style={{ color: '#a3a3a3' }}>{value}</span>}
-        />
         <Bar
           dataKey="win_rate"
           name="Win Rate (%)"

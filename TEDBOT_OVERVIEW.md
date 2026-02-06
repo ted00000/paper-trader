@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v8.8 (ANALYZE → GO Continuity) - Live paper trading with real brokerage API execution
+**Current Version**: v8.9 (Data Integrity & Dashboard QA) - Live paper trading with real brokerage API execution
 
 ---
 
@@ -877,11 +877,63 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: February 4, 2026
-**Version**: v8.8 (ANALYZE → GO Continuity)
+**Last Updated**: February 5, 2026
+**Version**: v8.9 (Data Integrity & Dashboard QA)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Update (v8.8 - Feb 4, 2026)**:
+**Latest Update (v8.9 - Feb 5, 2026)**:
+- **Catalyst Data Cleanup**: Fixed 7 historical trades with invalid catalyst types
+  - **Problem Solved**: Several trades had placeholder or incorrect catalyst types (e.g., "Rare Earth Mining", "Screener Validated - Tier 1/2") causing Unknown tiers in dashboard
+  - **Trades Fixed**:
+    - MP: "Rare Earth Mining" → "Policy_Change" (China tariff catalyst)
+    - WDC: "Screener Validated - Tier 2" → "Analyst_Upgrade" (Nasdaq-100 inclusion)
+    - ILMN: "Screener Validated - Tier 2" → "Analyst_Upgrade" (CMS reimbursement + analyst upgrades)
+    - WS: "Screener Validated - Tier 1" → "M&A" (Kloeckner acquisition)
+    - LFUS: "Screener Validated - Tier 1" → "Earnings_Beat" (Q4 beat)
+    - GE: Fixed corrupted data → "Earnings_Beat" (Q4 2024 beat)
+    - PEN: Fixed corrupted data → "M&A_Target" (Boston Scientific acquisition)
+  - **Rationale**: Accurate catalyst attribution enables learning system to identify which catalysts drive best returns
+
+- **Unknown Tier Prevention**: Added code safeguards to prevent future Unknown tiers
+  - **Policy_Change Catalyst Handling**: New catalyst type for tariffs, regulations, government actions
+    ```python
+    # G2. Policy Change (tariffs, regulations, government action)
+    elif catalyst_type in ['Policy_Change', 'Tariff', 'Regulation']:
+        return {'tier': 'Tier2', ...}
+    ```
+  - **Safety Check for Empty Catalysts**: Defaults to Tier2 instead of Unknown
+    ```python
+    if not catalyst_type or catalyst_type.strip() == '':
+        return {'tier': 'Tier2', 'tier_name': 'Medium Conviction - Unspecified Catalyst', ...}
+    ```
+  - **Fallback Changes**: Three code paths changed from 'Unknown' to 'Tier2' default (lines 1289, 1483, 6324)
+  - **Impact**: Dashboard will never show "Unknown" tier going forward
+
+- **Dashboard Tier Performance Donut Fix**: Colors now correctly display by tier
+  - **Problem Solved**: Both tiers showed same gray color because COLORS object used 'Tier 1' (with space) but API returns 'Tier1' (no space)
+  - **Fix**: Added both formats to COLORS mapping:
+    ```javascript
+    const COLORS = {
+      'Tier1': '#00ff41',   // neon green (profit color)
+      'Tier2': '#00f5ff',   // tedbot cyan/blue accent
+      'Tier3': '#f59e0b',   // amber/yellow
+      // Legacy format (with space)
+      'Tier 1': '#00ff41',
+      'Tier 2': '#00f5ff',
+      'Tier 3': '#f59e0b',
+    }
+    ```
+  - **Colors**: Tier1 = neon green (#00ff41), Tier2 = cyan/blue (#00f5ff), Tier3 = amber (#f59e0b)
+
+- **Dashboard Catalyst Performance Chart Fix**: Removed redundant "Win Rate (%)" legend
+  - **Problem Solved**: Bottom of chart had out-of-place "Win Rate %" text (Y-axis already labeled)
+  - **Fix**: Removed Legend component from CatalystPerformanceChart.jsx
+
+- **Dashboard Donut Positioning Fix**: Chart no longer cut off at top
+  - **Problem Solved**: Donut chart was getting clipped at the top edge
+  - **Fix**: Changed cy from "40%" to "45%", reduced radius (innerRadius: 55, outerRadius: 75)
+
+**Previous Update (v8.8 - Feb 4, 2026)**:
 - **ANALYZE → GO Continuity**: Overnight recommendations now visible to morning GO command
   - **Problem Solved**: ANALYZE makes recommendations (e.g., "EXIT WS at market open") but GO couldn't see them
   - GO command now loads most recent ANALYZE output (within 24 hours)
