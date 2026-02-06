@@ -50,3 +50,6 @@ universe_tickers.json
 
 # Personal notes
 Stagnation and Stop Loss.txt
+
+# Screener data (server-generated only)
+screener_candidates.json
