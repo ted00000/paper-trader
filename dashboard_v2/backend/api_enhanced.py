@@ -757,19 +757,24 @@ def get_operations_status():
                         'is_today': is_today
                     }
                     continue
-                elif status == 'SUCCESS' and is_today:
+                elif status == 'SUCCESS':
                     # Find the corresponding daily_reviews file for details
-                    pattern = f"{operation}_{today.replace('-', '')}*.json"
+                    if is_today:
+                        pattern = f"{operation}_{today.replace('-', '')}*.json"
+                    else:
+                        # Extract date from last_run for non-today runs
+                        run_date = last_run[:10].replace('-', '') if last_run else ''
+                        pattern = f"{operation}_{run_date}*.json"
                     files = sorted(daily_reviews_dir.glob(pattern), reverse=True)
                     log_file = str(files[0]) if files else status_data.get('log_file', '')
 
                     operations[op_upper] = {
                         'status': 'SUCCESS',
                         'last_run': last_run,
-                        'health': 'HEALTHY',
+                        'health': 'HEALTHY' if is_today else 'WARNING',
                         'log_file': log_file,
-                        'summary': f"Latest {operation} command completed",
-                        'is_today': True
+                        'summary': f"Latest {operation} command completed" if is_today else f"Last run: {last_run[:10] if last_run else 'unknown'}",
+                        'is_today': is_today
                     }
                     continue
             except Exception:
