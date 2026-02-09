@@ -51,6 +51,19 @@ def verify_session(token):
     """Verify if session token is valid"""
     return token in active_sessions
 
+def require_auth(f):
+    """Decorator to require authentication for an endpoint"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Authentication required'}), 401
+        token = auth_header[7:]
+        if not verify_session(token):
+            return jsonify({'error': 'Invalid or expired session'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
 # Data file paths (READ ONLY)
 TRADES_CSV = PROJECT_DIR / 'trade_history' / 'completed_trades.csv'
 PORTFOLIO_JSON = PROJECT_DIR / 'portfolio_data' / 'current_portfolio.json'
