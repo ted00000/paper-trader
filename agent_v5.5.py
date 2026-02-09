@@ -1349,6 +1349,18 @@ Stagnation = position hasn't moved as expected given time held and volatility.
             if shares_to_sell <= 0:
                 return False, f"Invalid quantity: {shares_to_sell}", None, None
 
+            # v8.9.1: Cancel any open orders for this ticker before selling
+            # This prevents "insufficient qty" errors when shares are locked by stop orders
+            try:
+                open_orders = self.broker.get_orders_for_symbol(ticker, status='open')
+                if open_orders:
+                    for order in open_orders:
+                        self.broker.cancel_order(order.id)
+                        print(f"      🔄 Canceled open {order.type} order for {ticker}")
+            except Exception as cancel_err:
+                print(f"      ⚠️ Could not cancel open orders: {cancel_err}")
+                # Continue with sell attempt anyway
+
             # Place market sell order
             print(f"      📤 Placing Alpaca SELL order: {shares_to_sell} shares of {ticker}")
             order = self.broker.place_market_order(ticker, shares_to_sell, side='sell')
