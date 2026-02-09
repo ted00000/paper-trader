@@ -8720,6 +8720,9 @@ CURRENT PORTFOLIO
         still_skipped = []
         entered_positions = []  # Track for dashboard
 
+        # v8.9.4: Build set of existing tickers to prevent duplicate entries
+        existing_tickers = {p['ticker'] for p in positions}
+
         for stock in stocks:
             ticker = stock['ticker']
             original_gap = stock['gap_pct']
@@ -8728,6 +8731,12 @@ CURRENT PORTFOLIO
             pos_data = stock['position_data']
 
             print(f"   Checking {ticker} (was {original_gap:+.1f}% gap at 9:45 AM)...")
+
+            # v8.9.4: Check if ticker already in portfolio (prevent duplicates)
+            if ticker in existing_tickers:
+                print(f"      ⚠️ {ticker} already in portfolio - skipping to prevent duplicate")
+                still_skipped.append({**stock, 'final_gap': original_gap, 'skip_reason': 'already_in_portfolio'})
+                continue
 
             # Get current price via Alpaca (real-time) - RECHECK needs live prices during market hours
             current_price = None
@@ -8779,6 +8788,14 @@ CURRENT PORTFOLIO
                 if position_size_dollars > cash_available:
                     position_size_dollars = round(cash_available, 2)
                     print(f"      ⚠️ Reduced size to available cash ${cash_available:.2f}")
+
+                # v8.9.4: Minimum position size check to avoid tiny positions
+                MIN_POSITION_SIZE = 100.00  # $100 minimum
+                if position_size_dollars < MIN_POSITION_SIZE:
+                    print(f"      ⚠️ Position size ${position_size_dollars:.2f} below minimum ${MIN_POSITION_SIZE:.2f}")
+                    print(f"      → Skipping entry due to insufficient cash")
+                    still_skipped.append({**stock, 'final_gap': current_gap, 'skip_reason': 'insufficient_cash'})
+                    continue
 
                 # Create position - copy ALL fields from original for learning engine
                 new_position = {
