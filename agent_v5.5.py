@@ -8073,6 +8073,23 @@ CURRENT PORTFOLIO
                         position['unrealized_gain_pct'] = round(pnl_pct, 2)
                         position['unrealized_gain_dollars'] = round(pnl_dollars, 2)
 
+                    # v8.9.3: Retry placing Alpaca stop order if missing (fixes wash trade edge case)
+                    if self.use_alpaca and self.broker and not position.get('alpaca_stop_loss_order_id'):
+                        stop_loss_price = position.get('stop_loss', entry_price * 0.93)
+                        shares_for_stop = int(position.get('shares', 0))
+                        if shares_for_stop > 0 and stop_loss_price > 0:
+                            try:
+                                sl_success, sl_msg, sl_order_id = self.broker.place_stop_loss_order(
+                                    ticker=ticker,
+                                    qty=shares_for_stop,
+                                    stop_price=stop_loss_price
+                                )
+                                if sl_success:
+                                    position['alpaca_stop_loss_order_id'] = sl_order_id
+                                    print(f"      🔧 Alpaca: Placed missing stop-loss at ${stop_loss_price:.2f} (Order: {sl_order_id})")
+                            except Exception as e:
+                                pass  # Silent fail - will retry next EXECUTE
+
                     updated_positions.append(position)
                     print(f"   ✓ {ticker}: ${current_price:.2f} (Day {position['days_held']}, {position.get('unrealized_gain_pct', 0):+.1f}%)")
         else:
