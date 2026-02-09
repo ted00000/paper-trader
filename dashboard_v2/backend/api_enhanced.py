@@ -16,16 +16,11 @@ from functools import wraps
 import json
 import csv
 import os
-import sys
 import secrets
 import hashlib
 
 # Project setup
 PROJECT_DIR = Path(__file__).parent.parent.parent
-
-# Add project root to path for imports
-sys.path.insert(0, str(PROJECT_DIR))
-from alpaca_broker import AlpacaBroker
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 
@@ -50,19 +45,6 @@ def generate_session_token():
 def verify_session(token):
     """Verify if session token is valid"""
     return token in active_sessions
-
-def require_auth(f):
-    """Decorator to require authentication for an endpoint"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return jsonify({'error': 'Authentication required'}), 401
-        token = auth_header[7:]
-        if not verify_session(token):
-            return jsonify({'error': 'Invalid or expired session'}), 401
-        return f(*args, **kwargs)
-    return decorated
 
 # Data file paths (READ ONLY)
 TRADES_CSV = PROJECT_DIR / 'trade_history' / 'completed_trades.csv'
@@ -1409,157 +1391,6 @@ def get_screening_decisions():
             'is_today': False,
             'total_reviewed': 0
         }), 500
-
-# =====================================================================
-# UPDATE PRICES ENDPOINT
-# =====================================================================
-
-@app.route('/api/v2/update-prices', methods=['POST'])
-@require_auth
-def update_prices():
-    """
-    Fetch current prices from Alpaca and update portfolio + account status.
-
-    Updates:
-    - Each position's current_price, unrealized_gain_pct, unrealized_gain_dollars
-    - account_status.json: positions_value, unrealized_pl, account_value
-
-    Returns:
-        JSON with updated positions and account summary
-    """
-    try:
-        # Load current portfolio
-        if not PORTFOLIO_JSON.exists():
-            return jsonify({'error': 'Portfolio file not found'}), 404
-
-        with open(PORTFOLIO_JSON, 'r') as f:
-            portfolio = json.load(f)
-
-        positions = portfolio.get('positions', [])
-        if not positions:
-            return jsonify({
-                'success': True,
-                'message': 'No positions to update',
-                'positions_updated': 0
-            })
-
-        # Initialize Alpaca broker
-        try:
-            broker = AlpacaBroker()
-        except Exception as e:
-            return jsonify({'error': f'Failed to connect to Alpaca: {str(e)}'}), 500
-
-        # Fetch prices and update each position
-        updated_count = 0
-        errors = []
-
-        for pos in positions:
-            ticker = pos.get('ticker')
-            if not ticker:
-                continue
-
-            try:
-                current_price = broker.get_last_price(ticker)
-                if current_price and current_price > 0:
-                    entry_price = pos.get('entry_price', 0)
-                    shares = pos.get('shares', 0)
-
-                    # Update position fields
-                    pos['current_price'] = round(current_price, 2)
-
-                    if entry_price > 0:
-                        unrealized_gain_pct = ((current_price - entry_price) / entry_price) * 100
-                        unrealized_gain_dollars = (current_price - entry_price) * shares
-                        pos['unrealized_gain_pct'] = round(unrealized_gain_pct, 2)
-                        pos['unrealized_gain_dollars'] = round(unrealized_gain_dollars, 2)
-
-                    updated_count += 1
-                else:
-                    errors.append(f"{ticker}: no price returned")
-            except Exception as e:
-                errors.append(f"{ticker}: {str(e)}")
-
-        # Save updated portfolio
-        portfolio['last_updated'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-        with open(PORTFOLIO_JSON, 'w') as f:
-            json.dump(portfolio, f, indent=2)
-
-        # Recalculate account status
-        account_updated = _recalculate_account_status(positions)
-
-        return jsonify({
-            'success': True,
-            'message': f'Updated {updated_count} of {len(positions)} positions',
-            'positions_updated': updated_count,
-            'errors': errors if errors else None,
-            'account': account_updated,
-            'timestamp': datetime.now().isoformat()
-        })
-
-    except Exception as e:
-        return jsonify({'error': f'Failed to update prices: {str(e)}'}), 500
-
-
-def _recalculate_account_status(positions):
-    """
-    Recalculate and save account_status.json based on updated positions.
-
-    Returns:
-        dict: Updated account summary
-    """
-    # Calculate portfolio value and cost basis
-    portfolio_value = 0.0
-    cost_basis = 0.0
-
-    for pos in positions:
-        current_price = pos.get('current_price', pos.get('entry_price', 0))
-        entry_price = pos.get('entry_price', 0)
-        shares = pos.get('shares', 0)
-
-        portfolio_value += current_price * shares
-        cost_basis += entry_price * shares
-
-    # Calculate realized P&L from trades CSV
-    realized_pl = 0.0
-    if TRADES_CSV.exists():
-        with open(TRADES_CSV, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row.get('Trade_ID'):
-                    realized_pl += float(row.get('Return_Dollars', 0))
-
-    # Calculate account values
-    cash_available = STARTING_CAPITAL - cost_basis + realized_pl
-    account_value = portfolio_value + cash_available
-    unrealized_pl = portfolio_value - cost_basis
-
-    # Load existing account status to preserve other fields
-    account = {}
-    if ACCOUNT_JSON.exists():
-        with open(ACCOUNT_JSON, 'r') as f:
-            account = json.load(f)
-
-    # Update the price-sensitive fields
-    account.update({
-        'account_value': round(account_value, 2),
-        'cash_available': round(cash_available, 2),
-        'positions_value': round(portfolio_value, 2),
-        'cost_basis': round(cost_basis, 2),
-        'unrealized_pl': round(unrealized_pl, 2),
-        'last_updated': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-    })
-
-    # Save updated account status
-    with open(ACCOUNT_JSON, 'w') as f:
-        json.dump(account, f, indent=2)
-
-    return {
-        'account_value': account['account_value'],
-        'positions_value': account['positions_value'],
-        'unrealized_pl': account['unrealized_pl'],
-        'cash_available': account['cash_available']
-    }
-
 
 @app.route('/api/v2/health', methods=['GET'])
 def health_check():
