@@ -22,6 +22,7 @@ function CommandCenter({ isSuperUser = false }) {
   const [overview, setOverview] = useState(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
+  const [updatingPrices, setUpdatingPrices] = useState(false)
 
   // Fetch overview data
   useEffect(() => {
@@ -39,6 +40,23 @@ function CommandCenter({ isSuperUser = false }) {
     } catch (error) {
       console.error('Failed to fetch overview:', error)
       setLoading(false)
+    }
+  }
+
+  const updatePrices = async () => {
+    setUpdatingPrices(true)
+    try {
+      const token = localStorage.getItem('session_token')
+      await axios.post('/api/v2/update-prices', {}, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      // Refresh the overview data to show updated prices
+      await fetchOverview()
+    } catch (error) {
+      console.error('Failed to update prices:', error)
+      alert('Failed to update prices: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setUpdatingPrices(false)
     }
   }
 
@@ -237,7 +255,17 @@ function CommandCenter({ isSuperUser = false }) {
         transition={{ delay: 0.2 }}
         className="glass rounded-lg p-6"
       >
-        <h3 className="text-xl font-bold mb-4">Active Positions</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold">Active Positions</h3>
+          <button
+            onClick={updatePrices}
+            disabled={updatingPrices}
+            className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${updatingPrices ? 'animate-spin' : ''}`} />
+            {updatingPrices ? 'Updating...' : 'Update'}
+          </button>
+        </div>
         <ActivePositionsGrid positions={positions} />
       </motion.div>
 
