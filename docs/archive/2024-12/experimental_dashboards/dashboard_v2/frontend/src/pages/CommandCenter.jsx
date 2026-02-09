@@ -46,7 +46,7 @@ function CommandCenter({ isSuperUser = false }) {
   const updatePrices = async () => {
     setUpdatingPrices(true)
     try {
-      const token = localStorage.getItem('session_token')
+      const token = localStorage.getItem('tedbot_session')
       await axios.post('/api/v2/update-prices', {}, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
