@@ -993,8 +993,12 @@ def get_operation_log(operation):
         with open(latest_file) as f:
             data = json.load(f)
 
-        # Extract text content from Claude response OR format structured execute log
-        content = data.get('content', [{}])[0].get('text', '')
+        # Handle case where data is a simple string (e.g., RECHECK "nothing to recheck" messages)
+        if isinstance(data, str):
+            content = data
+        else:
+            # Extract text content from Claude response OR format structured execute log
+            content = data.get('content', [{}])[0].get('text', '')
 
         # If no content, check if this is a structured execute log
         if not content and operation == 'execute' and 'summary' in data:
