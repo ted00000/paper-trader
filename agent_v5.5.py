@@ -4912,6 +4912,45 @@ CRITICAL: When executing 'go' command, you MUST include a properly formatted JSO
             auto_exits_section += "2. The trade outcome (win/loss and magnitude)\n"
             auto_exits_section += "3. Any lessons learned for future similar setups\n"
 
+        # v8.9.2: Include today's closed trades from EXIT command for learning
+        # This ensures ANALYZE sees all exits (not just auto-exits from ANALYZE run)
+        todays_exits_section = ""
+        if command == 'analyze' and self.daily_activity_file.exists():
+            try:
+                with open(self.daily_activity_file, 'r') as f:
+                    activity = json.load(f)
+                closed_today = activity.get('closed_today', [])
+                if closed_today:
+                    todays_exits_section = "\n============================================================\n"
+                    todays_exits_section += "📊 TODAY'S CLOSED TRADES (For Learning Analysis)\n"
+                    todays_exits_section += "============================================================\n"
+                    todays_exits_section += "The following trades were closed today. Analyze each for lessons learned.\n\n"
+
+                    for trade in closed_today:
+                        ticker = trade.get('ticker', 'UNKNOWN')
+                        entry_price = trade.get('entry_price', 0)
+                        exit_price = trade.get('exit_price', 0)
+                        return_pct = trade.get('return_percent', 0)
+                        exit_reason = trade.get('exit_reason', 'Unknown')
+                        days_held = trade.get('hold_days', 0)
+                        catalyst = trade.get('catalyst', 'Unknown')
+                        thesis = trade.get('thesis', 'N/A')
+
+                        todays_exits_section += f"### {ticker} ({return_pct:+.1f}%)\n"
+                        todays_exits_section += f"  Entry: ${entry_price:.2f} → Exit: ${exit_price:.2f}\n"
+                        todays_exits_section += f"  Days Held: {days_held} | Catalyst: {catalyst}\n"
+                        todays_exits_section += f"  Exit Reason: {exit_reason}\n"
+                        todays_exits_section += f"  Original Thesis: {thesis}\n\n"
+
+                    todays_exits_section += "LEARNING QUESTIONS:\n"
+                    todays_exits_section += "1. Was the entry thesis valid? Did we enter for the right reasons?\n"
+                    todays_exits_section += "2. Was the exit timing appropriate? Too early? Too late?\n"
+                    todays_exits_section += "3. What worked well in this trade that we should repeat?\n"
+                    todays_exits_section += "4. What failed that we should avoid in future similar setups?\n"
+                    todays_exits_section += "5. Any pattern updates needed for the learning database?\n\n"
+            except Exception as e:
+                print(f"   ⚠️ Could not load today's exits: {e}")
+
         # v8.8 ANALYZE → GO CONTINUITY: Include previous ANALYZE recommendations for GO command
         # This ensures Claude can see overnight recommendations and verify against premarket data
         previous_analyze_section = ""
@@ -4935,7 +4974,7 @@ The following patterns have shown poor results. You may still use them if you ha
 but explain your reasoning and consider what makes this situation different from past failures.
 Your decisions will be tracked for accountability.
 {context.get('exclusions', 'None')}
-{auto_exits_section}{previous_analyze_section}
+{auto_exits_section}{todays_exits_section}{previous_analyze_section}
 CURRENT PORTFOLIO:
 {context.get('portfolio', 'Not initialized')}
 
