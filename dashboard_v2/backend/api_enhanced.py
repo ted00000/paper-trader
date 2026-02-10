@@ -1392,6 +1392,52 @@ def get_screening_decisions():
             'total_reviewed': 0
         }), 500
 
+@app.route('/api/v2/alpaca-status', methods=['GET'])
+def alpaca_status():
+    """
+    Alpaca broker alignment status.
+
+    Reads status file written by the agent during EXECUTE.
+    Returns:
+        - GREEN: Online and aligned
+        - YELLOW: Alignment issues detected
+        - RED: Connection disrupted or status unknown
+    """
+    status_file = PROJECT_DIR / 'portfolio_data' / 'alpaca_status.json'
+
+    try:
+        if not status_file.exists():
+            return jsonify({
+                'status': 'RED',
+                'message': 'Status file not found - agent may not have run yet',
+                'last_check': None,
+                'details': None
+            })
+
+        with open(status_file, 'r') as f:
+            status_data = json.load(f)
+
+        # Check if status is stale (more than 2 hours old)
+        last_check = status_data.get('timestamp')
+        if last_check:
+            from datetime import datetime
+            last_check_dt = datetime.fromisoformat(last_check.replace('Z', '+00:00').replace('+00:00', ''))
+            age_minutes = (datetime.now() - last_check_dt).total_seconds() / 60
+            if age_minutes > 120:  # 2 hours
+                status_data['status'] = 'YELLOW'
+                status_data['message'] = f'Status is {int(age_minutes)} minutes old'
+
+        return jsonify(status_data)
+
+    except Exception as e:
+        return jsonify({
+            'status': 'RED',
+            'message': f'Error reading status: {str(e)}',
+            'last_check': None,
+            'details': None
+        })
+
+
 @app.route('/api/v2/health', methods=['GET'])
 def health_check():
     """API health check"""

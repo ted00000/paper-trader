@@ -5901,7 +5901,95 @@ If conditions have changed, adjust recommendations accordingly and explain why.
         final_equity = account['account_value']
         unrealized_pl = portfolio_value - cost_basis
         print(f"   ✓ Updated account status: ${final_equity:.2f} (Positions: ${portfolio_value:.2f} + Cash: ${final_cash:.2f}, Realized P&L: ${realized_pl:+.2f}, Unrealized P&L: ${unrealized_pl:+.2f})")
-    
+
+        # v8.9.5: Write Alpaca status for dashboard indicator
+        self.write_alpaca_status()
+
+    def write_alpaca_status(self):
+        """
+        Write Alpaca connection and alignment status for dashboard display.
+
+        Status levels:
+        - GREEN: Online and positions aligned
+        - YELLOW: Online but alignment issues detected
+        - RED: Connection failed
+        """
+        status_file = self.project_dir / 'portfolio_data' / 'alpaca_status.json'
+
+        if not self.use_alpaca or not self.broker:
+            status = {
+                'status': 'RED',
+                'message': 'Alpaca not configured',
+                'timestamp': datetime.now().isoformat(),
+                'details': None
+            }
+            with open(status_file, 'w') as f:
+                json.dump(status, f, indent=2)
+            return
+
+        try:
+            # Get Alpaca data
+            alpaca_account = self.broker.get_account()
+            alpaca_positions = {p.symbol: float(p.qty) for p in self.broker.api.list_positions()}
+
+            # Load JSON portfolio
+            portfolio = self.load_current_portfolio()
+            json_positions = {p['ticker']: p.get('shares', 0) for p in portfolio.get('positions', [])}
+
+            # Check alignment
+            issues = []
+            all_tickers = set(json_positions.keys()) | set(alpaca_positions.keys())
+
+            for ticker in all_tickers:
+                json_shares = json_positions.get(ticker, 0)
+                alpaca_shares = alpaca_positions.get(ticker, 0)
+
+                if json_shares > 0 and alpaca_shares == 0:
+                    issues.append(f'{ticker}: in JSON but not Alpaca')
+                elif alpaca_shares > 0 and json_shares == 0:
+                    issues.append(f'{ticker}: in Alpaca but not JSON')
+                elif abs(json_shares - alpaca_shares) > 0.01:
+                    issues.append(f'{ticker}: share mismatch (JSON: {json_shares:.2f}, Alpaca: {alpaca_shares:.2f})')
+
+            # Determine status
+            if issues:
+                status = {
+                    'status': 'YELLOW',
+                    'message': f'{len(issues)} alignment issue(s) detected',
+                    'timestamp': datetime.now().isoformat(),
+                    'details': {
+                        'issues': issues,
+                        'json_positions': len(json_positions),
+                        'alpaca_positions': len(alpaca_positions),
+                        'alpaca_equity': float(alpaca_account.equity),
+                        'alpaca_cash': float(alpaca_account.cash)
+                    }
+                }
+            else:
+                status = {
+                    'status': 'GREEN',
+                    'message': f'Online and aligned ({len(alpaca_positions)} positions)',
+                    'timestamp': datetime.now().isoformat(),
+                    'details': {
+                        'positions': len(alpaca_positions),
+                        'alpaca_equity': float(alpaca_account.equity),
+                        'alpaca_cash': float(alpaca_account.cash)
+                    }
+                }
+
+            with open(status_file, 'w') as f:
+                json.dump(status, f, indent=2)
+
+        except Exception as e:
+            status = {
+                'status': 'RED',
+                'message': f'Connection failed: {str(e)}',
+                'timestamp': datetime.now().isoformat(),
+                'details': None
+            }
+            with open(status_file, 'w') as f:
+                json.dump(status, f, indent=2)
+
     # =====================================================================
     # VALIDATION AND LOGGING
     # =====================================================================

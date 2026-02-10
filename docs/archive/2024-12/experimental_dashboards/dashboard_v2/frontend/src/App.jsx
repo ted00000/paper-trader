@@ -28,6 +28,7 @@ function App() {
   const [isSuperUser, setIsSuperUser] = useState(false)
   const [loading, setLoading] = useState(true)
   const [headerData, setHeaderData] = useState({ value: 0, return: 0 })
+  const [alpacaStatus, setAlpacaStatus] = useState({ status: 'RED', message: 'Loading...' })
 
   // Check for existing session on mount
   useEffect(() => {
@@ -67,7 +68,7 @@ function App() {
     setIsAuthenticated(false)
   }
 
-  // Fetch header data when authenticated
+  // Fetch header data and Alpaca status when authenticated
   useEffect(() => {
     if (!isAuthenticated) return
 
@@ -84,8 +85,23 @@ function App() {
       }
     }
 
+    const fetchAlpacaStatus = async () => {
+      try {
+        const response = await fetch('/api/v2/alpaca-status')
+        const data = await response.json()
+        setAlpacaStatus(data)
+      } catch (error) {
+        console.error('Failed to fetch Alpaca status:', error)
+        setAlpacaStatus({ status: 'RED', message: 'Connection error' })
+      }
+    }
+
     fetchHeaderData()
-    const interval = setInterval(fetchHeaderData, 30000) // Update every 30s
+    fetchAlpacaStatus()
+    const interval = setInterval(() => {
+      fetchHeaderData()
+      fetchAlpacaStatus()
+    }, 30000) // Update every 30s
     return () => clearInterval(interval)
   }, [isAuthenticated])
 
@@ -187,6 +203,20 @@ function App() {
                   <div className="text-xs sm:text-sm text-tedbot-gray-500">Total Return</div>
                   <div className={`text-lg sm:text-2xl font-bold ${headerData.return >= 0 ? 'text-profit' : 'text-loss'}`}>
                     {headerData.return >= 0 ? '+' : ''}{headerData.return.toFixed(2)}%
+                  </div>
+                </div>
+                <div className="text-left sm:text-right" title={alpacaStatus.message}>
+                  <div className="text-xs sm:text-sm text-tedbot-gray-500">Alpaca</div>
+                  <div className={`flex items-center gap-1.5 text-sm font-medium ${
+                    alpacaStatus.status === 'GREEN' ? 'text-profit' :
+                    alpacaStatus.status === 'YELLOW' ? 'text-yellow-500' : 'text-loss'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                      alpacaStatus.status === 'GREEN' ? 'bg-profit' :
+                      alpacaStatus.status === 'YELLOW' ? 'bg-yellow-500' : 'bg-loss'
+                    }`}></span>
+                    {alpacaStatus.status === 'GREEN' ? 'Aligned' :
+                     alpacaStatus.status === 'YELLOW' ? 'Warning' : 'Offline'}
                   </div>
                 </div>
                 <button
