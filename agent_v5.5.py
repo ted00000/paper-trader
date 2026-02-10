@@ -8302,7 +8302,10 @@ CURRENT PORTFOLIO
                             pos['price_target'] = round(fill_price * (1 + pos.get('target_pct', 10)/100), 2)
                             print(f"      → Entry price updated to Alpaca fill: ${fill_price:.2f}")
 
-                        # v8.8: Place stop-loss order via Alpaca for real-time protection (Bug #5 fix)
+                        # v8.9.5: Place stop-loss order via Alpaca for real-time protection
+                        # Add delay to avoid wash trade detection (Alpaca rejects rapid order sequences)
+                        time.sleep(2)  # Wait 2 seconds for buy order to fully settle
+
                         actual_entry = fill_price if fill_price else entry_price
                         stop_loss_price = pos.get('stop_loss', actual_entry * 0.93)
                         shares_for_stop = int(actual_shares) if actual_shares > 0 else int(pos.get('shares', 0))
@@ -8880,7 +8883,10 @@ CURRENT PORTFOLIO
                                 new_position['profit_target'] = round(fill_price * 1.05, 2)
                             print(f"      → Entry price updated to Alpaca fill: ${fill_price:.2f}")
 
-                        # v8.8: Place stop-loss order via Alpaca for real-time protection (Bug #5 fix)
+                        # v8.9.5: Place stop-loss order via Alpaca for real-time protection
+                        # Add delay to avoid wash trade detection (Alpaca rejects rapid order sequences)
+                        time.sleep(2)  # Wait 2 seconds for buy order to fully settle
+
                         actual_entry = fill_price if fill_price else current_price
                         stop_loss_price = new_position.get('stop_loss', actual_entry * 0.95)
                         shares_for_stop = int(actual_shares) if actual_shares > 0 else int(new_position.get('shares', 0))
