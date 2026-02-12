@@ -7,7 +7,7 @@ Tedbot is an **autonomous AI-powered catalyst-driven swing trading system** that
 **Performance Target**: 90-92% of best-in-class professional trader performance
 **Strategy**: Event-driven momentum trading (3-7 day holds, occasionally 30-60 days for post-earnings drift)
 **Approach**: High-conviction, concentrated positions (10 max) with strict risk management
-**Current Version**: v8.9 (Data Integrity & Dashboard QA) - Live paper trading with real brokerage API execution
+**Current Version**: v8.9.7 (AI Reliability & JSON Retry) - Live paper trading with real brokerage API execution
 
 ---
 
@@ -303,7 +303,7 @@ Tedbot implements a **closed-loop autonomous trading system** with four intercon
 ### Phase 2: Morning Analysis (GO Command)
 
 **Tool**: `agent_v5.5.py go`
-**Schedule**: 9:00 AM ET daily (15 minutes before market open)
+**Schedule**: 8:45 AM ET daily (45 minutes before market open)
 **Purpose**: Claude reviews screener candidates and selects best opportunities
 
 #### Claude's Analysis Process:
@@ -716,10 +716,12 @@ Analyzes past performance across multiple dimensions:
 ## Execution Schedule (Automated via Cron)
 
 ```
-8:00 AM - Market Screener starts scanning
-9:00 AM - GO command (Claude analyzes opportunities)
-9:45 AM - EXECUTE command (Place BUY orders)
-4:30 PM - ANALYZE command (Review positions, place SELL orders)
+7:00 AM  - SCREEN (filter S&P 1500, Claude catalyst analysis)
+8:45 AM  - GO command (Claude analyzes candidates, creates pending_positions.json)
+9:45 AM  - EXECUTE command (Place BUY orders, trailing stops)
+10:15 AM - RECHECK (re-evaluate gap-skipped stocks)
+3:45 PM  - EXIT command (Claude + exit rules, same-day sell execution)
+4:30 PM  - ANALYZE command (Summary + learning only, no order execution)
 ```
 
 ---
@@ -800,7 +802,7 @@ Analyzes past performance across multiple dimensions:
 - RS: +12% vs SMH (sector), RS Rating: 85 (STRONG)
 - Stage 2: All 5 checks pass ✓
 
-**2. Analysis (GO - 9:00 AM):**
+**2. Analysis (GO - 8:45 AM):**
 - News Score: 18/20 (5 articles, all positive, fresh <12hrs)
 - VIX: 18 (GREEN - normal trading)
 - Sector: Technology (Leading sector, +3.4% vs SPY)
@@ -877,11 +879,72 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 
 ---
 
-**Last Updated**: February 5, 2026
-**Version**: v8.9 (Data Integrity & Dashboard QA)
+**Last Updated**: February 12, 2026
+**Version**: v8.9.7 (AI Reliability & JSON Retry)
 **Status**: Live in production paper trading - 6-12 month results collection period
 
-**Latest Update (v8.9 - Feb 5, 2026)**:
+**Latest Update (v8.9.7 - Feb 12, 2026)**:
+- **JSON Extraction Retry with Full Context**: Robust retry mechanism for Claude response parsing
+  - **Problem Solved**: Claude occasionally returns extensive markdown analysis but forgets the required JSON block
+  - **Previous Bad Fix**: "Recovery call" truncated original response and asked for JSON only (gave Claude "clouded view")
+  - **New Approach**: Full retry with complete context - same data, same analysis opportunity
+  - **Rationale**: "Given the same data, Claude should make the same choices. A different choice based on most recent data is trustworthy. Don't give Claude a clouded view."
+  - **Implementation**:
+    ```python
+    if not decisions:
+        # v8.9.7: JSON extraction failed - retry full GO call from scratch
+        print("   ⚠️ No JSON found in response, retrying full GO call...")
+        response = self.call_claude_api('go', context, premarket_data)
+        decisions = self.extract_json_from_response(response_text)
+    ```
+
+- **Prompt Improvements**: JSON requirement at START of prompts (not just end)
+  - **Problem Solved**: Claude would write extensive analysis and forget JSON at the end
+  - **Fix**: Added prominent JSON requirement at the BEGINNING of both portfolio review and initial build prompts
+  - **Implementation**:
+    ```python
+    user_message = f"""⚠️ CRITICAL: Your response MUST end with a ```json code block containing your decisions. Without this JSON, the system cannot execute. This is mandatory.
+
+    PORTFOLIO REVIEW - {today_date} @ 8:45 AM (Pre-market)
+    ```
+  - **Impact**: Reduces retry frequency, Claude sees requirement before writing analysis
+
+**Previous Update (v8.9.6 - Feb 12, 2026)**:
+- **Degraded Mode Response Variable Fix**: Fixed UnboundLocalError in API failure handling
+  - **Problem Solved**: GO command crashed with "UnboundLocalError: 'response' not defined" when Claude API failed
+  - **Root Cause**: `response` variable only defined in try block, but `save_response()` called it unconditionally
+  - **Fix**: Added response dict creation in degraded mode exception handler
+  - **Implementation**:
+    ```python
+    # v8.9.6: Set response variable for save_response() call later
+    response = {
+        'degraded_mode': True,
+        'error_type': error_type,
+        'error_message': error_msg,
+        'timestamp': timestamp,
+        'decisions': decisions
+    }
+    ```
+
+**Previous Update (v8.9.5 - Feb 11, 2026)**:
+- **Alpaca Status Indicator on Dashboard**: Real-time broker connection health display
+  - **GREEN**: Alpaca connected, all positions synced
+  - **YELLOW**: Alpaca connected but position count mismatch
+  - **RED**: Alpaca disconnected or API error
+  - **Location**: Dashboard header, next to account value
+  - **Rationale**: Immediate visibility into broker connectivity issues
+
+- **Wash Trade Detection Fix for Stop-Loss Orders**: Increased delays to 3 seconds
+  - **Problem Solved**: MRK stop-loss order failed with "wash trade detected" error
+  - **Root Cause**: 2-second delay insufficient for Alpaca to fully settle buy orders
+  - **Fix**: Increased all stop-loss placement delays from 2 seconds to 3 seconds
+  - **Implementation**:
+    ```python
+    time.sleep(3)  # Wait 3 seconds for buy order to fully settle (v8.9.5)
+    ```
+  - **Impact**: Prevents stop-loss placement failures after new position entries
+
+**Previous Update (v8.9 - Feb 5, 2026)**:
 - **Catalyst Data Cleanup**: Fixed 7 historical trades with invalid catalyst types
   - **Problem Solved**: Several trades had placeholder or incorrect catalyst types (e.g., "Rare Earth Mining", "Screener Validated - Tier 1/2") causing Unknown tiers in dashboard
   - **Trades Fixed**:
@@ -1025,9 +1088,9 @@ A: SHUTDOWN mode activates at VIX >30. All positions exit at stops, no new trade
 - **RECHECK Pricing Fix**: Now uses Alpaca real-time prices (was calling non-existent method)
 - **Updated Schedule**:
   - 7:00 AM: SCREEN (filter S&P 1500)
-  - 9:00 AM: GO (Claude analyzes candidates)
+  - 8:45 AM: GO (Claude analyzes candidates)
   - 9:45 AM: EXECUTE (buy orders + trailing stops)
-  - 10:30 AM: RECHECK (gap-skipped stocks)
+  - 10:15 AM: RECHECK (gap-skipped stocks)
   - 3:45 PM: EXIT (Claude + exit rules, same-day execution)
   - 4:30 PM: ANALYZE (summary + learning only)
 

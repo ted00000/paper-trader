@@ -1351,15 +1351,24 @@ Stagnation = position hasn't moved as expected given time held and volatility.
 
             # v8.9.1: Cancel any open orders for this ticker before selling
             # This prevents "insufficient qty" errors when shares are locked by stop orders
+            orders_canceled = False
             try:
                 open_orders = self.broker.get_orders_for_symbol(ticker, status='open')
                 if open_orders:
                     for order in open_orders:
                         self.broker.cancel_order(order.id)
                         print(f"      🔄 Canceled open {order.type} order for {ticker}")
+                        orders_canceled = True
             except Exception as cancel_err:
                 print(f"      ⚠️ Could not cancel open orders: {cancel_err}")
                 # Continue with sell attempt anyway
+
+            # v8.9.6: Wait for Alpaca to release shares after canceling stop orders
+            # Without this delay, Alpaca returns "insufficient qty available" (ROK bug fix)
+            # Using 3 seconds to be conservative - cancel processing may take longer than buy settlements
+            if orders_canceled:
+                import time
+                time.sleep(3)  # Wait 3 seconds for shares to be released
 
             # Place market sell order
             print(f"      📤 Placing Alpaca SELL order: {shares_to_sell} shares of {ticker}")
@@ -4389,7 +4398,9 @@ Stagnation = position hasn't moved as expected given time held and volatility.
                     if vacant_slots <= 0:
                         print(f"   ❌ DEBUG: No vacant slots (portfolio full)")
 
-                user_message = f"""PORTFOLIO REVIEW - {today_date} @ 8:45 AM (Pre-market)
+                user_message = f"""⚠️ CRITICAL: Your response MUST end with a ```json code block containing your decisions. Without this JSON, the system cannot execute. This is mandatory.
+
+PORTFOLIO REVIEW - {today_date} @ 8:45 AM (Pre-market)
 
 CURRENT POSITIONS ({len(premarket_data)}):
 {portfolio_review}
@@ -4537,7 +4548,9 @@ Provide full analysis of each position BEFORE the JSON. Justify all exits agains
                 else:
                     instruction = "Select 10 stocks with Tier 1 catalysts. Focus on well-known, liquid stocks."
 
-                user_message = f"""BUILD INITIAL PORTFOLIO - {today_date}
+                user_message = f"""⚠️ CRITICAL: Your response MUST end with a ```json code block containing your decisions. Without this JSON, the system cannot execute. This is mandatory.
+
+BUILD INITIAL PORTFOLIO - {today_date}
 
 No existing positions. {instruction}
 
@@ -7089,6 +7102,15 @@ CURRENT PORTFOLIO
             # Create a minimal response for logging
             response_text = f"DEGRADED MODE: Claude API unavailable. Holding {len(decisions['hold'])} positions, no new entries."
 
+            # v8.9.6: Set response variable for save_response() call later
+            response = {
+                'degraded_mode': True,
+                'error_type': error_type,
+                'error_message': error_msg,
+                'timestamp': timestamp,
+                'decisions': decisions
+            }
+
             print("   ✓ Degraded mode decisions generated\n")
 
         # Step 4: Extract decisions from Claude's response (or degraded mode)
@@ -7102,8 +7124,22 @@ CURRENT PORTFOLIO
             decisions = self.extract_json_from_response(response_text)
 
             if not decisions:
-                print("   ✗ No valid JSON found in response\n")
-                return False
+                # v8.9.7: JSON extraction failed - retry full GO call from scratch
+                print("   ⚠️ No JSON found in response, retrying full GO call...")
+                try:
+                    response = self.call_claude_api('go', context, premarket_data)
+                    content_blocks = response.get('content', [])
+                    response_text = content_blocks[0].get('text', '') if content_blocks else ''
+                    decisions = self.extract_json_from_response(response_text)
+                    if decisions:
+                        print("   ✓ Retry successful - JSON extracted")
+                    else:
+                        print("   ✗ Retry failed - still no valid JSON in response")
+                        print("   ✗ No valid JSON found in response\n")
+                        return False
+                except Exception as retry_err:
+                    print(f"   ✗ Retry failed with error: {retry_err}")
+                    return False
 
         # Step 5: Process decisions and create pending file
         hold_positions = decisions.get('hold', [])
@@ -7982,13 +8018,13 @@ CURRENT PORTFOLIO
         current_positions = current_portfolio.get('positions', [])
         print(f"   ✓ Loaded {len(current_positions)} current positions\n")
 
-        # STEP 2.5: Check for positions auto-sold by Alpaca trailing stops
-        # This detects positions that were sold between GO (9 AM) and EXECUTE (9:45 AM)
+        # STEP 2.5: Check for positions auto-sold by Alpaca (trailing stops OR any other reason)
+        # v8.9.8: Enhanced detection - catches trailing stops AND manual sells via Alpaca dashboard
+        # This detects positions that were sold between GO (8:45 AM) and EXECUTE (9:45 AM)
         alpaca_auto_closed = []
         if self.use_alpaca and self.broker and self.portfolio_file.exists():
-            print("2.5. Checking for Alpaca trailing stop fills...")
+            print("2.5. Checking for Alpaca position sync...")
 
-            # Load JSON portfolio to get positions that HAD trailing stops active
             try:
                 with open(self.portfolio_file, 'r') as f:
                     json_portfolio = json.load(f)
@@ -7997,28 +8033,46 @@ CURRENT PORTFOLIO
                 # Get current Alpaca positions
                 alpaca_positions = {p.symbol: p for p in self.broker.get_positions()}
 
-                # Check for positions with trailing stops that are no longer in Alpaca
+                # v8.9.8: Check for ANY position in JSON but NOT in Alpaca
                 for position in json_positions:
                     ticker = position.get('ticker')
-                    if position.get('trailing_stop_active') and ticker not in alpaca_positions:
-                        print(f"   🔔 {ticker} was AUTO-SOLD by Alpaca trailing stop!")
+                    if ticker not in alpaca_positions:
+                        is_trailing_stop = position.get('trailing_stop_active', False)
 
-                        # Try to get actual fill price from Alpaca
+                        if is_trailing_stop:
+                            print(f"   🔔 {ticker} was AUTO-SOLD by Alpaca trailing stop!")
+                        else:
+                            print(f"   🔔 {ticker} was SOLD externally (not in Alpaca)!")
+
+                        # Try to get actual fill price from Alpaca closed orders
                         exit_price = position.get('trailing_stop_price', position.get('current_price', 0))
+                        exit_reason = "Unknown external sale"
                         try:
                             closed_orders = self.broker.get_orders_for_symbol(ticker, status='closed')
                             for order in closed_orders:
-                                if order.type == 'trailing_stop' and order.status == 'filled':
+                                if order.status == 'filled':
                                     exit_price = float(order.filled_avg_price)
-                                    print(f"      Fill price: ${exit_price:.2f}")
+                                    if order.type == 'trailing_stop':
+                                        peak_pct = position.get('peak_return_pct', 0)
+                                        exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
+                                    elif order.type == 'stop':
+                                        exit_reason = "Alpaca stop-loss triggered"
+                                    elif order.type == 'market':
+                                        exit_reason = "Manual sell via Alpaca"
+                                    else:
+                                        exit_reason = f"Alpaca {order.type} order filled"
+                                    print(f"      Fill price: ${exit_price:.2f} ({exit_reason})")
                                     break
                         except Exception as e:
                             print(f"      ⚠️ Could not fetch fill price: {e}")
+                            if is_trailing_stop:
+                                peak_pct = position.get('peak_return_pct', 0)
+                                exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
+                            else:
+                                exit_reason = "Position closed externally"
 
-                        peak_pct = position.get('peak_return_pct', 0)
                         entry_price = position.get('entry_price', 0)
                         return_pct = ((exit_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
-                        exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
 
                         # Log the trade
                         trade_data = self.close_position(position, exit_price, exit_reason)
@@ -8027,12 +8081,12 @@ CURRENT PORTFOLIO
                         print(f"      ✓ Logged: {ticker} exited at ${exit_price:.2f} ({return_pct:+.1f}%)")
 
                 if alpaca_auto_closed:
-                    print(f"   ✓ {len(alpaca_auto_closed)} position(s) auto-closed by Alpaca trailing stops\n")
+                    print(f"   ✓ {len(alpaca_auto_closed)} position(s) detected as closed in Alpaca\n")
                 else:
-                    print("   ✓ No Alpaca trailing stop fills detected\n")
+                    print("   ✓ All JSON positions match Alpaca positions\n")
 
             except Exception as e:
-                print(f"   ⚠️ Could not check trailing stop fills: {e}\n")
+                print(f"   ⚠️ Could not check position sync: {e}\n")
 
         # Process EXITS
         print("3. Processing EXITS...")
@@ -8188,26 +8242,26 @@ CURRENT PORTFOLIO
         # Track held positions count BEFORE adding new buys (for accurate reporting)
         held_positions_count = len(updated_positions)
 
+        # Calculate current account value (needed for portfolio save even if no buys)
+        STARTING_CAPITAL = 10000.00
+        portfolio_value = sum(p.get('position_size', 0) for p in updated_positions)
+
+        # Calculate realized P&L from completed trades
+        realized_pl = 0.00
+        if self.trades_csv.exists():
+            with open(self.trades_csv, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('Trade_ID'):
+                        realized_pl += float(row.get('Return_Dollars', 0))
+
+        # Current account value = starting capital + all profits/losses
+        current_account_value = STARTING_CAPITAL + realized_pl
+
+        # Cash available = account value - currently invested positions
+        cash_available = current_account_value - portfolio_value
+
         if buy_positions:
-            # Calculate current account value for position sizing (COMPOUND GROWTH)
-            STARTING_CAPITAL = 10000.00
-            portfolio_value = sum(p.get('position_size', 0) for p in updated_positions)
-
-            # Calculate realized P&L from completed trades
-            realized_pl = 0.00
-            if self.trades_csv.exists():
-                with open(self.trades_csv, 'r') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        if row.get('Trade_ID'):
-                            realized_pl += float(row.get('Return_Dollars', 0))
-
-            # Current account value = starting capital + all profits/losses
-            current_account_value = STARTING_CAPITAL + realized_pl
-
-            # Cash available = account value - currently invested positions
-            cash_available = current_account_value - portfolio_value
-
             print(f"   Account Value: ${current_account_value:.2f} (Cash: ${cash_available:.2f}, Invested: ${portfolio_value:.2f})")
 
             buy_tickers = [p['ticker'] for p in buy_positions]
@@ -8392,7 +8446,7 @@ CURRENT PORTFOLIO
 
                         # v8.9.5: Place stop-loss order via Alpaca for real-time protection
                         # Add delay to avoid wash trade detection (Alpaca rejects rapid order sequences)
-                        time.sleep(2)  # Wait 2 seconds for buy order to fully settle
+                        time.sleep(3)  # Wait 3 seconds for buy order to fully settle (v8.9.6)
 
                         actual_entry = fill_price if fill_price else entry_price
                         stop_loss_price = pos.get('stop_loss', actual_entry * 0.93)
@@ -8973,7 +9027,7 @@ CURRENT PORTFOLIO
 
                         # v8.9.5: Place stop-loss order via Alpaca for real-time protection
                         # Add delay to avoid wash trade detection (Alpaca rejects rapid order sequences)
-                        time.sleep(2)  # Wait 2 seconds for buy order to fully settle
+                        time.sleep(3)  # Wait 3 seconds for buy order to fully settle (v8.9.6)
 
                         actual_entry = fill_price if fill_price else current_price
                         stop_loss_price = new_position.get('stop_loss', actual_entry * 0.95)
@@ -9144,32 +9198,56 @@ CURRENT PORTFOLIO
 
         print(f"📋 Reviewing {len(positions)} position(s) for exit...\n")
 
-        # STEP 1: Check for positions auto-sold by Alpaca trailing stops
+        # STEP 1: Check for positions auto-sold by Alpaca (trailing stops OR any other reason)
+        # v8.9.8: Enhanced detection - catches trailing stops AND manual sells via Alpaca dashboard
         alpaca_closed_trades = []
         if self.use_alpaca and self.broker:
-            print("1. Checking for Alpaca trailing stop fills...")
+            print("1. Checking for Alpaca position sync...")
             alpaca_positions = {p.symbol: p for p in self.broker.get_positions()}
 
             for position in positions[:]:  # Iterate copy to allow removal
                 ticker = position['ticker']
-                if position.get('trailing_stop_active') and ticker not in alpaca_positions:
-                    print(f"   🔔 {ticker} was AUTO-SOLD by Alpaca trailing stop!")
 
+                # v8.9.8: Check if position is in JSON but NOT in Alpaca (sold externally)
+                if ticker not in alpaca_positions:
+                    is_trailing_stop = position.get('trailing_stop_active', False)
+
+                    if is_trailing_stop:
+                        print(f"   🔔 {ticker} was AUTO-SOLD by Alpaca trailing stop!")
+                    else:
+                        print(f"   🔔 {ticker} was SOLD externally (not in Alpaca)!")
+
+                    # Try to get actual fill price from Alpaca closed orders
                     exit_price = position.get('trailing_stop_price', position.get('current_price', 0))
+                    exit_reason = "Unknown external sale"
                     try:
                         closed_orders = self.broker.get_orders_for_symbol(ticker, status='closed')
                         for order in closed_orders:
-                            if order.type == 'trailing_stop' and order.status == 'filled':
+                            if order.status == 'filled':
                                 exit_price = float(order.filled_avg_price)
-                                print(f"      Fill price: ${exit_price:.2f}")
+                                # Determine exit reason based on order type
+                                if order.type == 'trailing_stop':
+                                    peak_pct = position.get('peak_return_pct', 0)
+                                    exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
+                                elif order.type == 'stop':
+                                    exit_reason = "Alpaca stop-loss triggered"
+                                elif order.type == 'market':
+                                    exit_reason = "Manual sell via Alpaca"
+                                else:
+                                    exit_reason = f"Alpaca {order.type} order filled"
+                                print(f"      Fill price: ${exit_price:.2f} ({exit_reason})")
                                 break
                     except Exception as e:
                         print(f"      ⚠️ Could not fetch fill price: {e}")
+                        # Fallback exit reason
+                        if is_trailing_stop:
+                            peak_pct = position.get('peak_return_pct', 0)
+                            exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
+                        else:
+                            exit_reason = "Position closed externally"
 
-                    peak_pct = position.get('peak_return_pct', 0)
                     entry_price = position.get('entry_price', 0)
                     return_pct = ((exit_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
-                    exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
 
                     trade_data = self.close_position(position, exit_price, exit_reason)
                     self.log_completed_trade(trade_data)
@@ -9178,9 +9256,9 @@ CURRENT PORTFOLIO
                     print(f"      ✓ Logged: {ticker} exited at ${exit_price:.2f} ({return_pct:+.1f}%)")
 
             if alpaca_closed_trades:
-                print(f"   ✓ {len(alpaca_closed_trades)} position(s) auto-closed by Alpaca\n")
+                print(f"   ✓ {len(alpaca_closed_trades)} position(s) detected as closed in Alpaca\n")
             else:
-                print("   ✓ No Alpaca trailing stop fills detected\n")
+                print("   ✓ All JSON positions match Alpaca positions\n")
 
         if not positions:
             print("   ✓ All positions were closed by trailing stops")
@@ -9188,6 +9266,11 @@ CURRENT PORTFOLIO
             portfolio['last_updated'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
             with open(self.portfolio_file, 'w') as f:
                 json.dump(portfolio, f, indent=2)
+            # v8.9.8: Update daily activity before early return (was missing - caused empty Today's Activity)
+            if alpaca_closed_trades:
+                self.create_daily_activity_summary(alpaca_closed_trades)
+                print(f"   ✓ Daily activity updated with {len(alpaca_closed_trades)} trailing stop fill(s)")
+            self.update_account_status()
             return True
 
         # STEP 2: Fetch REAL-TIME prices from Alpaca

@@ -1,6 +1,6 @@
 # TedBot Trading System - Methodology & Architecture
 
-**Version:** 5.5 (January 2026)
+**Version:** 8.9.7 (February 2026)
 **Status:** Paper Trading (Validation Phase)
 **Starting Capital:** $10,000
 
@@ -12,6 +12,14 @@ TedBot is a **systematic, rules-based swing trading system** that combines quant
 
 The system is not a black-box statistical arbitrage model. It is a **catalyst-driven momentum strategy** that uses explicit, auditable rules at every stage. The AI layer provides judgment on news quality and catalyst validity - something traditional quant models struggle with - while the quantitative framework provides discipline, risk controls, and systematic execution.
 
+**Key v8.x Enhancements:**
+- Real-time Alpaca broker integration with live stop-loss orders
+- Gap protection with automatic RECHECK at 10:15 AM
+- Trailing stop upgrades for profitable positions
+- Separated EXIT (3:45 PM) and ANALYZE (4:30 PM) commands
+- Dashboard with real-time Alpaca alignment monitoring
+- AI failover with degraded mode and retry mechanisms
+
 ---
 
 ## Table of Contents
@@ -20,8 +28,11 @@ The system is not a black-box statistical arbitrage model. It is a **catalyst-dr
 2. [Universe & Screening Methodology](#2-universe--screening-methodology)
 3. [Portfolio Construction (GO Command)](#3-portfolio-construction-go-command)
 4. [Risk Management & Execution](#4-risk-management--execution)
-5. [Portfolio Monitoring & Exits](#5-portfolio-monitoring--exits)
-6. [Honest Assessment: Strengths & Limitations](#6-honest-assessment-strengths--limitations)
+5. [Alpaca Broker Integration](#5-alpaca-broker-integration)
+6. [Portfolio Monitoring & Exits](#6-portfolio-monitoring--exits)
+7. [AI Failover & Reliability](#7-ai-failover--reliability)
+8. [Dashboard & Monitoring](#8-dashboard--monitoring)
+9. [Honest Assessment: Strengths & Limitations](#9-honest-assessment-strengths--limitations)
 
 ---
 
@@ -34,14 +45,17 @@ The system is not a black-box statistical arbitrage model. It is a **catalyst-dr
 | 7:00 AM | **SCREEN** | Scan S&P 1500, calculate breadth, validate catalysts |
 | 9:00 AM | **GO** | Claude analyzes top candidates, builds portfolio decisions |
 | 9:45 AM | **EXECUTE** | Place orders via Alpaca with spread/gap validation |
-| 4:30 PM | **ANALYZE** | Update prices, check exits, log performance |
+| 10:15 AM | **RECHECK** | Re-evaluate stocks skipped due to gap at open |
+| 3:45 PM | **EXIT** | Claude reviews positions for end-of-day exits |
+| 4:30 PM | **ANALYZE** | Update performance metrics, extract learnings |
 
 ### Technology Stack
 
 - **Screening:** Python + Polygon.io API (market data, news, technicals)
 - **Decision Layer:** Claude Sonnet 4.5 (portfolio construction) + Claude Haiku 3.5 (catalyst screening)
-- **Execution:** Alpaca Markets Paper Trading API
+- **Execution:** Alpaca Markets Paper Trading API (real-time orders)
 - **Risk Framework:** Custom Python (ATR stops, gap analysis, spread checks)
+- **Dashboard:** React + Flask API with real-time Alpaca sync
 
 ---
 
@@ -216,6 +230,9 @@ Claude returns a structured JSON decision:
 }
 ```
 
+**JSON Output Requirement (v8.9.7):**
+The prompt now emphasizes JSON output at both the beginning AND end to ensure Claude includes the required decision block. If JSON extraction fails, the system automatically retries the full GO call from scratch.
+
 ### 3.2 Entry Decisions
 
 **ENTER:** Standard entry (position size 6-10%)
@@ -284,6 +301,8 @@ After Claude's decisions, before execution, each position passes through:
 2. **News Validation** - Confirms catalyst freshness (0-20 score)
 3. **Relative Strength Validation** - Confirms momentum still intact
 4. **Sector Concentration Check** - Guidelines for < 40% single-sector exposure (Claude documents rationale for exceptions)
+5. **Duplicate Position Check** - Prevents entering same ticker twice (v8.9.4)
+6. **Minimum Position Size Check** - Ensures positions are >= $100 (v8.9.4)
 
 ### 3.6 Portfolio Rotation (When Full)
 
@@ -311,15 +330,22 @@ Rotation recommended when exit score >= 50 AND opportunity score >= 60.
 
 Before any order is placed, three safeguards must pass:
 
-#### Gap Analysis
+#### Gap Analysis (v8.0+)
 
 | Gap Classification | Size | Action |
 |-------------------|------|--------|
 | EXHAUSTION_GAP | >= 8% | Skip entry entirely |
-| BREAKAWAY_GAP | 5-7.9% | Skip (wait for consolidation) |
-| CONTINUATION_GAP | 2-4.9% | Delay entry 15 minutes |
+| BREAKAWAY_GAP | 5-7.9% | Skip at open, RECHECK at 10:15 AM |
+| CONTINUATION_GAP | 2-4.9% | Skip at open, RECHECK at 10:15 AM |
 | NORMAL | < 2% | Enter at open |
 | GAP_DOWN | <= -3% | Enter (buy weakness) |
+
+**RECHECK Command (v8.9):**
+Stocks skipped due to gap at open are saved to `skipped_for_gap.json`. At 10:15 AM, the RECHECK command:
+1. Re-fetches current prices for skipped stocks
+2. Calculates the gap from original previous close
+3. Enters if the stock has pulled back (current gap <= +2%)
+4. Leaves on skip list if still extended
 
 #### Bid-Ask Spread Check
 
@@ -354,6 +380,9 @@ Final_Stop = max(ATR_Stop, Max_Stop)  // Use tighter of the two
 
 **Fallback (ATR unavailable):** Fixed -7% stop.
 
+**Alpaca Stop-Loss Orders (v8.9+):**
+Stop-loss orders are now placed directly with Alpaca for real-time protection. See Section 5 for details.
+
 ### 4.3 Dynamic Profit Targets
 
 Targets are **catalyst-specific**, based on empirical research on post-catalyst price behavior:
@@ -368,19 +397,97 @@ Targets are **catalyst-specific**, based on empirical research on post-catalyst 
 | Tier 2 (Standard) | 8% | - | 3-5 days |
 | Insider Buying | 10% | - | 10-20 days |
 
-### 4.4 Execution via Alpaca
+### 4.4 Trailing Stop Upgrades (v8.2+)
 
-- **Order Type:** Market orders (simplicity, guaranteed fill for liquid names)
-- **Slippage Tracking:** Records bid/ask at entry, calculates execution cost in basis points
-- **Position Sizing:** Dollar-based (% of account value), converted to shares at execution
+When a position reaches its profit target, the system upgrades from a fixed stop to a trailing stop:
+
+**Criteria for Trailing Stop Activation:**
+- Position return >= target percentage (catalyst-specific)
+- Position held >= 2 days (minimum hold)
+
+**Trailing Stop Parameters:**
+- Trail percentage: 2% below current price
+- Minimum lock-in: Entry price + 8%
+
+**Alpaca Trailing Stops:**
+When criteria are met, the system:
+1. Cancels the existing fixed stop-loss order
+2. Places a trailing stop order with Alpaca
+3. Alpaca automatically adjusts the stop as price rises
 
 ---
 
-## 5. Portfolio Monitoring & Exits
+## 5. Alpaca Broker Integration
 
-### 5.1 Exit Priority Hierarchy
+### 5.1 Overview (v7.2+, Enhanced v8.9+)
 
-Checked daily at 4:30 PM (ANALYZE command):
+TedBot integrates with Alpaca Markets for paper trading execution. This provides:
+- Real-time order execution at market open
+- Live stop-loss and trailing stop orders
+- Actual fill prices as source of truth
+- Portfolio synchronization
+
+### 5.2 Order Flow
+
+**Buy Orders:**
+1. Calculate position size in dollars
+2. Convert to shares based on current price
+3. Place market buy order via Alpaca
+4. Wait 3 seconds (wash trade prevention)
+5. Place stop-loss order at calculated stop price
+6. Record Alpaca order IDs for tracking
+
+**Sell Orders:**
+1. Cancel any open orders for the ticker (stops)
+2. Wait 3 seconds (share release time)
+3. Place market sell order
+4. Record fill price as exit price
+
+### 5.3 Wash Trade Prevention (v8.9.5+)
+
+Alpaca's systems detect rapid order sequences as potential wash trades. To prevent order rejections:
+- **After buy fill:** Wait 3 seconds before placing stop-loss
+- **After stop cancel:** Wait 3 seconds before placing sell order
+
+### 5.4 Portfolio Synchronization
+
+The system maintains two sources of truth:
+- **JSON files:** Position data, entry prices, catalysts, thesis
+- **Alpaca:** Actual shares held, current market value
+
+At each EXECUTE/EXIT run:
+1. Compare JSON positions to Alpaca positions
+2. Log any discrepancies
+3. Use Alpaca values for account equity/cash
+4. Maintain JSON for strategy metadata
+
+### 5.5 Missing Stop-Loss Recovery (v8.9.3+)
+
+If a stop-loss order fails to place (wash trade timing, API error):
+1. Position is flagged as missing stop protection
+2. On next EXECUTE run, system attempts to place the missing stop
+3. JSON tracking provides fallback protection
+
+---
+
+## 6. Portfolio Monitoring & Exits
+
+### 6.1 EXIT Command (3:45 PM) - v8.2+
+
+The EXIT command runs 15 minutes before market close to:
+- Execute Claude-recommended exits
+- Check stop-loss conditions
+- Check time stops (21-day maximum)
+- Log closed trades
+
+**Separation from ANALYZE:**
+Previously combined, EXIT and ANALYZE are now separate commands:
+- EXIT (3:45 PM): Executes trades, closes positions
+- ANALYZE (4:30 PM): Updates metrics, extracts learnings (no trading)
+
+### 6.2 Exit Priority Hierarchy
+
+Checked at EXIT command:
 
 1. **Catalyst Invalidation** (HIGHEST PRIORITY)
    - Thesis-breaking news detected (offering, lawsuit, downgrade)
@@ -389,6 +496,7 @@ Checked daily at 4:30 PM (ANALYZE command):
 2. **Stop Loss**
    - Price <= ATR-based stop (or -7% cap)
    - Exit 100%
+   - **Note:** With Alpaca stops, this may execute intraday automatically
 
 3. **Profit Target + Trailing Stop**
    - Price >= dynamic target
@@ -400,7 +508,16 @@ Checked daily at 4:30 PM (ANALYZE command):
    - PED (Post-Earnings Drift): Extended hold period
    - Exit 100%
 
-### 5.2 Trailing Stop Mechanics
+### 6.3 Exit Validation (v8.0+)
+
+Before executing an exit, the system validates:
+- **Target claims:** If Claude says "target hit" but price < target, reject exit
+- **Stop claims:** If Claude says "stop hit" but price > stop, reject exit
+- **Mid-range exits:** Require valid reason (catalyst invalidated, rotation)
+
+Invalid exits are moved to HOLD instead of executed.
+
+### 6.4 Trailing Stop Mechanics
 
 Once profit target is hit:
 1. Trailing stop activates at entry + 8% (locks in gains)
@@ -409,7 +526,7 @@ Once profit target is hit:
 
 **Gap-Aware Exception:** If target is hit via a large gap (>= 5%), wait for consolidation before activating trail (prevents whipsaw on gap-and-fade patterns).
 
-### 5.3 Position Tracking
+### 6.5 Position Tracking
 
 Each position maintains:
 - Entry price, date, shares
@@ -417,22 +534,96 @@ Each position maintains:
 - Days held (incremented daily)
 - Stop loss, price target
 - Catalyst type and tier
-- Trailing stop status
+- Trailing stop status and Alpaca order ID
+- Alpaca stop-loss order ID
 - Bid/ask at entry, slippage in bps
 
-### 5.4 Trade Logging
+### 6.6 Trade Logging
 
 All closed trades logged to CSV with:
 - Entry/exit dates and prices
-- Return percentage
+- Return percentage and dollars
 - Catalyst type and tier
 - Exit reason (standardized)
 - Days held
 - Slippage data
+- Alpaca order IDs
 
 ---
 
-## 6. Honest Assessment: Strengths & Limitations
+## 7. AI Failover & Reliability
+
+### 7.1 Degraded Mode (v8.0+)
+
+If the Claude API fails during GO command:
+
+**Degraded Mode Behavior:**
+- HOLD all existing positions
+- No new entries (BUY list empty)
+- No exits except rule-based stops
+- System logs failure for monitoring
+- Retry on next GO command
+
+**Triggers:**
+- API timeout (>120s, then >240s retry)
+- API key missing or invalid
+- Rate limiting
+- Network errors
+
+### 7.2 JSON Extraction Retry (v8.9.7)
+
+If Claude returns a response without the required JSON block:
+
+1. System detects missing JSON
+2. Logs warning: "No JSON found, retrying full GO call..."
+3. Makes a complete new API call with full context
+4. If retry also fails, GO command fails (does not execute bad decisions)
+
+**Prevention:**
+The prompt now includes the JSON requirement at both the beginning AND end:
+```
+⚠️ CRITICAL: Your response MUST end with a ```json code block containing your decisions.
+```
+
+### 7.3 Error Logging
+
+All failures logged to:
+- `logs/claude_api_failures.json` - API errors
+- `logs/go.log` - Full command output
+- Dashboard status files - Real-time monitoring
+
+---
+
+## 8. Dashboard & Monitoring
+
+### 8.1 Web Dashboard (v8.0+)
+
+React-based dashboard provides:
+- Portfolio overview with current P&L
+- Position cards with entry/current prices
+- Trade history and performance charts
+- System status indicators
+
+### 8.2 Alpaca Status Indicator (v8.9.5+)
+
+Dashboard header shows Alpaca connection status:
+
+| Status | Color | Meaning |
+|--------|-------|---------|
+| GREEN | Aligned | All positions match between JSON and Alpaca |
+| YELLOW | Warning | Discrepancy detected or status file stale (>2 hours) |
+| RED | Offline | Cannot connect to Alpaca or major sync issue |
+
+### 8.3 Operation Status
+
+Each command writes status to `dashboard_data/operation_status/`:
+- Last run timestamp
+- Success/failure status
+- Error messages if any
+
+---
+
+## 9. Honest Assessment: Strengths & Limitations
 
 ### What This System IS
 
@@ -445,6 +636,8 @@ All closed trades logged to CSV with:
 4. **AI-Augmented, Not AI-Dependent** - The LLM layer provides judgment on news quality and catalyst validity (something traditional NLP/keyword models do poorly), but the quantitative framework provides discipline. Claude cannot override stops, sizing rules, or regime gates.
 
 5. **Fully Automated Pipeline** - From screening to execution to monitoring, the system runs without manual intervention. All decisions are logged for analysis.
+
+6. **Broker-Integrated (v8.x)** - Real-time order execution via Alpaca with actual stop-loss orders provides institutional-grade risk management.
 
 ### What This System IS NOT
 
@@ -466,6 +659,8 @@ The LLM (Claude) serves a specific, bounded role:
 
 - **GO Stage (Sonnet):** Constructs the portfolio from pre-validated candidates. Claude sees the same quantitative data a human analyst would (technicals, news, RS rankings) and makes entry/pass/exit decisions. The quantitative conviction system then overlays position sizing.
 
+- **EXIT Stage (Sonnet):** Reviews positions for exit decisions based on catalyst status and market conditions.
+
 **Critical Constraint:** Claude's decisions are validated and bounded by the quantitative framework. It cannot:
 - Enter positions that fail binary gates
 - Size positions above conviction limits
@@ -482,13 +677,13 @@ This system occupies the space between **discretionary trading** and **fully qua
 | Universe selection | Gut feel | Systematic (S&P 1500) | Systematic |
 | Signal generation | Experience | Rules + AI judgment | Statistical models |
 | Position sizing | Variable | Conviction formula | Kelly/Risk parity |
-| Risk management | Mental stops | ATR + regime gates | VaR/CVaR models |
-| Execution | Manual | Automated + checks | Algorithmic |
+| Risk management | Mental stops | ATR + Alpaca stops | VaR/CVaR models |
+| Execution | Manual | Automated + Alpaca | Algorithmic |
 | Backtesting | None | Limited | Rigorous walk-forward |
 | Parameter optimization | None | Research-based | Statistical |
 | Strategy diversification | Single | Single | Multi-strategy |
 
-**Verdict:** TedBot is a **systematic event-driven trading system with AI-augmented catalyst validation**. It has institutional-grade screening architecture and risk controls, but lacks the statistical backtesting rigor and multi-strategy diversification of a true quantitative fund. It is significantly more disciplined and systematic than a solo developer's discretionary trading, but honestly cannot claim to be a "quant platform" in the institutional sense without validated out-of-sample performance data.
+**Verdict:** TedBot is a **systematic event-driven trading system with AI-augmented catalyst validation and broker-integrated execution**. It has institutional-grade screening architecture and risk controls, but lacks the statistical backtesting rigor and multi-strategy diversification of a true quantitative fund. It is significantly more disciplined and systematic than a solo developer's discretionary trading, but honestly cannot claim to be a "quant platform" in the institutional sense without validated out-of-sample performance data.
 
 ### Path to Institutional Grade
 
@@ -519,10 +714,12 @@ To bridge the gap, the system would need:
 | VIX Shutdown | >= 35 | Block entries |
 | VIX Cautious | 30-34 | Tier 1 only |
 | Spread Limit | 0.50% | Skip if wider |
-| Gap Skip | >= 5% | Wait/skip |
+| Gap Skip | >= 2% | RECHECK at 10:15 |
+| Gap Hard Skip | >= 8% | No entry |
 | Breadth Healthy | >= 50% | Full sizing |
 | Breadth Degraded | 40-49% | Reduce 20% |
 | Breadth Unhealthy | < 40% | Reduce 40% |
+| Wash Trade Delay | 3 seconds | Alpaca timing |
 
 ## Appendix B: Data Sources
 
@@ -530,17 +727,33 @@ To bridge the gap, the system would need:
 |--------|---------|-----------|
 | Polygon.io | Market data, news, technicals, snapshots | Paid API |
 | Anthropic Claude | Catalyst validation, portfolio construction | Pay-per-token |
-| Alpaca Markets | Paper trading execution | Free (paper) |
+| Alpaca Markets | Paper trading execution, real-time orders | Free (paper) |
 
 ## Appendix C: Automation Schedule
 
 ```
 07:00 ET  SCREEN   Scan 1,500 stocks, calculate breadth, validate catalysts
 09:00 ET  GO       Claude analyzes top 15, makes entry/hold/exit decisions
-09:45 ET  EXECUTE  Place orders with gap/spread validation
-16:30 ET  ANALYZE  Update prices, check exits, log performance
+09:45 ET  EXECUTE  Place orders with gap/spread validation, Alpaca stops
+10:15 ET  RECHECK  Re-evaluate gap-skipped stocks for entry
+15:45 ET  EXIT     Claude reviews positions, execute end-of-day exits
+16:30 ET  ANALYZE  Update performance metrics, extract learnings
 ```
+
+## Appendix D: Version History
+
+| Version | Date | Key Changes |
+|---------|------|-------------|
+| 5.5 | Jan 2026 | Initial documented version |
+| 7.2 | Jan 2026 | Alpaca paper trading integration |
+| 8.0 | Jan 2026 | Gap protection, validation pipeline |
+| 8.2 | Feb 2026 | EXIT/ANALYZE split, trailing stops |
+| 8.9 | Feb 2026 | Alpaca stop-loss orders, RECHECK command |
+| 8.9.4 | Feb 2026 | Duplicate/minimum position checks |
+| 8.9.5 | Feb 2026 | Wash trade delays, Alpaca status indicator |
+| 8.9.6 | Feb 2026 | Sell delay fix, degraded mode response fix |
+| 8.9.7 | Feb 2026 | JSON extraction retry, prompt improvements |
 
 ---
 
-*Document generated January 23, 2026. System version 5.5.*
+*Document updated February 12, 2026. System version 8.9.7.*
