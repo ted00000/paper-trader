@@ -1478,10 +1478,12 @@ Stagnation = position hasn't moved as expected given time held and volatility.
         # Determine exit type
         exit_type = self._determine_exit_type(trade['exit_reason'], trade)
 
+        # v8.9.8: Include exit_date in trade_id to prevent duplicates when same ticker bought twice
+        exit_date_str = datetime.now().strftime('%Y-%m-%d')
         trade_data = {
-            'trade_id': f"{trade['ticker']}_{trade['entry_date']}",
+            'trade_id': f"{trade['ticker']}_{trade['entry_date']}_to_{exit_date_str}",
             'entry_date': trade['entry_date'],
-            'exit_date': datetime.now().strftime('%Y-%m-%d'),
+            'exit_date': exit_date_str,
             'ticker': trade['ticker'],
             'premarket_price': trade.get('premarket_price', 0),
             'entry_price': trade['entry_price'],
@@ -6374,7 +6376,8 @@ CURRENT PORTFOLIO
         account_value_after = account_data.get('account_value', 1000.00)
 
         trade_data = {
-            'trade_id': f"{position['ticker']}_{position['entry_date']}",
+            # v8.9.8: Include exit_date in trade_id to prevent duplicates when same ticker bought twice
+            'trade_id': f"{position['ticker']}_{position['entry_date']}_to_{exit_date.strftime('%Y-%m-%d')}",
             'entry_date': position['entry_date'],
             'exit_date': exit_date.strftime('%Y-%m-%d'),
             'ticker': position['ticker'],
