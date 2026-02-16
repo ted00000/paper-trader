@@ -32,9 +32,6 @@ update_status() {
 EOF
 }
 
-# Mark as starting
-update_status "RUNNING"
-
 # Change to script directory
 cd "$SCRIPT_DIR" || {
     update_status "FAILED" "Could not change to directory $SCRIPT_DIR"
@@ -49,17 +46,32 @@ fi
 source venv/bin/activate
 
 # Load environment variables
-if [ ! -f "/root/.env" ]; then
-    update_status "FAILED" "Environment file not found at /root/.env"
+if [ ! -f "config/.env" ]; then
+    update_status "FAILED" "Environment file not found at config/.env"
     exit 1
 fi
-source /root/.env
+source config/.env
+
+# ============================================================
+# MARKET HOLIDAY CHECK (v8.9.8)
+# Skip trading on weekends and US market holidays
+# ============================================================
+if ! python3 market_holidays.py >> "$LOG_FILE" 2>&1; then
+    echo "============================================================" >> "$LOG_FILE"
+    echo "GO Command SKIPPED (Market Closed): $(date)" >> "$LOG_FILE"
+    echo "============================================================" >> "$LOG_FILE"
+    update_status "SKIPPED" "Market closed (holiday or weekend)"
+    exit 0  # Exit successfully - skipping is expected behavior
+fi
 
 # Verify agent script exists
 if [ ! -f "$AGENT_SCRIPT" ]; then
     update_status "FAILED" "Agent script not found: $AGENT_SCRIPT"
     exit 1
 fi
+
+# Mark as starting
+update_status "RUNNING"
 
 # Run GO with logging and error capture
 echo "============================================================" >> "$LOG_FILE"

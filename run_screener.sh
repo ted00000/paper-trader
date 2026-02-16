@@ -32,9 +32,6 @@ update_status() {
 EOF
 }
 
-# Mark as starting
-update_status "RUNNING"
-
 # Change to script directory
 cd "$SCRIPT_DIR" || {
     update_status "FAILED" "Could not change to directory $SCRIPT_DIR"
@@ -49,12 +46,12 @@ fi
 source venv/bin/activate
 
 # Load and EXPORT environment variables (including FINNHUB_API_KEY)
-if [ ! -f "/root/.env" ]; then
-    update_status "FAILED" "Environment file not found at /root/.env"
+if [ ! -f "config/.env" ]; then
+    update_status "FAILED" "Environment file not found at config/.env"
     exit 1
 fi
 
-# Export all variables from .env (same method as start_dashboard.sh)
+# Export all variables from config/.env
 while IFS= read -r line; do
     # Skip comments and empty lines
     [[ $line =~ ^#.*$ ]] && continue
@@ -75,13 +72,28 @@ while IFS= read -r line; do
         # Export without shell expansion
         export "$key=$value"
     fi
-done < /root/.env
+done < config/.env
+
+# ============================================================
+# MARKET HOLIDAY CHECK (v8.9.8)
+# Skip trading on weekends and US market holidays
+# ============================================================
+if ! python3 market_holidays.py >> "$LOG_FILE" 2>&1; then
+    echo "============================================================" >> "$LOG_FILE"
+    echo "Market Screener SKIPPED (Market Closed): $(date)" >> "$LOG_FILE"
+    echo "============================================================" >> "$LOG_FILE"
+    update_status "SKIPPED" "Market closed (holiday or weekend)"
+    exit 0
+fi
 
 # Verify screener script exists
 if [ ! -f "$SCREENER_SCRIPT" ]; then
     update_status "FAILED" "Screener script not found: $SCREENER_SCRIPT"
     exit 1
 fi
+
+# Mark as starting
+update_status "RUNNING"
 
 # Run screener with logging and error capture
 echo "============================================================" >> "$LOG_FILE"

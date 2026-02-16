@@ -1,14 +1,14 @@
 #!/bin/bash
-# Wrapper script for EXECUTE command
-# Ensures proper environment, logging, and status tracking for cron
+# Wrapper script for RECHECK command
+# Re-evaluates stocks skipped at 9:45 AM due to gap-up
 
 # Exit on error
 set -e
 
 # Configuration
 SCRIPT_DIR="/root/paper_trading_lab"
-LOG_FILE="$SCRIPT_DIR/logs/execute.log"
-STATUS_FILE="$SCRIPT_DIR/dashboard_data/operation_status/execute_status.json"
+LOG_FILE="$SCRIPT_DIR/logs/recheck.log"
+STATUS_FILE="$SCRIPT_DIR/dashboard_data/operation_status/recheck_status.json"
 AGENT_SCRIPT="agent_v5.5.py"
 
 # Create log directory if it doesn't exist
@@ -21,15 +21,15 @@ update_status() {
     local error=${2:-""}
     local timestamp=$(date -Iseconds)
 
-    cat > "$STATUS_FILE" <<EOF
+    cat > "$STATUS_FILE" <<STATUS_EOF
 {
-  "operation": "EXECUTE",
+  "operation": "RECHECK",
   "last_run": "$timestamp",
   "status": "$status",
   "log_file": "$LOG_FILE",
   "error": "$error"
 }
-EOF
+STATUS_EOF
 }
 
 # Change to script directory
@@ -58,7 +58,7 @@ source config/.env
 # ============================================================
 if ! python3 market_holidays.py >> "$LOG_FILE" 2>&1; then
     echo "============================================================" >> "$LOG_FILE"
-    echo "EXECUTE Command SKIPPED (Market Closed): $(date)" >> "$LOG_FILE"
+    echo "RECHECK Command SKIPPED (Market Closed): $(date)" >> "$LOG_FILE"
     echo "============================================================" >> "$LOG_FILE"
     update_status "SKIPPED" "Market closed (holiday or weekend)"
     exit 0
@@ -73,20 +73,20 @@ fi
 # Mark as starting
 update_status "RUNNING"
 
-# Run EXECUTE with logging and error capture
+# Run RECHECK with logging and error capture
 echo "============================================================" >> "$LOG_FILE"
-echo "EXECUTE Command Starting: $(date)" >> "$LOG_FILE"
+echo "RECHECK Command Starting: $(date)" >> "$LOG_FILE"
 echo "============================================================" >> "$LOG_FILE"
 
-if python3 "$AGENT_SCRIPT" execute >> "$LOG_FILE" 2>&1; then
+if python3 "$AGENT_SCRIPT" recheck >> "$LOG_FILE" 2>&1; then
     # Success
     update_status "SUCCESS"
-    echo "EXECUTE command completed successfully: $(date)" >> "$LOG_FILE"
+    echo "RECHECK command completed successfully: $(date)" >> "$LOG_FILE"
     exit 0
 else
     # Failure
     EXIT_CODE=$?
-    update_status "FAILED" "EXECUTE command failed with exit code $EXIT_CODE"
-    echo "EXECUTE command failed with exit code $EXIT_CODE: $(date)" >> "$LOG_FILE"
+    update_status "FAILED" "RECHECK command failed with exit code $EXIT_CODE"
+    echo "RECHECK command failed with exit code $EXIT_CODE: $(date)" >> "$LOG_FILE"
     exit $EXIT_CODE
 fi
