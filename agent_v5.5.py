@@ -707,6 +707,8 @@ Stagnation = position hasn't moved as expected given time held and volatility.
 
         gap_pct = ((current_price - previous_close) / previous_close) * 100 if previous_close > 0 else 0
 
+        # v8.9.8: Updated gap thresholds - EXECUTE runs at 9:45 AM (15min after open)
+        # Only skip for very large gaps (>=8%), allow others with appropriate caution
         if gap_pct >= 8.0:
             return {
                 'gap_pct': gap_pct,
@@ -714,30 +716,44 @@ Stagnation = position hasn't moved as expected given time held and volatility.
                 'entry_strategy': 'WAIT_FOR_PULLBACK_OR_SKIP',
                 'reasoning': f'Gap {gap_pct:+.1f}% too large, high fade risk',
                 'recommended_action': 'Wait for gap fill to support or skip entirely',
-                'should_enter_at_open': False,
-                'should_exit_at_open': False,  # Let it consolidate
+                'should_enter_at_open': False,  # Skip and save for RECHECK
+                'should_exit_at_open': False,
                 'risk_level': 'HIGH'
             }
         elif gap_pct >= 5.0:
+            # 5-8% gap: Enter with caution at 9:45 AM (opening volatility has passed)
             return {
                 'gap_pct': gap_pct,
                 'classification': 'BREAKAWAY_GAP',
-                'entry_strategy': 'WAIT_30MIN_THEN_PULLBACK',
-                'reasoning': f'Gap {gap_pct:+.1f}% strong, let it consolidate first',
-                'recommended_action': 'First pullback to VWAP or gap support after 30min',
-                'should_enter_at_open': False,
-                'should_exit_at_open': False,  # Wait for consolidation
+                'entry_strategy': 'ENTER_WITH_CAUTION',
+                'reasoning': f'Gap {gap_pct:+.1f}% strong but 9:45 AM entry after opening rush',
+                'recommended_action': 'Enter with reduced size or tighter stop',
+                'should_enter_at_open': True,  # v8.9.8: Allow entry at 9:45 AM
+                'should_exit_at_open': True,
                 'risk_level': 'MEDIUM'
             }
-        elif gap_pct >= 2.0:
+        elif gap_pct >= 3.0:
+            # 3-5% gap: Enter normally at 9:45 AM with logging
             return {
                 'gap_pct': gap_pct,
                 'classification': 'CONTINUATION_GAP',
                 'entry_strategy': 'ENTER_AT_945AM',
-                'reasoning': f'Gap {gap_pct:+.1f}% reasonable, wait for opening volatility',
-                'recommended_action': 'Enter at 9:45 AM after opening rush',
-                'should_enter_at_open': False,  # Wait 15min
-                'should_exit_at_open': True,  # Can exit normally
+                'reasoning': f'Gap {gap_pct:+.1f}% reasonable, 9:45 AM entry after opening volatility',
+                'recommended_action': 'Normal entry with gap noted',
+                'should_enter_at_open': True,  # v8.9.8: Allow entry
+                'should_exit_at_open': True,
+                'risk_level': 'LOW'
+            }
+        elif gap_pct >= 2.0:
+            # 2-3% gap: Normal entry, minimal concern
+            return {
+                'gap_pct': gap_pct,
+                'classification': 'SMALL_GAP',
+                'entry_strategy': 'ENTER_NORMALLY',
+                'reasoning': f'Gap {gap_pct:+.1f}% minimal',
+                'recommended_action': 'Normal entry',
+                'should_enter_at_open': True,  # v8.9.8: Allow entry
+                'should_exit_at_open': True,
                 'risk_level': 'LOW'
             }
         elif gap_pct <= -3.0:
@@ -6221,20 +6237,29 @@ CURRENT PORTFOLIO
         if 'target' in reason_lower or return_pct >= 10:
             return f"Target reached ({return_pct:+.1f}%)"
 
-        # Check for stop loss
-        elif 'stop' in reason_lower or return_pct <= -7:
-            return f"Stop loss ({return_pct:+.1f}%)"
-
-        # Check for time stop
-        elif 'time' in reason_lower or 'days' in reason_lower:
+        # Check for time stop BEFORE stop loss (so "Time stop" doesn't match "stop")
+        elif 'time' in reason_lower or 'days' in reason_lower or 'day ' in reason_lower:
             days_held = position.get('days_held', 0)
             return f"Time stop ({days_held} days)"
+
+        # Check for stagnation (v8.9.8)
+        elif 'stagnation' in reason_lower or 'stagnant' in reason_lower or 'dead money' in reason_lower:
+            days_held = position.get('days_held', 0)
+            return f"Stagnation ({days_held} days, {return_pct:+.1f}%)"
+
+        # Check for stop loss (actual stop hit, not "approaching")
+        elif return_pct <= -7:
+            return f"Stop loss ({return_pct:+.1f}%)"
+
+        # Check for approaching stop (discretionary exit before stop hit)
+        elif 'stop' in reason_lower and 'approach' in reason_lower:
+            return f"Stop approaching ({return_pct:+.1f}%)"
 
         # Check for catalyst failure
         elif 'catalyst' in reason_lower or 'thesis' in reason_lower or 'invalid' in reason_lower:
             return f"Catalyst failed ({return_pct:+.1f}%)"
 
-        # Default: Portfolio management
+        # Default: Portfolio management (discretionary exit)
         else:
             return f"Portfolio decision ({return_pct:+.1f}%)"
 
@@ -8190,8 +8215,17 @@ CURRENT PORTFOLIO
 
                     # Check if price is between stop and target (no valid exit reason)
                     elif exit_price > stop_loss and exit_price < price_target:
-                        # Only allow if catalyst invalidated or other valid reason
-                        if 'catalyst' not in claude_reason.lower() and 'time' not in claude_reason.lower() and 'rotation' not in claude_reason.lower():
+                        # v8.9.8: Allow discretionary exits with valid reasons from GO
+                        # Valid reasons include: catalyst issues, time/stagnation, rotation, approaching stop, arbitrage concerns
+                        reason_lower = claude_reason.lower()
+                        valid_discretionary_keywords = [
+                            'catalyst', 'time', 'rotation', 'stagnation', 'stagnant',
+                            'approaching', 'day ', 'days', 'arbitrage', 'dead money',
+                            'faded', 'exhausted', 'momentum', 'better opportunity',
+                            'capital', 'free', 'redeploy'
+                        ]
+                        has_valid_reason = any(keyword in reason_lower for keyword in valid_discretionary_keywords)
+                        if not has_valid_reason:
                             should_execute_exit = False
                             rejection_reason = f"Price ${exit_price:.2f} between stop ${stop_loss:.2f} and target ${price_target:.2f} - no valid exit reason"
 
