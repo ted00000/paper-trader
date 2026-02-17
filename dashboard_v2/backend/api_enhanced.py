@@ -1352,6 +1352,8 @@ def get_screening_decisions():
                     activity_data = json.load(f)
                     if activity_data.get('date') == today:
                         for trade in activity_data.get('closed_today', []):
+                            # v8.9.8: Accept both return_percent and return_pct field names
+                            pnl_pct = trade.get('return_percent') or trade.get('return_pct')
                             todays_trades.append({
                                 'time': activity_data.get('time', ''),
                                 'ticker': trade.get('ticker'),
@@ -1359,7 +1361,7 @@ def get_screening_decisions():
                                 'price': trade.get('exit_price'),
                                 'shares': trade.get('shares'),
                                 'pnl': trade.get('return_dollars'),
-                                'pnl_pct': trade.get('return_percent'),
+                                'pnl_pct': pnl_pct,
                                 'reason': trade.get('exit_reason')
                             })
             except Exception:
