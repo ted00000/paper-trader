@@ -3012,34 +3012,72 @@ Stagnation = position hasn't moved as expected given time held and volatility.
         # Convert to date for comparison
         check_date = check_date.date() if hasattr(check_date, 'date') else check_date
 
-        # 2025 Macro Calendar (hardcoded for reliability)
+        # 2026 Macro Calendar (hardcoded for reliability) - Updated v8.9.8
         # Format: (event_date, event_type, description)
-        macro_events_2025 = [
-            # FOMC Meetings (2-day before, 1-day after blackout)
-            ('2025-01-29', 'FOMC', 'FOMC Meeting'),
-            ('2025-03-19', 'FOMC', 'FOMC Meeting'),
-            ('2025-05-07', 'FOMC', 'FOMC Meeting'),
-            ('2025-06-18', 'FOMC', 'FOMC Meeting'),
-            ('2025-07-30', 'FOMC', 'FOMC Meeting'),
-            ('2025-09-17', 'FOMC', 'FOMC Meeting'),
-            ('2025-11-05', 'FOMC', 'FOMC Meeting'),
-            ('2025-12-17', 'FOMC', 'FOMC Meeting'),
+        macro_events = [
+            # =================================================================
+            # FOMC Meetings 2026 (announcement day = blackout)
+            # =================================================================
+            ('2026-01-28', 'FOMC', 'FOMC Meeting'),
+            ('2026-03-18', 'FOMC', 'FOMC Meeting'),
+            ('2026-05-06', 'FOMC', 'FOMC Meeting'),
+            ('2026-06-17', 'FOMC', 'FOMC Meeting'),
+            ('2026-07-29', 'FOMC', 'FOMC Meeting'),
+            ('2026-09-16', 'FOMC', 'FOMC Meeting'),
+            ('2026-11-04', 'FOMC', 'FOMC Meeting'),
+            ('2026-12-16', 'FOMC', 'FOMC Meeting'),
 
-            # CPI Release (1-day before, day of blackout) - typically mid-month
-            # ('2025-11-13', 'CPI', 'CPI Release'),  # CANCELLED - Government shutdown
-            ('2025-12-11', 'CPI', 'CPI Release'),
+            # =================================================================
+            # CPI Releases 2026 (8:30 AM release = blackout)
+            # =================================================================
+            ('2026-01-14', 'CPI', 'CPI Release'),
+            ('2026-02-11', 'CPI', 'CPI Release'),
+            ('2026-03-11', 'CPI', 'CPI Release'),
+            ('2026-04-15', 'CPI', 'CPI Release'),
+            ('2026-05-13', 'CPI', 'CPI Release'),
+            ('2026-06-10', 'CPI', 'CPI Release'),
+            ('2026-07-15', 'CPI', 'CPI Release'),
+            ('2026-08-12', 'CPI', 'CPI Release'),
+            ('2026-09-16', 'CPI', 'CPI Release'),
+            ('2026-10-14', 'CPI', 'CPI Release'),
+            ('2026-11-12', 'CPI', 'CPI Release'),
+            ('2026-12-09', 'CPI', 'CPI Release'),
 
-            # NFP (Jobs Report) - First Friday of each month (1-day before, day of blackout)
-            ('2025-11-07', 'NFP', 'Jobs Report'),
-            ('2025-12-05', 'NFP', 'Jobs Report'),
+            # =================================================================
+            # NFP (Jobs Report) 2026 - First Friday of month (8:30 AM = blackout)
+            # =================================================================
+            ('2026-01-09', 'NFP', 'Jobs Report'),
+            ('2026-02-06', 'NFP', 'Jobs Report'),
+            ('2026-03-06', 'NFP', 'Jobs Report'),
+            ('2026-04-03', 'NFP', 'Jobs Report'),
+            ('2026-05-01', 'NFP', 'Jobs Report'),
+            ('2026-06-05', 'NFP', 'Jobs Report'),
+            ('2026-07-02', 'NFP', 'Jobs Report'),
+            ('2026-08-07', 'NFP', 'Jobs Report'),
+            ('2026-09-04', 'NFP', 'Jobs Report'),
+            ('2026-10-02', 'NFP', 'Jobs Report'),
+            ('2026-11-06', 'NFP', 'Jobs Report'),
+            ('2026-12-04', 'NFP', 'Jobs Report'),
 
-            # PCE (Inflation) - End of month (1-day before, day of blackout)
-            ('2025-11-26', 'PCE', 'PCE Release'),
-            ('2025-12-23', 'PCE', 'PCE Release'),
+            # =================================================================
+            # PCE (Core Inflation) 2026 - End of month (8:30 AM = blackout)
+            # =================================================================
+            ('2026-01-30', 'PCE', 'PCE Release'),
+            ('2026-02-27', 'PCE', 'PCE Release'),
+            ('2026-03-27', 'PCE', 'PCE Release'),
+            ('2026-04-30', 'PCE', 'PCE Release'),
+            ('2026-05-29', 'PCE', 'PCE Release'),
+            ('2026-06-26', 'PCE', 'PCE Release'),
+            ('2026-07-31', 'PCE', 'PCE Release'),
+            ('2026-08-28', 'PCE', 'PCE Release'),
+            ('2026-09-25', 'PCE', 'PCE Release'),
+            ('2026-10-30', 'PCE', 'PCE Release'),
+            ('2026-11-25', 'PCE', 'PCE Release'),
+            ('2026-12-23', 'PCE', 'PCE Release'),
         ]
 
         # Check each event
-        for event_date_str, event_type, description in macro_events_2025:
+        for event_date_str, event_type, description in macro_events:
             event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
 
             # Define blackout windows - EVENT-DAY ONLY (aligned with institutional best practices)
