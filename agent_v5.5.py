@@ -1450,27 +1450,42 @@ Stagnation = position hasn't moved as expected given time held and volatility.
             print(f"      📤 Placing Alpaca BUY order: {shares} shares of {ticker} (~${position_size_dollars:.2f})")
             order = self.broker.place_market_order(ticker, shares, side='buy')
 
-            # v8.9: Get actual fill price from Alpaca (source of truth)
+            # v8.9.8: Get actual fill price from Alpaca (CRITICAL for stop-loss calculation)
+            # Must wait for fill - stop-loss MUST be based on actual entry, not quoted price
+            import time
             fill_price = None
+            actual_shares = shares
+
+            # Check immediately first
             if order.filled_avg_price:
                 fill_price = float(order.filled_avg_price)
-            else:
-                # Wait briefly and re-fetch order to get fill price
-                import time
-                time.sleep(0.5)
-                try:
-                    filled_order = self.broker.get_order(order.id)
-                    if filled_order and filled_order.filled_avg_price:
-                        fill_price = float(filled_order.filled_avg_price)
-                except:
-                    pass
+                if order.filled_qty:
+                    actual_shares = int(float(order.filled_qty))
+
+            # If not filled yet, poll for up to 5 seconds (market orders should fill fast)
+            if not fill_price:
+                for attempt in range(10):  # 10 attempts x 0.5s = 5 seconds max
+                    time.sleep(0.5)
+                    try:
+                        filled_order = self.broker.get_order(order.id)
+                        if filled_order and filled_order.filled_avg_price:
+                            fill_price = float(filled_order.filled_avg_price)
+                            if filled_order.filled_qty:
+                                actual_shares = int(float(filled_order.filled_qty))
+                            break
+                        # If order is no longer pending, stop polling
+                        if filled_order.status.value not in ['new', 'pending_new', 'accepted']:
+                            break
+                    except:
+                        pass
 
             if fill_price:
-                print(f"      ✓ Alpaca order filled: {order.id} @ ${fill_price:.2f}")
+                print(f"      ✓ Alpaca order filled: {order.id} @ ${fill_price:.2f} ({actual_shares} shares)")
             else:
-                print(f"      ✓ Alpaca order placed: {order.id} (status: {order.status})")
+                print(f"      ⚠️ Alpaca order pending, fill price unavailable: {order.id}")
+                print(f"      → Stop-loss will use quoted price ${entry_price:.2f} as fallback")
 
-            return True, f"Bought {shares} shares via Alpaca", order.id, shares, fill_price
+            return True, f"Bought {actual_shares} shares via Alpaca", order.id, actual_shares, fill_price
 
         except Exception as e:
             error_msg = f"Alpaca buy failed: {str(e)}"
