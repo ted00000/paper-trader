@@ -8407,35 +8407,41 @@ CURRENT PORTFOLIO
                         print(f"      Recommended: {gap_analysis['recommended_action']}")
                         print(f"      → Will re-check at 10:15 AM (run 'python agent_v5.5.py recheck')")
 
-                        # Save to skipped_for_gap.json for 10:15 AM recheck
-                        skipped_file = self.project_dir / 'skipped_for_gap.json'
-                        skipped_stocks = []
-                        if skipped_file.exists():
-                            try:
-                                with open(skipped_file) as f:
-                                    skipped_data = json.load(f)
-                                    # Only keep today's skipped stocks
-                                    today = datetime.now().strftime('%Y-%m-%d')
-                                    if skipped_data.get('date') == today:
-                                        skipped_stocks = skipped_data.get('stocks', [])
-                            except:
-                                pass
+                        # v8.9.9: Save to skipped_for_gap.json for 10:15 AM recheck
+                        # Added explicit error handling to diagnose file write failures
+                        try:
+                            skipped_file = self.project_dir / 'skipped_for_gap.json'
+                            skipped_stocks = []
+                            if skipped_file.exists():
+                                try:
+                                    with open(skipped_file) as f:
+                                        skipped_data = json.load(f)
+                                        # Only keep today's skipped stocks
+                                        today = datetime.now().strftime('%Y-%m-%d')
+                                        if skipped_data.get('date') == today:
+                                            skipped_stocks = skipped_data.get('stocks', [])
+                                except Exception as read_err:
+                                    print(f"      ⚠️ Warning: Failed to read existing skipped file: {read_err}")
 
-                        skipped_stocks.append({
-                            'ticker': ticker,
-                            'original_entry_price': entry_price,
-                            'previous_close': previous_close,
-                            'gap_pct': gap_analysis['gap_pct'],
-                            'classification': gap_analysis['classification'],
-                            'position_data': pos,  # Full position data for entry
-                            'skipped_at': datetime.now().strftime('%H:%M:%S')
-                        })
+                            skipped_stocks.append({
+                                'ticker': ticker,
+                                'original_entry_price': entry_price,
+                                'previous_close': previous_close,
+                                'gap_pct': gap_analysis['gap_pct'],
+                                'classification': gap_analysis['classification'],
+                                'position_data': pos,  # Full position data for entry
+                                'skipped_at': datetime.now().strftime('%H:%M:%S')
+                            })
 
-                        with open(skipped_file, 'w') as f:
-                            json.dump({
-                                'date': datetime.now().strftime('%Y-%m-%d'),
-                                'stocks': skipped_stocks
-                            }, f, indent=2, default=str)
+                            with open(skipped_file, 'w') as f:
+                                json.dump({
+                                    'date': datetime.now().strftime('%Y-%m-%d'),
+                                    'stocks': skipped_stocks
+                                }, f, indent=2, default=str)
+                            print(f"      ✓ Saved to skipped_for_gap.json for RECHECK")
+                        except Exception as write_err:
+                            print(f"      ⚠️ CRITICAL: Failed to save skipped stock: {write_err}")
+                            # Don't let file write failure crash EXECUTE
 
                         continue  # Skip this entry
 
