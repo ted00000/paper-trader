@@ -4607,7 +4607,8 @@ CRITICAL OUTPUT REQUIREMENT - JSON at end:
       "position_size_pct": 6.0,
       "catalyst": "FDA_Approval",
       "sector": "Healthcare",
-      "thesis": "One sentence thesis"
+      "thesis": "One sentence thesis",
+      "custom_stop_pct": -3.0
     }}
   ]
 }}
@@ -4618,8 +4619,21 @@ CRITICAL OUTPUT REQUIREMENT - JSON at end:
 - confidence_level: Must be "HIGH", "MEDIUM", or "LOW"
 - position_size_pct: Use decimal (9.0, not 100.00)
 
+**OPTIONAL: CUSTOM STOP LOSS (v8.9.9):**
+- custom_stop_pct: Tighter stop than default -7% (e.g., -3.0, -5.0)
+- Use when entry timing is risky (climax top, extended, speculative)
+- CONSTRAINT: Must be between -1.0 and -7.0 (system enforces -7% max loss ceiling)
+- If omitted, system uses default -7% stop
+- Example: "custom_stop_pct": -3.0 for a climax top entry needing tight risk management
+
 **CRITICAL:** A ticker can ONLY appear in ONE array (hold, exit, or buy). Never put the same ticker in multiple arrays.
 Do not include tickers you are PASSing on in the buy array - simply omit them.
+
+**AUTONOMOUS SYSTEM REMINDER (v8.9.9):**
+This system runs autonomously with NO human monitoring. Your recommendations execute automatically.
+- DO NOT recommend "mental stops" or "watch and exit if..." - there's no human watching
+- If you want a tighter stop, specify custom_stop_pct in the JSON
+- All exits execute at market open via EXECUTE command
 
 Provide full analysis of each position BEFORE the JSON. Justify all exits against the rules above.
 
@@ -8512,22 +8526,36 @@ CURRENT PORTFOLIO
                         pos['entry_spread_pct'] = 0
                         pos['slippage_bps'] = 0
 
-                    # v7.0: ATR-based stops (2.5x ATR, capped at -7%)
-                    atr = self.calculate_atr(ticker, period=14)
-                    if atr and atr > 0:
-                        # Stop = entry - (2.5 * ATR), but not wider than -7%
-                        atr_stop_distance = atr * 2.5
-                        atr_stop = entry_price - atr_stop_distance
-                        max_stop = entry_price * 0.93  # -7% cap for safety
-                        pos['stop_loss'] = round(max(atr_stop, max_stop), 2)  # Use tighter of the two
-                        stop_pct = ((pos['stop_loss'] - entry_price) / entry_price) * 100
-                        pos['stop_pct'] = round(stop_pct, 2)  # v7.1.1 - Track stop distance for distribution analysis
-                        print(f"      Stop: ${pos['stop_loss']:.2f} ({stop_pct:.1f}%) - ATR-based (ATR=${atr:.2f}, 2.5x=${atr_stop_distance:.2f})")
+                    # v8.9.9: Custom stop support with -7% ceiling enforcement
+                    custom_stop_pct = pos.get('custom_stop_pct')
+                    if custom_stop_pct is not None:
+                        # Enforce -7% ceiling: custom stop can be tighter (e.g., -3%) but never wider
+                        if custom_stop_pct < -7.0:
+                            print(f"      ⚠️ Custom stop {custom_stop_pct}% exceeds -7% max, capping at -7%")
+                            custom_stop_pct = -7.0
+                        elif custom_stop_pct > -1.0:
+                            print(f"      ⚠️ Custom stop {custom_stop_pct}% too tight, setting to -1%")
+                            custom_stop_pct = -1.0
+                        pos['stop_loss'] = round(entry_price * (1 + custom_stop_pct/100), 2)
+                        pos['stop_pct'] = custom_stop_pct
+                        print(f"      Stop: ${pos['stop_loss']:.2f} ({custom_stop_pct:.1f}%) - Custom (GO recommendation)")
                     else:
-                        # Fallback to -7% if ATR unavailable
-                        pos['stop_loss'] = round(entry_price * 0.93, 2)
-                        pos['stop_pct'] = -7.0  # v7.1.1 - Fixed stop percentage
-                        print(f"      Stop: ${pos['stop_loss']:.2f} (-7.0%) - Fixed (ATR unavailable)")
+                        # v7.0: ATR-based stops (2.5x ATR, capped at -7%)
+                        atr = self.calculate_atr(ticker, period=14)
+                        if atr and atr > 0:
+                            # Stop = entry - (2.5 * ATR), but not wider than -7%
+                            atr_stop_distance = atr * 2.5
+                            atr_stop = entry_price - atr_stop_distance
+                            max_stop = entry_price * 0.93  # -7% cap for safety
+                            pos['stop_loss'] = round(max(atr_stop, max_stop), 2)  # Use tighter of the two
+                            stop_pct = ((pos['stop_loss'] - entry_price) / entry_price) * 100
+                            pos['stop_pct'] = round(stop_pct, 2)
+                            print(f"      Stop: ${pos['stop_loss']:.2f} ({stop_pct:.1f}%) - ATR-based (ATR=${atr:.2f}, 2.5x=${atr_stop_distance:.2f})")
+                        else:
+                            # Fallback to -7% if ATR unavailable
+                            pos['stop_loss'] = round(entry_price * 0.93, 2)
+                            pos['stop_pct'] = -7.0
+                            print(f"      Stop: ${pos['stop_loss']:.2f} (-7.0%) - Fixed (ATR unavailable)")
 
                     pos['price_target'] = round(entry_price * (1 + dynamic_target_pct/100), 2)  # Dynamic target
                     pos['target_pct'] = dynamic_target_pct  # Store for reference
