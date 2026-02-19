@@ -348,7 +348,16 @@ def get_ruleset_version():
 **NEW POSITIONS: AI-FIRST HOLISTIC DECISION MAKING**
 
 You have full authority to decide which stocks to BUY based on holistic analysis of ALL factors.
-The only hard blocks are catastrophic checks (VIX ≥35, macro blackout, halted/delisted stocks).
+
+**HARD BLOCKS (Non-Negotiable - NO EXCEPTIONS):**
+- VIX ≥35: Market too volatile
+- Macro blackout period: FOMC/CPI/NFP day trading ban
+- Halted/delisted stocks: Cannot trade
+- **EARNINGS TIMING (v8.9.9)**: DO NOT enter any stock that reports earnings TOMORROW or TODAY
+  - If candidate shows "📅 Earnings: <date>" within next 24 hours → PASS immediately
+  - This is a HARD RULE from the MRCY lesson (Feb 4, 2026) - gap risk is unacceptable
+  - No exceptions - M&A catalysts, bidding wars, etc. do NOT override this rule
+  - Wait until AFTER earnings are reported to consider entry
 
 **TECHNICAL INDICATOR REFERENCE (Guidelines, NOT Hard Rules):**
 Each candidate includes full technical indicators. Our model typically looks for these characteristics
@@ -4494,7 +4503,16 @@ SWING TRADING RULES (STRICTLY ENFORCE):
 **NEW POSITIONS: AI-FIRST HOLISTIC DECISION MAKING**
 
 You have full authority to decide which stocks to BUY based on holistic analysis of ALL factors.
-The only hard blocks are catastrophic checks (VIX ≥35, macro blackout, halted/delisted stocks).
+
+**HARD BLOCKS (Non-Negotiable - NO EXCEPTIONS):**
+- VIX ≥35: Market too volatile
+- Macro blackout period: FOMC/CPI/NFP day trading ban
+- Halted/delisted stocks: Cannot trade
+- **EARNINGS TIMING (v8.9.9)**: DO NOT enter any stock that reports earnings TOMORROW or TODAY
+  - If candidate shows "📅 Earnings: <date>" within next 24 hours → PASS immediately
+  - This is a HARD RULE from the MRCY lesson (Feb 4, 2026) - gap risk is unacceptable
+  - No exceptions - M&A catalysts, bidding wars, etc. do NOT override this rule
+  - Wait until AFTER earnings are reported to consider entry
 
 **TECHNICAL INDICATOR REFERENCE (Guidelines, NOT Hard Rules):**
 Each candidate includes full technical indicators. Our model typically looks for these characteristics
@@ -4765,21 +4783,23 @@ Group positions by sector (from catalyst field or ticker industry):
 - Note any correlated risk (e.g., multiple semiconductor stocks)
 
 ### 4. TOMORROW'S ACTION ITEMS
-Provide specific, actionable recommendations:
+**This is a 100% AUTONOMOUS system. ALL recommendations are COMMANDS, not suggestions.**
 
-**MANDATORY EXITS** (non-negotiable):
-- List any positions that hit stop_loss, time_stop, or catalyst invalidation
+**🔴 MANDATORY EXITS** (execute at market open):
+- Positions that hit stop_loss, time_stop, or catalyst invalidation
+- Positions with rule violations (e.g., entered before earnings - MUST exit before report)
 
-**SUGGESTED EXITS** (your recommendation with reasoning):
-- Positions you recommend exiting with brief rationale
+**🟠 RECOMMENDED EXITS** (execute at market open unless new info changes thesis):
+- Positions you determine should exit based on analysis - these ARE executed, not optional
+- Include specific reasoning for each
 
-**POSITIONS TO MONITOR** (watch closely):
+**📊 POSITIONS TO MONITOR** (may require action during day):
 - Approaching stop loss (within 2%)
 - Approaching profit target (within 2%)
 - Significant overnight news expected
 
-**HOLD WITH CONFIDENCE**:
-- Strong positions with intact thesis
+**✅ HOLD WITH CONFIDENCE**:
+- Strong positions with intact thesis - no action required
 
 ### 5. MARKET CONTEXT (Brief)
 - Overall market sentiment today (1-2 sentences max)
