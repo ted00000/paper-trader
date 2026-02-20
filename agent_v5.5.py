@@ -359,6 +359,18 @@ You have full authority to decide which stocks to BUY based on holistic analysis
   - No exceptions - M&A catalysts, bidding wars, etc. do NOT override this rule
   - Wait until AFTER earnings are reported to consider entry
 
+**MERGER ARBITRAGE RULES (v8.9.9 - MASI Lesson):**
+Merger arb IS different from momentum trading, but entry timing still matters:
+- **Spread minimum ≥5%**: If spread to deal price is <5%, PASS - not worth opportunity cost for swing system
+  - Example: MASI at $175 with $180 deal = 2.8% spread = PASS (too small)
+  - Example: Stock at $45 with $50 deal = 11% spread = Consider entry
+- **Don't chase the announcement pop**: If stock already ran >15% on M&A news, WAIT for pullback
+  - MASI ran +32% in 3 days → should have waited, not chased
+  - The "hard floor" only helps if you don't overpay to get in
+- **Technical warnings still apply to ENTRY TIMING**: RSI >75 + climax volume = bad entry even with valid deal
+  - Merger arb reduces PRICE TARGET uncertainty, not ENTRY TIMING risk
+- **Time value matters**: Deals take 3-6 months to close. A 2.5% spread over 4 months = poor return vs other opportunities
+
 **TECHNICAL INDICATOR REFERENCE (Guidelines, NOT Hard Rules):**
 Each candidate includes full technical indicators. Our model typically looks for these characteristics
 when multiple factors co-exist, but you should weigh ALL factors holistically:
@@ -4513,6 +4525,18 @@ You have full authority to decide which stocks to BUY based on holistic analysis
   - This is a HARD RULE from the MRCY lesson (Feb 4, 2026) - gap risk is unacceptable
   - No exceptions - M&A catalysts, bidding wars, etc. do NOT override this rule
   - Wait until AFTER earnings are reported to consider entry
+
+**MERGER ARBITRAGE RULES (v8.9.9 - MASI Lesson):**
+Merger arb IS different from momentum trading, but entry timing still matters:
+- **Spread minimum ≥5%**: If spread to deal price is <5%, PASS - not worth opportunity cost for swing system
+  - Example: MASI at $175 with $180 deal = 2.8% spread = PASS (too small)
+  - Example: Stock at $45 with $50 deal = 11% spread = Consider entry
+- **Don't chase the announcement pop**: If stock already ran >15% on M&A news, WAIT for pullback
+  - MASI ran +32% in 3 days → should have waited, not chased
+  - The "hard floor" only helps if you don't overpay to get in
+- **Technical warnings still apply to ENTRY TIMING**: RSI >75 + climax volume = bad entry even with valid deal
+  - Merger arb reduces PRICE TARGET uncertainty, not ENTRY TIMING risk
+- **Time value matters**: Deals take 3-6 months to close. A 2.5% spread over 4 months = poor return vs other opportunities
 
 **TECHNICAL INDICATOR REFERENCE (Guidelines, NOT Hard Rules):**
 Each candidate includes full technical indicators. Our model typically looks for these characteristics
