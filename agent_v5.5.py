@@ -1471,34 +1471,52 @@ Stagnation = position hasn't moved as expected given time held and volatility.
             print(f"      📤 Placing Alpaca BUY order: {shares} shares of {ticker} (~${position_size_dollars:.2f})")
             order = self.broker.place_market_order(ticker, shares, side='buy')
 
-            # v8.9.8: Get actual fill price from Alpaca (CRITICAL for stop-loss calculation)
+            # v8.9.10: Get actual fill price from Alpaca (CRITICAL for stop-loss calculation)
             # Must wait for fill - stop-loss MUST be based on actual entry, not quoted price
+            # BUG FIX: Always poll to confirm filled_qty matches requested shares
             import time
             fill_price = None
-            actual_shares = shares
+            actual_shares = shares  # Default to requested shares
 
-            # Check immediately first
-            if order.filled_avg_price:
-                fill_price = float(order.filled_avg_price)
-                if order.filled_qty:
-                    actual_shares = int(float(order.filled_qty))
-
-            # If not filled yet, poll for up to 5 seconds (market orders should fill fast)
-            if not fill_price:
-                for attempt in range(10):  # 10 attempts x 0.5s = 5 seconds max
-                    time.sleep(0.5)
-                    try:
-                        filled_order = self.broker.get_order(order.id)
-                        if filled_order and filled_order.filled_avg_price:
+            # Poll for fill confirmation - market orders should fill within seconds
+            # v8.9.10: Always poll to ensure we get the correct filled_qty
+            for attempt in range(10):  # 10 attempts x 0.5s = 5 seconds max
+                time.sleep(0.5)
+                try:
+                    filled_order = self.broker.get_order(order.id)
+                    if filled_order and filled_order.status.value == 'filled':
+                        # Order is fully filled - get final values
+                        if filled_order.filled_avg_price:
                             fill_price = float(filled_order.filled_avg_price)
-                            if filled_order.filled_qty:
-                                actual_shares = int(float(filled_order.filled_qty))
-                            break
-                        # If order is no longer pending, stop polling
-                        if filled_order.status.value not in ['new', 'pending_new', 'accepted']:
-                            break
-                    except:
-                        pass
+                        if filled_order.filled_qty:
+                            actual_shares = int(float(filled_order.filled_qty))
+                        break
+                    # If order failed or was rejected, stop polling
+                    if filled_order.status.value in ['canceled', 'expired', 'rejected']:
+                        print(f"      ⚠️ Order {filled_order.status.value}: {order.id}")
+                        break
+                except Exception as poll_err:
+                    # Log polling errors but continue trying
+                    if attempt == 9:  # Last attempt
+                        print(f"      ⚠️ Fill polling failed: {poll_err}")
+
+            # v8.9.10: Final verification - refetch to ensure we have correct data
+            if fill_price and actual_shares != shares:
+                # Shares mismatch - this is expected if partial fill, but log it
+                print(f"      ℹ️  Filled {actual_shares} of {shares} requested shares")
+            elif fill_price and actual_shares == shares:
+                # Perfect fill
+                pass
+            elif not fill_price:
+                # Fallback: try one more time to get fill data
+                try:
+                    final_order = self.broker.get_order(order.id)
+                    if final_order and final_order.filled_avg_price:
+                        fill_price = float(final_order.filled_avg_price)
+                    if final_order and final_order.filled_qty:
+                        actual_shares = int(float(final_order.filled_qty))
+                except:
+                    pass
 
             if fill_price:
                 print(f"      ✓ Alpaca order filled: {order.id} @ ${fill_price:.2f} ({actual_shares} shares)")
