@@ -42,7 +42,7 @@ FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', '')
 FMP_API_KEY = os.environ.get('FMP_API_KEY', '')  # PHASE 2.2: Financial Modeling Prep (free tier)
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
 CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages'
-CLAUDE_MODEL = 'claude-3-haiku-20240307'  # Haiku for cost efficiency (updated from deprecated 3-5-haiku-20241022)
+CLAUDE_MODEL = 'claude-haiku-4-5'  # Haiku 4.5 ($1/MTok input, $5/MTok output)
 
 # S&P 1500 Sector ETF Mapping (same as agent)
 SECTOR_ETF_MAP = {
