@@ -1,9 +1,22 @@
 # Tedbot Execution Paths - Complete System Flow Documentation
 
-**Version**: v8.9.8
-**Last Updated**: February 13, 2026
+**Version**: v8.9.9
+**Last Updated**: February 19, 2026
 
 This document exhaustively describes every execution path through the Tedbot system, including primary flows, edge cases, and error handling.
+
+---
+
+## Changelog (v8.9.9)
+
+| Change | Description |
+|--------|-------------|
+| **Earnings Timing HARD RULE** | No entry if stock reports earnings within 24 hours (MRCY lesson) |
+| **Merger Arbitrage Rules** | Spread ≥5%, don't chase >15% pop, technical warnings still apply (MASI lesson) |
+| **Custom Stop Support** | GO can recommend tighter stops (-1% to -7%), EXECUTE enforces -7% ceiling |
+| **ANALYZE Fully Autonomous** | Removed "Your decision" language - all recommendations are commands |
+| **RECHECK Permission Fix** | Fixed chmod +x on run_recheck.sh for cron execution |
+| **skipped_for_gap.json Logging** | Added explicit error handling and confirmation logging |
 
 ---
 
@@ -172,16 +185,20 @@ agent_v5.5.py execute
 
 **Purpose**: Re-evaluate stocks that were skipped due to gaps at 9:45 AM
 
+**v8.9.9 Fixes**:
+- Fixed run_recheck.sh permission (chmod +x) for cron execution
+- Added explicit error handling and logging when saving skipped_for_gap.json
+
 **Execution Path**:
 ```
 agent_v5.5.py recheck
-├── Load skipped_for_gaps.json
+├── Load skipped_for_gap.json (v8.9.9: explicit error logging if missing)
 ├── If no skipped stocks OR stale date:
 │   └── Return SUCCESS (nothing to do)
 ├── Fetch current Alpaca prices
 ├── For each skipped stock:
 │   ├── Check if gap has normalized (<3%)
-│   ├── If yes: Execute entry
+│   ├── If yes: Execute entry via _execute_alpaca_buy()
 │   └── If no: Keep skipped
 ├── Update portfolio
 └── Create daily activity summary
@@ -262,6 +279,8 @@ agent_v5.5.py exit
 
 **Purpose**: End-of-day summary, learning, NO order execution
 
+**Autonomy Note (v8.9.9)**: This is a 100% autonomous system. ALL ANALYZE recommendations are COMMANDS for the next trading day, not suggestions. There is no human review between ANALYZE and the next GO/EXECUTE.
+
 **Execution Path**:
 ```
 agent_v5.5.py analyze
@@ -270,6 +289,9 @@ agent_v5.5.py analyze
 ├── Update portfolio with EOD values
 ├── Create daily activity summary (reads from CSV)
 ├── Call Claude for performance analysis
+│   ├── 🔴 MANDATORY EXITS → Execute at next market open
+│   ├── 🟠 RECOMMENDED EXITS → Execute unless new info changes thesis
+│   └── 🟢 HOLD positions with notes
 ├── Update learning database
 ├── Save ANALYZE recommendations for next GO
 └── Update account status
@@ -293,6 +315,49 @@ agent_v5.5.py analyze
 
 ## 2. Entry Scenarios
 
+### 2.0 Hard Blocks (v8.9.9)
+
+**These conditions ALWAYS block entry - no exceptions:**
+
+| Block | Condition | Rationale |
+|-------|-----------|-----------|
+| **VIX ≥35** | Market too volatile | Historically poor win rate |
+| **Macro Blackout** | FOMC/CPI/NFP/PCE day | Binary event risk |
+| **Halted/Delisted** | Cannot trade | Obvious |
+| **Earnings Timing** | Reports within 24 hours | MRCY lesson (Feb 4, 2026) - gap risk unacceptable |
+
+**Earnings Timing Rule**:
+```
+If candidate shows "📅 Earnings: <date>" within 24 hours:
+├── PASS immediately
+├── No exceptions for M&A, bidding wars, etc.
+└── This is a HARD RULE - gap risk is unacceptable
+```
+
+### 2.0.1 Merger Arbitrage Entry Rules (v8.9.9)
+
+**Background**: Merger arb IS different from momentum trading, but entry timing still matters.
+
+**Rules** (MASI lesson - Feb 2026):
+| Rule | Threshold | Rationale |
+|------|-----------|-----------|
+| **Spread Minimum** | ≥5% to deal price | <5% not worth opportunity cost |
+| **Don't Chase Pop** | Wait if already >15% up on news | Entry timing matters |
+| **Technical Warnings** | RSI >75 + climax volume = bad entry | Even for arb |
+| **Time Value** | Calculate implied return | 2.5% over 4 months = poor annualized |
+
+**Path**:
+```
+GO (Merger Arb Candidate)
+├── Calculate spread to deal price
+├── If spread <5%: PASS
+├── If already ran >15% on announcement: WAIT for pullback
+├── If RSI >75 + extended technicals: PASS or wait
+└── Calculate annualized return vs opportunity cost
+```
+
+---
+
 ### 2.1 Normal Entry (Gap < 3%)
 
 **Trigger**: GO recommends BUY, gap < 3% at EXECUTE time
@@ -303,14 +368,23 @@ EXECUTE
 ├── Validate buying power
 ├── Execute Alpaca market buy
 ├── Wait 3 seconds (wash trade prevention)
+├── Calculate stop-loss:
+│   ├── If custom_stop_pct specified by GO: Use that (capped at -7%)
+│   ├── Otherwise: ATR-based stop (max -7%)
 ├── Place Alpaca stop-loss order
 ├── Add to active_positions.json
 ├── Update account_status.json
 └── Update daily_activity.json
 ```
 
+**Custom Stop Support (v8.9.9)**:
+- GO can specify `custom_stop_pct` (-1% to -7%) for tighter risk management
+- EXECUTE enforces -7% ceiling (custom stop can never be wider)
+- Example: TPH with -3% custom stop = tighter risk for volatile catalyst
+
 **Logging**:
 - `logs/execute.log`: "✓ Bought X shares of TICKER at $Y"
+- `logs/execute.log`: "Stop: $X.XX (-Y.Y%) - Custom (GO recommendation)" (if custom)
 - `daily_activity.json`: Entry added to `new_entries[]`
 
 **Dashboard**: Today page shows entry with conviction level
@@ -838,4 +912,4 @@ ANALYZE → daily_activity.json (final summary)
 
 ---
 
-*Document generated for Tedbot v8.9.8*
+*Document generated for Tedbot v8.9.9*
