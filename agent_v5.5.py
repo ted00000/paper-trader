@@ -8651,9 +8651,19 @@ CURRENT PORTFOLIO
                                 print(f"      → Using JSON stop-loss tracking as fallback")
 
                     elif "not available" not in alpaca_msg:
-                        # Log Alpaca failures (but don't block the entry if Alpaca fails)
-                        print(f"      ⚠️ Alpaca: {alpaca_msg}")
-                        print(f"      → Continuing with JSON portfolio tracking")
+                        # v10.5: DON'T add position if Alpaca failed to execute
+                        # This prevents phantom positions (like DE) that exist in JSON but not in Alpaca
+                        if "Invalid quantity" in alpaca_msg:
+                            print(f"      ⚠️ Alpaca: {alpaca_msg}")
+                            print(f"      ✗ SKIPPED {ticker}: Cannot buy 0 shares (price too high for allocation)")
+                            # Restore cash since we didn't actually buy
+                            cash_available += position_size_dollars
+                            continue  # Skip adding to portfolio
+                        else:
+                            print(f"      ⚠️ Alpaca: {alpaca_msg}")
+                            print(f"      ✗ SKIPPED {ticker}: Alpaca order failed - not adding to portfolio")
+                            cash_available += position_size_dollars
+                            continue  # Skip adding to portfolio
 
                     updated_positions.append(pos)
                     actual_entry = pos['entry_price']  # v8.9: Use actual fill price
@@ -9256,8 +9266,15 @@ CURRENT PORTFOLIO
                             else:
                                 print(f"      ⚠️ Alpaca stop-loss failed: {sl_msg}")
                     else:
-                        print(f"      ⚠️ Alpaca: {alpaca_msg}")
-                        print(f"      → Continuing with JSON portfolio tracking")
+                        # v10.5: DON'T add position if Alpaca failed to execute
+                        if "Invalid quantity" in alpaca_msg:
+                            print(f"      ⚠️ Alpaca: {alpaca_msg}")
+                            print(f"      ✗ SKIPPED {ticker}: Cannot buy 0 shares (price too high)")
+                            continue
+                        else:
+                            print(f"      ⚠️ Alpaca: {alpaca_msg}")
+                            print(f"      ✗ SKIPPED {ticker}: Alpaca order failed - not adding to portfolio")
+                            continue
 
                 positions.append(new_position)
                 cash_available -= position_size_dollars
