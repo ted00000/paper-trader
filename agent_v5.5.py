@@ -8771,13 +8771,24 @@ CURRENT PORTFOLIO
             "command": "execute",
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "summary": {
-                "closed": len(closed_trades),
+                "alpaca_auto_closed": len(alpaca_auto_closed),
+                "system_closed": len(closed_trades),
+                "total_closed": len(alpaca_auto_closed) + len(closed_trades),
                 "holding": held_positions_count,
                 "entered": len(updated_positions) - held_positions_count,
                 "total_active": len(updated_positions),
                 "trailing_stops_placed": trailing_stops_placed
             },
-            "closed_trades": [
+            "alpaca_auto_closed": [
+                {
+                    "ticker": t.get("ticker"),
+                    "exit_price": t.get("exit_price", 0),
+                    "pnl_pct": t.get("pnl_percent", 0),
+                    "reason": t.get("exit_reason", "Unknown")
+                }
+                for t in alpaca_auto_closed
+            ],
+            "system_closed": [
                 {
                     "ticker": t.get("ticker"),
                     "exit_price": t.get("exit_price", 0),
@@ -8799,7 +8810,13 @@ CURRENT PORTFOLIO
         print("EXECUTE COMMAND COMPLETE")
         print("="*60)
         print(f"\n✓ Portfolio Updated:")
-        print(f"  - Closed: {len(closed_trades)} positions")
+        # v10.5: Show both System Closed and Alpaca Auto-Closed separately
+        if alpaca_auto_closed:
+            print(f"  - Alpaca Auto-Closed: {len(alpaca_auto_closed)} positions (trailing stops/stop-losses)")
+        if closed_trades:
+            print(f"  - System Closed: {len(closed_trades)} positions (exit commands)")
+        if not alpaca_auto_closed and not closed_trades:
+            print(f"  - Closed: 0 positions")
         print(f"  - Holding: {held_positions_count} positions")
         print(f"  - Entered: {len(updated_positions) - held_positions_count} new positions")
         print(f"  - Total Active: {len(updated_positions)} positions")
