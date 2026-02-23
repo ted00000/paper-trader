@@ -8941,12 +8941,21 @@ CURRENT PORTFOLIO
         losers = [t for t in all_trades_today if t['return_percent'] <= 0]
         total_pl_dollars = sum(t['return_dollars'] for t in all_trades_today)
 
+        # v10.5: Categorize Alpaca auto-closed vs System closed
+        alpaca_keywords = ['alpaca', 'trailing stop', 'stop-loss triggered', 'manual sell']
+        alpaca_auto_closed = [t for t in all_trades_today
+                              if any(kw in t['exit_reason'].lower() for kw in alpaca_keywords)]
+        system_closed = [t for t in all_trades_today
+                         if not any(kw in t['exit_reason'].lower() for kw in alpaca_keywords)]
+
         # Create activity summary
         activity = {
             'date': today,
             'time': datetime.now(et_tz).strftime('%H:%M:%S ET'),
             'summary': {
                 'positions_closed': total_closed,
+                'alpaca_auto_closed': len(alpaca_auto_closed),
+                'system_closed': len(system_closed),
                 'winners': len(winners),
                 'losers': len(losers),
                 'total_pl_dollars': round(total_pl_dollars, 2),

@@ -1256,7 +1256,7 @@
             let html = `
                 <div style="padding: 16px; background: rgba(0,255,65,0.05); border-radius: 8px; margin-bottom: 16px;">
                     <div style="display: flex; gap: 24px; flex-wrap: wrap;">
-                        <div><strong>Positions Closed:</strong> ${summary.positions_closed}</div>
+                        <div><strong>Positions Closed:</strong> ${summary.positions_closed}${summary.alpaca_auto_closed > 0 || summary.system_closed > 0 ? ` (${summary.alpaca_auto_closed || 0} Alpaca, ${summary.system_closed || 0} System)` : ''}</div>
                         <div><strong style="color: #00ff41;">Winners:</strong> ${summary.winners}</div>
                         <div><strong style="color: #ff4444;">Losers:</strong> ${summary.losers}</div>
                         <div><strong>Total P&L:</strong> <span style="color: ${summary.total_pl_dollars >= 0 ? '#00ff41' : '#ff4444'};">${summary.total_pl_dollars >= 0 ? '+' : ''}$${summary.total_pl_dollars.toFixed(2)}</span></div>
