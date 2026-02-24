@@ -8470,7 +8470,9 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
                             'catalyst', 'time', 'rotation', 'stagnation', 'stagnant',
                             'approaching', 'day ', 'days', 'arbitrage', 'dead money',
                             'faded', 'exhausted', 'momentum', 'better opportunity',
-                            'capital', 'free', 'redeploy'
+                            'capital', 'free', 'redeploy',
+                            # v10.5: Trust Claude's MANDATORY EXIT decisions
+                            'mandatory', 'violation', 'discipline', 'rule', 'chased', 'extended'
                         ]
                         has_valid_reason = any(keyword in reason_lower for keyword in valid_discretionary_keywords)
                         if not has_valid_reason:
