@@ -582,7 +582,8 @@ class TradingAgent:
                     'Sector', 'Stop_Loss', 'Stop_Pct', 'Price_Target',  # v7.1.1 - Added Stop_Pct for distribution analysis
                     'Trailing_Stop_Activated', 'Trailing_Stop_Price', 'Peak_Return_Pct',  # v7.1 - Exit policy tracking
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
-                    'Rotation_Into_Ticker', 'Rotation_Reason'
+                    'Rotation_Into_Ticker', 'Rotation_Reason',
+                    'Entry_Quality', 'Entry_RSI', 'Entry_MA20_Distance', 'Entry_3Day_Change'  # v10.5 - Entry timing learning
                 ])
 
         # Ensure daily_activity.json exists
@@ -5567,6 +5568,42 @@ If conditions have changed, adjust recommendations accordingly and explain why.
                     lines.append(f"  {name}: {stats.get('win_rate_pct', 0):.0f}% win rate, optimal size {stats.get('optimal_position_size_pct')}%")
                 lines.append("")
 
+        # v10.5: ENTRY TIMING PATTERNS - For GO (shows if CAUTION entries underperform)
+        if command == 'go':
+            entry_patterns = db.get('entry_timing_patterns', {}).get('by_quality', {})
+
+            entries_with_data = [
+                (name, stats) for name, stats in entry_patterns.items()
+                if stats.get('total', 0) >= 3  # Need at least 3 trades to be meaningful
+            ]
+
+            if entries_with_data:
+                # Sort by win rate (best first)
+                entries_with_data.sort(key=lambda x: x[1].get('win_rate_pct', 0), reverse=True)
+
+                lines.append("⚠️ ENTRY TIMING QUALITY PERFORMANCE (v10.5 Data-Driven):")
+                for name, stats in entries_with_data:
+                    total = stats.get('total', 0)
+                    win_rate = stats.get('win_rate_pct', 0)
+                    avg_return = stats.get('avg_return_pct', 0)
+                    avg_rsi = stats.get('avg_rsi', 0)
+                    avg_ma20 = stats.get('avg_ma20_distance', 0)
+
+                    emoji = "✅" if win_rate >= 55 else "⚠️" if win_rate >= 40 else "❌"
+                    lines.append(f"  {emoji} {name}: {win_rate:.0f}% win rate, {avg_return:+.1f}% avg ({total} trades)")
+                    lines.append(f"      Avg RSI: {avg_rsi:.0f}, Avg MA20 Distance: {avg_ma20:+.1f}%")
+
+                # Add explicit guidance if CAUTION underperforms
+                caution_stats = entry_patterns.get('CAUTION', {})
+                good_stats = entry_patterns.get('GOOD', {})
+                if caution_stats.get('total', 0) >= 3 and good_stats.get('total', 0) >= 3:
+                    caution_wr = caution_stats.get('win_rate_pct', 0)
+                    good_wr = good_stats.get('win_rate_pct', 0)
+                    if caution_wr < good_wr - 10:  # CAUTION is >10% worse
+                        lines.append(f"  📊 DATA INSIGHT: CAUTION entries ({caution_wr:.0f}%) underperform GOOD entries ({good_wr:.0f}%) by {good_wr - caution_wr:.0f}%")
+                        lines.append(f"      → Consider PASSING on entries flagged 'CAUTION - wait for pullback'")
+                lines.append("")
+
         # EXIT PATTERNS - For ANALYZE
         if command == 'analyze':
             exit_patterns = db.get('exit_timing_patterns', {}).get('exit_types', {})
@@ -5633,10 +5670,58 @@ If conditions have changed, adjust recommendations accordingly and explain why.
         market_regime = trade_data.get('market_regime', 'uncertain')
         ticker = trade_data.get('ticker', '')
 
+        # v10.5: Extract entry timing data
+        entry_quality = trade_data.get('entry_quality', 'UNKNOWN')
+        entry_rsi = float(trade_data.get('entry_rsi', 0))
+        entry_ma20_distance = float(trade_data.get('entry_ma20_distance', 0))
+
         is_winner = return_pct > 0
 
-        # Update catalyst performance
-        catalyst_type_key = catalyst_type.replace(' ', '_').replace('-', '_')
+        # v10.5: Update entry timing patterns
+        if 'entry_timing_patterns' not in db:
+            db['entry_timing_patterns'] = {'by_quality': {}}
+        if 'by_quality' not in db['entry_timing_patterns']:
+            db['entry_timing_patterns']['by_quality'] = {}
+
+        quality_key = entry_quality.upper()
+        if quality_key not in db['entry_timing_patterns']['by_quality']:
+            db['entry_timing_patterns']['by_quality'][quality_key] = {
+                'total': 0, 'winners': 0, 'losers': 0,
+                'win_rate_pct': 0.0, 'avg_return_pct': 0.0,
+                'avg_rsi': 0.0, 'avg_ma20_distance': 0.0
+            }
+
+        eq_stats = db['entry_timing_patterns']['by_quality'][quality_key]
+        eq_stats['total'] = eq_stats.get('total', 0) + 1
+        if is_winner:
+            eq_stats['winners'] = eq_stats.get('winners', 0) + 1
+        else:
+            eq_stats['losers'] = eq_stats.get('losers', 0) + 1
+
+        total = eq_stats['total']
+        eq_stats['win_rate_pct'] = round((eq_stats['winners'] / total) * 100, 1)
+        prev_avg = eq_stats.get('avg_return_pct', 0)
+        eq_stats['avg_return_pct'] = round(prev_avg + (return_pct - prev_avg) / total, 2)
+        prev_rsi = eq_stats.get('avg_rsi', 0)
+        eq_stats['avg_rsi'] = round(prev_rsi + (entry_rsi - prev_rsi) / total, 1)
+        prev_ma20 = eq_stats.get('avg_ma20_distance', 0)
+        eq_stats['avg_ma20_distance'] = round(prev_ma20 + (entry_ma20_distance - prev_ma20) / total, 1)
+
+        # Update catalyst performance - v10.5: Create entry dynamically if not found
+        catalyst_type_key = catalyst_type.replace(' ', '_').replace('-', '_').replace('&', 'and')
+        if 'catalysts' not in db.get('catalyst_performance', {}):
+            db['catalyst_performance']['catalysts'] = {}
+
+        # Create catalyst entry if it doesn't exist
+        if catalyst_type_key not in db['catalyst_performance']['catalysts']:
+            db['catalyst_performance']['catalysts'][catalyst_type_key] = {
+                'total_trades': 0, 'winners': 0, 'losers': 0,
+                'win_rate_pct': 0.0, 'avg_winner_pct': 0.0, 'avg_loser_pct': 0.0,
+                'net_avg_return_pct': 0.0, 'best_trade_pct': 0.0, 'worst_trade_pct': 0.0,
+                'avg_hold_days': 0.0, 'optimal_exit_day': None,
+                'confidence': 'INSUFFICIENT_DATA', 'sample_trades': []
+            }
+
         if catalyst_type_key in db.get('catalyst_performance', {}).get('catalysts', {}):
             cat_stats = db['catalyst_performance']['catalysts'][catalyst_type_key]
 
@@ -5702,8 +5787,17 @@ If conditions have changed, adjust recommendations accordingly and explain why.
             prev_avg = regime_stats.get('avg_return_pct', 0)
             regime_stats['avg_return_pct'] = round(prev_avg + (return_pct - prev_avg) / total, 2)
 
-        # Update exit type statistics
+        # Update exit type statistics - v10.5: Create entry dynamically if not found
         exit_key = exit_type.lower().replace(' ', '_').replace('-', '_')
+        if 'exit_types' not in db.get('exit_timing_patterns', {}):
+            db['exit_timing_patterns']['exit_types'] = {}
+
+        # Create exit type entry if it doesn't exist
+        if exit_key not in db['exit_timing_patterns']['exit_types']:
+            db['exit_timing_patterns']['exit_types'][exit_key] = {
+                'total': 0, 'avg_return_pct': 0.0, 'notes': f'Auto-created for {exit_type}'
+            }
+
         if exit_key in db.get('exit_timing_patterns', {}).get('exit_types', {}):
             exit_stats = db['exit_timing_patterns']['exit_types'][exit_key]
 
@@ -6529,6 +6623,13 @@ CURRENT PORTFOLIO
 
         account_value_after = account_data.get('account_value', 1000.00)
 
+        # v10.5: Extract entry timing data for learning
+        timing_data = position.get('timing_data', {})
+        entry_quality = timing_data.get('entry_quality', 'UNKNOWN')
+        entry_rsi = timing_data.get('rsi', 0)
+        entry_ma20_distance = timing_data.get('distance_from_ma20_pct', 0)
+        entry_3day_change = timing_data.get('three_day_change_pct', 0)
+
         trade_data = {
             # v8.9.8: Include exit_date in trade_id to prevent duplicates when same ticker bought twice
             'trade_id': f"{position['ticker']}_{position['entry_date']}_to_{exit_date.strftime('%Y-%m-%d')}",
@@ -6556,7 +6657,12 @@ CURRENT PORTFOLIO
             'what_failed': 'Hit stop loss' if 'Stop' in exit_reason else '',
             'account_value_after': account_value_after,
             'rotation_into_ticker': position.get('rotation_into_ticker', ''),
-            'rotation_reason': position.get('rotation_reason', '')
+            'rotation_reason': position.get('rotation_reason', ''),
+            # v10.5: Entry timing data for learning
+            'entry_quality': entry_quality,
+            'entry_rsi': entry_rsi,
+            'entry_ma20_distance': entry_ma20_distance,
+            'entry_3day_change': entry_3day_change
         }
 
         return trade_data
@@ -6605,7 +6711,8 @@ CURRENT PORTFOLIO
                     'Sector', 'Stop_Loss', 'Stop_Pct', 'Price_Target',  # v7.1.1 - Added Stop_Pct for distribution analysis
                     'Trailing_Stop_Activated', 'Trailing_Stop_Price', 'Peak_Return_Pct',  # v7.1 - Exit policy tracking
                     'Thesis', 'What_Worked', 'What_Failed', 'Account_Value_After',
-                    'Rotation_Into_Ticker', 'Rotation_Reason'
+                    'Rotation_Into_Ticker', 'Rotation_Reason',
+                    'Entry_Quality', 'Entry_RSI', 'Entry_MA20_Distance', 'Entry_3Day_Change'  # v10.5 - Entry timing learning
                 ])
 
         # Bug #3 fix: Check for duplicate trade_id to prevent duplicate records
@@ -6685,7 +6792,11 @@ CURRENT PORTFOLIO
                 trade_data.get('what_failed', ''),
                 trade_data.get('account_value_after', 0),
                 trade_data.get('rotation_into_ticker', ''),
-                trade_data.get('rotation_reason', '')
+                trade_data.get('rotation_reason', ''),
+                trade_data.get('entry_quality', 'UNKNOWN'),  # v10.5 - Entry timing learning
+                trade_data.get('entry_rsi', 0),
+                trade_data.get('entry_ma20_distance', 0),
+                trade_data.get('entry_3day_change', 0)
             ])
 
         print(f"   ✓ Logged trade to CSV: {trade_data.get('ticker')} "
