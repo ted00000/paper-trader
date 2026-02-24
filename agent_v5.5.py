@@ -7392,21 +7392,67 @@ CURRENT PORTFOLIO
             decisions = self.extract_json_from_response(response_text)
 
             if not decisions:
-                # v8.9.7: JSON extraction failed - retry full GO call from scratch
-                print("   ⚠️ No JSON found in response, retrying full GO call...")
+                # v10.5: JSON extraction failed - use focused recovery prompt instead of full retry
+                # The full retry was failing because Claude would write another long analysis without JSON
+                print("   ⚠️ No JSON found in response, sending focused recovery request...")
                 try:
-                    response = self.call_claude_api('go', context, premarket_data)
-                    content_blocks = response.get('content', [])
-                    response_text = content_blocks[0].get('text', '') if content_blocks else ''
-                    decisions = self.extract_json_from_response(response_text)
+                    # Extract key decisions from Claude's analysis text
+                    recovery_prompt = f"""You wrote a detailed portfolio analysis but forgot to include the required JSON block.
+
+Based on your analysis, provide ONLY the JSON block now. No explanation, no markdown, just the JSON.
+
+Your analysis mentioned these decisions (extract from your text):
+{response_text[:3000]}
+
+Now output ONLY the JSON in this exact format:
+```json
+{{
+  "hold": ["TICKER1", "TICKER2"],
+  "exit": [
+    {{"ticker": "TICKER", "reason": "Brief reason"}}
+  ],
+  "buy": [
+    {{"ticker": "TICKER", "position_size": 100.00, "catalyst": "Type", "thesis": "Why"}}
+  ],
+  "trailing_stops": []
+}}
+```
+
+IMPORTANT: Output ONLY the JSON block above. Nothing else."""
+
+                    # Make a quick recovery API call
+                    headers = {
+                        'x-api-key': CLAUDE_API_KEY,
+                        'anthropic-version': '2023-06-01',
+                        'content-type': 'application/json'
+                    }
+                    recovery_payload = {
+                        'model': CLAUDE_MODEL,
+                        'max_tokens': 2000,
+                        'messages': [{'role': 'user', 'content': recovery_prompt}]
+                    }
+
+                    print("   📤 Recovery API call (30s timeout)...")
+                    recovery_response = requests.post(
+                        CLAUDE_API_URL,
+                        headers=headers,
+                        json=recovery_payload,
+                        timeout=30
+                    )
+                    recovery_response.raise_for_status()
+
+                    recovery_data = recovery_response.json()
+                    recovery_text = recovery_data.get('content', [{}])[0].get('text', '')
+                    decisions = self.extract_json_from_response(recovery_text)
+
                     if decisions:
-                        print("   ✓ Retry successful - JSON extracted")
+                        print("   ✓ Recovery successful - JSON extracted")
                     else:
-                        print("   ✗ Retry failed - still no valid JSON in response")
-                        print("   ✗ No valid JSON found in response\n")
+                        print("   ✗ Recovery failed - still no valid JSON")
+                        print(f"   ⚠️ Recovery response preview: {recovery_text[:200]}")
                         return False
                 except Exception as retry_err:
-                    print(f"   ✗ Retry failed with error: {retry_err}")
+                    print(f"   ✗ Recovery failed with error: {retry_err}")
                     return False
 
         # Step 5: Process decisions and create pending file
