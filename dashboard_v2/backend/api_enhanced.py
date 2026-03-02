@@ -1017,7 +1017,7 @@ def get_operation_log(operation):
             lines.append('')
             lines.append(f'- **Holding:** {summary.get("holding", 0)} positions')
             lines.append(f'- **New Entries:** {summary.get("entered", 0)}')
-            lines.append(f'- **Closed:** {summary.get("closed", 0)}')
+            lines.append(f'- **Closed:** {summary.get("total_closed", summary.get("closed", 0))}')
             lines.append(f'- **Total Active:** {summary.get("total_active", 0)}')
             lines.append('')
 
