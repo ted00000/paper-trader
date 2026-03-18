@@ -9615,7 +9615,7 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
                                 exit_price = float(order.filled_avg_price)
                                 # Determine exit reason based on order type
                                 if order.type == 'trailing_stop':
-                                    peak_pct = position.get('peak_return_pct', 0)
+                                    peak_pct = position.get('peak_return_pct') or 0  # v10.5: Handle None values
                                     exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
                                 elif order.type == 'stop':
                                     exit_reason = "Alpaca stop-loss triggered"
@@ -9629,7 +9629,7 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
                         print(f"      ⚠️ Could not fetch fill price: {e}")
                         # Fallback exit reason
                         if is_trailing_stop:
-                            peak_pct = position.get('peak_return_pct', 0)
+                            peak_pct = position.get('peak_return_pct') or 0  # v10.5: Handle None values
                             exit_reason = f"Alpaca trailing stop (peak +{peak_pct:.1f}%)"
                         else:
                             exit_reason = "Position closed externally"
@@ -10051,7 +10051,7 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
         if trailing_stops_active:
             print(f"   🎯 Trailing stops: {len(trailing_stops_active)}")
             for ts in trailing_stops_active:
-                print(f"      - {ts['ticker']}: +{ts['return_pct']:.1f}% (peak +{ts['peak_return_pct']:.1f}%)")
+                print(f"      - {ts['ticker']}: +{ts.get('return_pct') or 0:.1f}% (peak +{ts.get('peak_return_pct') or 0:.1f}%)")
         if not claude_used:
             print(f"   ⚠️ FAILSAFE MODE: Auto rules only (Claude timeout)")
         print()
