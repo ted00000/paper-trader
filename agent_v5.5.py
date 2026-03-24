@@ -8457,7 +8457,17 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
                     return_pct = ((exit_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
 
                     # Check if claiming target hit but price below target
-                    if 'target' in claude_reason.lower() and exit_price < price_target:
+                    # v10.5: Be specific - don't match "M&A_Target" catalyst type, only actual target claims
+                    reason_lower = claude_reason.lower()
+                    target_claimed = any(phrase in reason_lower for phrase in [
+                        'target reached', 'hit target', 'at target', 'price target',
+                        'reached target', 'target hit', '+10%', '+12%', '+15%'
+                    ])
+                    # Exclude if "target" is part of catalyst type like "M&A_Target"
+                    if '_target' in reason_lower or 'target catalyst' in reason_lower:
+                        target_claimed = False
+
+                    if target_claimed and exit_price < price_target:
                         should_execute_exit = False
                         rejection_reason = f"Target claimed but price ${exit_price:.2f} < target ${price_target:.2f} ({return_pct:+.1f}% < +10%)"
 
@@ -8472,7 +8482,9 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
                             'faded', 'exhausted', 'momentum', 'better opportunity',
                             'capital', 'free', 'redeploy',
                             # v10.5: Trust Claude's MANDATORY EXIT decisions
-                            'mandatory', 'violation', 'discipline', 'rule', 'chased', 'extended'
+                            'mandatory', 'violation', 'discipline', 'rule', 'chased', 'extended',
+                            # v10.5: Trust Claude's discretionary exits based on poor performance
+                            'win rate', 'failure', 'weak', 'poor', 'historical', 'underperform'
                         ]
                         has_valid_reason = any(keyword in reason_lower for keyword in valid_discretionary_keywords)
                         if not has_valid_reason:
