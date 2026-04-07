@@ -1481,21 +1481,30 @@ Stagnation = position hasn't moved as expected given time held and volatility.
 
             # Poll for fill confirmation - market orders should fill within seconds
             # v8.9.10: Always poll to ensure we get the correct filled_qty
+            # v10.5: Helper to safely get status (handles both enum and string)
+            def get_status_str(status):
+                """Get status as string, handling both enum and string types"""
+                if hasattr(status, 'value'):
+                    return status.value
+                return str(status).lower()
+
             for attempt in range(10):  # 10 attempts x 0.5s = 5 seconds max
                 time.sleep(0.5)
                 try:
                     filled_order = self.broker.get_order(order.id)
-                    if filled_order and filled_order.status.value == 'filled':
-                        # Order is fully filled - get final values
-                        if filled_order.filled_avg_price:
-                            fill_price = float(filled_order.filled_avg_price)
-                        if filled_order.filled_qty:
-                            actual_shares = int(float(filled_order.filled_qty))
-                        break
-                    # If order failed or was rejected, stop polling
-                    if filled_order.status.value in ['canceled', 'expired', 'rejected']:
-                        print(f"      ⚠️ Order {filled_order.status.value}: {order.id}")
-                        break
+                    if filled_order:
+                        status_str = get_status_str(filled_order.status)
+                        if status_str == 'filled':
+                            # Order is fully filled - get final values
+                            if filled_order.filled_avg_price:
+                                fill_price = float(filled_order.filled_avg_price)
+                            if filled_order.filled_qty:
+                                actual_shares = int(float(filled_order.filled_qty))
+                            break
+                        # If order failed or was rejected, stop polling
+                        if status_str in ['canceled', 'expired', 'rejected']:
+                            print(f"      ⚠️ Order {status_str}: {order.id}")
+                            break
                 except Exception as poll_err:
                     # Log polling errors but continue trying
                     if attempt == 9:  # Last attempt
