@@ -1510,13 +1510,21 @@ Stagnation = position hasn't moved as expected given time held and volatility.
                     if attempt == 9:  # Last attempt
                         print(f"      ⚠️ Fill polling failed: {poll_err}")
 
-            # v8.9.10: Final verification - refetch to ensure we have correct data
+            # v10.5: Final verification - refetch to ensure we have correct data
+            # Race condition fix: Alpaca may show status=filled before filled_qty is updated
             if fill_price and actual_shares != shares:
-                # Shares mismatch - this is expected if partial fill, but log it
-                print(f"      ℹ️  Filled {actual_shares} of {shares} requested shares")
-            elif fill_price and actual_shares == shares:
-                # Perfect fill
-                pass
+                # Shares mismatch - wait and refetch to catch late-updating filled_qty
+                print(f"      ℹ️  Initial fill shows {actual_shares} of {shares} requested, verifying...")
+                time.sleep(1.0)  # Wait for Alpaca to fully update
+                try:
+                    final_order = self.broker.get_order(order.id)
+                    if final_order and final_order.filled_qty:
+                        final_shares = int(float(final_order.filled_qty))
+                        if final_shares != actual_shares:
+                            print(f"      ✓ Corrected: actually filled {final_shares} shares")
+                            actual_shares = final_shares
+                except Exception as e:
+                    print(f"      ⚠️ Verification failed: {e}")
             elif not fill_price:
                 # Fallback: try one more time to get fill data
                 try:
