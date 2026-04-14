@@ -6951,21 +6951,22 @@ CURRENT PORTFOLIO
                 )
                 if alpaca_success:
                     print(f"      ✓ Alpaca: {alpaca_msg} (Order: {order_id})")
-                elif "not available" not in alpaca_msg:
-                    # Log Alpaca failures (but don't block the exit if Alpaca fails)
+
+                    # v8.9: Use Alpaca fill price as source of truth, fallback to quote price
+                    exit_price = fill_price if fill_price else current_price
+
+                    # Create trade record
+                    trade_data = self.close_position(position, exit_price, exit_reason)
+
+                    # Log to CSV
+                    self.log_completed_trade(trade_data)
+
+                    closed_trades.append(trade_data)
+                else:
+                    # v10.5: If Alpaca sell fails, keep position open - don't close in JSON
                     print(f"      ⚠️ Alpaca: {alpaca_msg}")
-                    print(f"      → Continuing with JSON portfolio tracking")
-
-                # v8.9: Use Alpaca fill price as source of truth, fallback to quote price
-                exit_price = fill_price if fill_price else current_price
-
-                # Create trade record
-                trade_data = self.close_position(position, exit_price, exit_reason)
-
-                # Log to CSV
-                self.log_completed_trade(trade_data)
-
-                closed_trades.append(trade_data)
+                    print(f"      → KEEPING POSITION OPEN (Alpaca sell failed)")
+                    positions_to_keep.append(position)
             else:
                 print(f"   ✓ {ticker}: ${current_price:.2f} ({unrealized_gain_pct:+.2f}%) - {exit_reason}")
                 positions_to_keep.append(position)
@@ -8520,18 +8521,19 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
                         )
                         if alpaca_success:
                             print(f"      ✓ Alpaca: {alpaca_msg} (Order: {order_id})")
-                        elif "not available" not in alpaca_msg:
-                            # Log Alpaca failures (but don't block the exit if Alpaca fails)
+
+                            # v8.9: Use Alpaca fill price as source of truth, fallback to quote price
+                            actual_exit_price = fill_price if fill_price else exit_price
+
+                            closed_trade = self._close_position(position, actual_exit_price, standardized_reason)
+                            closed_trades.append(closed_trade)
+                            exited_tickers.add(ticker)  # Track this ticker was exited
+                            print(f"   ✓ CLOSED {ticker}: {standardized_reason}")
+                        else:
+                            # v10.5: If Alpaca sell fails, keep position open - don't close in JSON
                             print(f"      ⚠️ Alpaca: {alpaca_msg}")
-                            print(f"      → Continuing with JSON portfolio tracking")
-
-                        # v8.9: Use Alpaca fill price as source of truth, fallback to quote price
-                        actual_exit_price = fill_price if fill_price else exit_price
-
-                        closed_trade = self._close_position(position, actual_exit_price, standardized_reason)
-                        closed_trades.append(closed_trade)
-                        exited_tickers.add(ticker)  # Track this ticker was exited
-                        print(f"   ✓ CLOSED {ticker}: {standardized_reason}")
+                            print(f"      → KEEPING POSITION OPEN (Alpaca sell failed)")
+                            # Don't add to closed_trades or exited_tickers - position stays open
                     else:
                         print(f"   ✗ REJECTED EXIT for {ticker}: {rejection_reason}")
                         print(f"      → Moved to HOLD instead")
