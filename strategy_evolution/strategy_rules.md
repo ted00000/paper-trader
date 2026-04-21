@@ -1,8 +1,16 @@
 # CURRENT STRATEGY RULES
 
-**Version:** 1.2
-**Last Updated:** February 4, 2026
-**Next Review:** After 25 completed trades or March 1, 2026
+**Version:** 2.0
+**Last Updated:** April 13, 2026
+**Next Review:** After 50 completed trades or July 1, 2026
+
+### v2.0 Changes (April 13, 2026) - Q1 2026 Strategy Overhaul:
+- **EXCLUDED CATALYSTS:** M&A_Target (22% win rate), FDA_Approval (29% win rate) - 84 trade analysis
+- **CONVICTION FILTER:** No SKIP or MEDIUM-HIGH conviction entries (underperform)
+- **ENTRY TIMING:** No chasing stocks already up 3%+ at entry
+- **STOP LOSS:** Widened from -7% to -8% (reduce whipsaws)
+- **TRAILING STOP:** Mandatory at +5% gain (lock in profits)
+- **HOLD TIME:** Optimal 6-7 days (70% win rate vs 18% for 2-3 days)
 
 ### v1.2 Changes (Feb 4, 2026):
 - Added earnings timing prohibitions (MRCY lesson - beat but crashed on guidance)
@@ -51,6 +59,14 @@
 
 ## 🛑 ENTRY PROHIBITIONS (NEVER BUY)
 
+### Q1 2026 Hard Exclusions (Data-Driven):
+- ❌ **M&A_Target catalyst** - 22% win rate, -$143 loss over 18 trades. Merger arbitrage consistently fails.
+- ❌ **FDA_Approval catalyst** - 29% win rate, -$56 loss over 7 trades. Only override with Tier 1 + HIGH conviction.
+- ❌ **SKIP conviction level** - These are explicitly flagged as "don't trade" for a reason.
+- ❌ **MEDIUM-HIGH conviction** - Underperforms; either commit to HIGH or drop to MEDIUM.
+- ❌ **Stocks already up 3%+ at entry** - Chasing leads to poor risk/reward. Wait for pullback.
+
+### Standard Prohibitions:
 - ❌ Pre-market gaps >15% (proven to fade)
 - ❌ Meme stocks without fundamental catalyst
 - ❌ Penny stocks (<$5/share)
@@ -70,10 +86,12 @@
 
 ## 📐 RISK MANAGEMENT
 
-### Stop Loss Rules:
-- **Standard Stop:** -7% from entry price
+### Stop Loss Rules (Updated v2.0):
+- **Standard Stop:** -8% from entry price (widened from -7% to reduce whipsaws)
 - **Enforcement:** Absolute - no exceptions, no "give it more room"
-- **Adjustment:** May tighten to breakeven after +5% gain
+- **Trailing Stop:** MANDATORY at +5% gain - move stop to breakeven
+- **Further Trailing:** At +8% gain, move stop to +3% profit lock
+- **Rationale:** Q1 data showed 43 trades hit stops for -$455.87. Wider stops + trailing reduces whipsaws while locking profits.
 
 ### Position Sizing:
 - **Per Position:** 10% of current account value
@@ -91,10 +109,11 @@
 
 ### Mandatory Exits:
 
-1. **Stop Loss Hit (-7%):**
+1. **Stop Loss Hit (-8%):**
    - Exit 100% immediately at market
    - No hesitation, no "waiting for bounce"
    - Document why stop was hit
+   - Note: Widened from -7% (v2.0) to reduce whipsaw exits
 
 2. **Price Target Reached (+10-15%):**
    - Sell 100% of position (full exit)
@@ -110,6 +129,12 @@
 4. **Time Stop (21 Days):**
    - If position held 3 weeks with minimal progress
    - Exit and redeploy capital to better opportunity
+
+5. **Optimal Hold Time (v2.0):**
+   - Q1 data shows 6-7 day holds have 70% win rate (best)
+   - 2-3 day holds have only 18% win rate (worst)
+   - Don't rush exits - give trades time to work
+   - Patience pays: Avoid exiting just because "it's been a few days"
 
 5. **Better Opportunity:**
    - New Tier 1 catalyst emerges
@@ -146,29 +171,44 @@
 
 ## 📊 CATALYST-SPECIFIC GUIDELINES
 
+### ⚠️ EXCLUDED CATALYSTS (v2.0 - DO NOT TRADE):
+
+**M&A_Target** - HARD EXCLUDED
+- Q1 2026: 22% win rate, -$143.20 across 18 trades
+- Merger arbitrage plays consistently fail
+- Spread compression rarely materializes as expected
+- **ACTION:** Skip all M&A_Target catalysts
+
+**FDA_Approval** - SOFT EXCLUDED
+- Q1 2026: 29% win rate, -$56.41 across 7 trades
+- Binary outcomes are unpredictable
+- **OVERRIDE ONLY IF:** Tier 1 catalyst + HIGH conviction + strong technicals
+
+### ✅ APPROVED CATALYSTS:
+
 ### Earnings Beats:
 - **Ideal Entry:** 1-3 days AFTER report (post-earnings drift capture)
 - **NEVER ENTER:** Day of earnings or day before (gap/crash risk)
 - **Rationale:** MRCY lesson (Feb 4, 2026) - beat estimates but crashed 14% after hours on guidance
-- **Expected Hold:** 3-5 days (post-earnings drift)
+- **Expected Hold:** 5-7 days (extended from 3-5 based on Q1 data)
 - **Target:** +12-15%
 - **Watch For:** Guidance language matters MORE than the beat itself
 
 ### Sector Momentum:
 - **Ideal Entry:** Early in rotation (first 1-3 days)
-- **Expected Hold:** 5-10 days
+- **Expected Hold:** 6-10 days (optimal per Q1 data)
 - **Target:** +10-12%
 - **Watch For:** Macro catalyst reversal
 
 ### Analyst Upgrades:
 - **Ideal Entry:** Day of or day after upgrade
-- **Expected Hold:** 2-4 days
+- **Expected Hold:** 4-7 days (extended from 2-4)
 - **Target:** +8-10%
 - **Watch For:** Follow-through or fade
 
 ### Technical Breakouts:
 - **Ideal Entry:** On breakout day with volume
-- **Expected Hold:** 2-5 days
+- **Expected Hold:** 5-7 days (extended from 2-5)
 - **Target:** +8-12%
 - **Watch For:** Volume confirmation continuing
 
@@ -184,24 +224,40 @@
 
 ---
 
-## 📈 CONFIDENCE LEVELS
+## 📈 CONFIDENCE LEVELS (Updated v2.0)
+
+### ✅ TRADEABLE CONVICTION LEVELS:
 
 ### HIGH Confidence (Allocate 12%):
 - Earnings beat >15% + guidance raise + analyst upgrades
 - Clear Tier 1 catalyst + strong technicals + sector tailwind
-- Expected win rate: 70-85%
+- Q1 2026 actual win rate: Best performing level
+- **PRIORITY:** Always fill HIGH conviction first
 
 ### MEDIUM Confidence (Allocate 10%):
 - Standard Tier 1 catalyst
 - 3+ supporting factors
-- Expected win rate: 55-70%
+- Acceptable win rate in Q1 data
+- **ACCEPTABLE:** Trade when HIGH not available
 
 ### LOWER Confidence (Allocate 8%):
 - Tier 1 catalyst but weaker confirmation
 - Only 3 supporting factors
-- Expected win rate: 45-60%
+- **USE SPARINGLY:** Only to fill portfolio when better options unavailable
 
-*Note: Current version uses flat 10% per position. May implement confidence-based sizing after sufficient data.*
+### ❌ EXCLUDED CONVICTION LEVELS (v2.0):
+
+**SKIP** - DO NOT TRADE
+- By definition, SKIP means "do not trade this"
+- Q1 showed these underperform significantly
+- **ACTION:** Never enter SKIP conviction trades
+
+**MEDIUM-HIGH** - DO NOT TRADE
+- Ambiguous confidence level
+- Q1 data shows underperformance vs pure HIGH or MEDIUM
+- **ACTION:** Commit to HIGH or drop to MEDIUM - no in-between
+
+*Note: Q1 analysis of 84 trades showed conviction level discipline is critical for profitability.*
 
 ---
 
@@ -216,7 +272,7 @@
 - Defensive: Consider 8-9 positions (10% cash)
 - Focus: Defensive sectors, short squeeze candidates
 - Targets: Lower end of range (+8-10%)
-- Tighter stops: Consider -5% instead of -7%
+- Tighter stops: Consider -6% instead of -8%
 
 ### Choppy/Sideways (SPY range-bound):
 - Selective: Only highest conviction Tier 1 catalysts
@@ -270,9 +326,36 @@
 
 ---
 
-**These rules are NOT suggestions - they are the system.**  
+**These rules are NOT suggestions - they are the system.**
 **Trust the process. Follow the rules. Let the data guide evolution.**
 
 ---
 
-*Next scheduled review: After 25 completed trades or November 1, 2025, whichever comes first.*
+## 📚 Q1 2026 LESSONS LEARNED
+
+*These findings drove the v2.0 rule changes above*
+
+### Performance Summary (84 trades):
+- **Win Rate:** 42.86%
+- **Realized P/L:** $71.58
+- **Total Stop Losses:** 43 trades, -$455.87
+
+### What Failed:
+1. **M&A_Target plays:** 22% win rate, -$143.20 (worst catalyst)
+2. **FDA_Approval plays:** 29% win rate, -$56.41
+3. **SKIP/MEDIUM-HIGH conviction:** Underperformed consistently
+4. **Chasing entries (up 3%+):** Poor risk/reward
+5. **Quick exits (2-3 days):** 18% win rate
+
+### What Worked:
+1. **6-7 day holds:** 70% win rate (best holding period)
+2. **HIGH conviction entries:** Outperformed other levels
+3. **Earnings post-drift:** Solid when entered 1-3 days after
+4. **Sector momentum:** Good returns when entered early
+
+### Key Insight:
+*Patience and discipline matter more than finding the "perfect" trade. Let winners run, cut losers at -8%, and avoid low-conviction entries.*
+
+---
+
+*Next scheduled review: After 50 completed trades or July 1, 2026, whichever comes first.*

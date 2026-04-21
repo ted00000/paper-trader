@@ -1,5 +1,22 @@
 {
-  "excluded_catalysts": [],
-  "last_updated": "2026-01-22 00:00:00",
-  "note": "These catalysts have been automatically excluded by the learning engine due to poor performance"
+  "excluded_catalysts": [
+    {
+      "catalyst": "M&A_Target",
+      "win_rate": 22.2,
+      "total_trades": 18,
+      "total_pnl": -143.20,
+      "reason": "Q1 2026 analysis: 22% win rate, -$143 loss across 18 trades. Merger arbitrage plays consistently fail.",
+      "excluded_date": "2026-04-13"
+    },
+    {
+      "catalyst": "FDA_Approval",
+      "win_rate": 28.6,
+      "total_trades": 7,
+      "total_pnl": -56.41,
+      "reason": "Q1 2026 analysis: 29% win rate, -$56 loss. Only trade if Tier 1 with HIGH conviction.",
+      "excluded_date": "2026-04-13"
+    }
+  ],
+  "last_updated": "2026-04-13 22:00:00",
+  "note": "Q1 2026 strategy review: These catalysts have poor win rates and negative P/L. M&A_Target is hard-excluded. FDA_Approval requires Tier 1 + HIGH conviction override."
 }

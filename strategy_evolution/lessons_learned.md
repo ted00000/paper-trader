@@ -1,20 +1,23 @@
 # LESSONS LEARNED - STRATEGY EVOLUTION
 
-**Last Updated:** January 22, 2026
-**Status:** Clean slate - awaiting first trades to begin learning
+**Last Updated:** April 13, 2026
+**Status:** Q1 2026 Complete - 84 trades analyzed
 
 ---
 
 ## 🎯 PROVEN PATTERNS (70%+ Win Rate)
 
-*Data will populate after 20+ trades per catalyst type*
+### Q1 2026 Winners:
+- **6-7 Day Holds:** 70% win rate - optimal holding period
+- **HIGH Conviction Entries:** Best performing conviction level
+- **Earnings Post-Drift (Day 2-3):** Strong when entering after initial reaction
 
-### Tier 1 Catalysts Performance:
-- **Earnings Beats:** Not enough data yet
-- **Sector Momentum:** Not enough data yet
-- **Analyst Upgrades:** Not enough data yet
-- **Technical Breakouts:** Not enough data yet
-- **Binary Events:** Not enough data yet
+### Tier 1 Catalysts Performance (Q1 2026):
+- **Earnings Beats:** Solid performance when entered 1-3 days post-earnings
+- **Sector Momentum:** Good returns when entered early in rotation
+- **Analyst Upgrades:** Moderate performance
+- **Technical Breakouts:** Moderate performance
+- **Binary Events (FDA, M&A):** POOR - see Failed Patterns below
 
 ---
 
@@ -26,7 +29,39 @@
 
 ## ❌ FAILED PATTERNS (< 40% Win Rate - AVOID)
 
-*Setups to stop making*
+### Q1 2026 Losers - HARD EXCLUDED:
+
+**M&A_Target Catalyst**
+- Win Rate: 22.2% (18 trades)
+- Total P/L: -$143.20
+- Status: HARD EXCLUDED - never trade
+- Lesson: Merger arbitrage spread compression rarely materializes as expected
+
+**FDA_Approval Catalyst**
+- Win Rate: 28.6% (7 trades)
+- Total P/L: -$56.41
+- Status: SOFT EXCLUDED - only with Tier 1 + HIGH conviction override
+- Lesson: Binary outcomes are unpredictable, risk/reward unfavorable
+
+**SKIP Conviction Level**
+- Underperforms consistently
+- Status: EXCLUDED
+- Lesson: If it's flagged as SKIP, there's a reason - don't second-guess
+
+**MEDIUM-HIGH Conviction Level**
+- Underperforms vs pure HIGH or pure MEDIUM
+- Status: EXCLUDED
+- Lesson: Ambiguous conviction leads to ambiguous results
+
+**2-3 Day Holds**
+- Win Rate: 18.2% (worst holding period)
+- Status: AVOID quick exits
+- Lesson: Patience pays - let trades work
+
+**Chasing Entries (up 3%+)**
+- Poor risk/reward
+- Status: EXCLUDED
+- Lesson: Wait for pullback or find a different setup
 
 ---
 

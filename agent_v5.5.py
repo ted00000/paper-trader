@@ -397,8 +397,9 @@ You must classify each recommendation with an explicit decision:
 - ENTER_SMALL: Reduced entry for speculative/uncertain setups (5-6% max)
 - PASS: Do not enter - catalyst interesting but insufficient conviction or excessive risk
 
-PASS is expected on 30-40% of candidates. Do not force trades on marginal setups.
-Quality over quantity is critical for system success.
+⚠️ PRIORITY: FILL ALL VACANT SLOTS - We want to be FULLY INVESTED at 10 positions.
+Only PASS if the candidate is clearly flawed (broken thesis, extreme technicals, excluded catalyst).
+Capital sitting idle is a COST - deploy it aggressively on reasonable setups.
 
 Examples:
 - Strong FDA catalyst + RSI 72 + good volume = ENTER at 9%
@@ -1972,10 +1973,11 @@ Stagnation = position hasn't moved as expected given time held and volatility.
 
     def check_bid_ask_spread(self, ticker):
         """
-        Check bid-ask spread to prevent expensive execution (v7.0)
+        Check bid-ask spread to prevent expensive execution (v7.0, updated v10.5)
 
         Wide spreads indicate illiquid stocks where market orders can be costly.
-        Skip trades if spread >0.5% to avoid giving away edge to market makers.
+        Skip trades if spread >1.0% to avoid giving away edge to market makers.
+        v10.5: Widened from 0.5% to 1.0% to deploy capital more aggressively.
 
         Args:
             ticker: Stock ticker symbol
@@ -1983,7 +1985,7 @@ Stagnation = position hasn't moved as expected given time held and volatility.
         Returns:
             dict: {
                 'spread_pct': float,     # Spread as % of mid-price
-                'should_skip': bool,     # True if spread >0.5%
+                'should_skip': bool,     # True if spread >1.0%
                 'mid_price': float,      # (bid + ask) / 2
                 'bid': float,
                 'ask': float
@@ -2020,7 +2022,7 @@ Stagnation = position hasn't moved as expected given time held and volatility.
 
                         return {
                             'spread_pct': round(spread_pct, 3),
-                            'should_skip': spread_pct > 0.5,  # Skip if >0.5%
+                            'should_skip': spread_pct > 1.0,  # v10.5: Widened from 0.5% to 1.0% to deploy capital more aggressively
                             'mid_price': round(mid_price, 2),
                             'bid': round(bid, 2),
                             'ask': round(ask, 2)
@@ -4514,7 +4516,7 @@ Stagnation = position hasn't moved as expected given time held and volatility.
                         # Store premarket prices in screener_data for format_screener_candidates
                         screener_data['premarket_prices'] = premarket_candidate_prices
 
-                    screener_section = f"\n\n{'='*70}\nAVAILABLE OPPORTUNITIES FOR {vacant_slots} VACANT SLOTS:\n{'='*70}\n\n"
+                    screener_section = f"\n\n{'='*70}\n⚠️ ACTION REQUIRED: FILL ALL {vacant_slots} VACANT SLOTS\n{'='*70}\n\nYou MUST recommend {vacant_slots} ENTER positions to reach our target of 10 positions.\nUndeployed capital is earning 0% - put it to work!\n\n"
                     formatted_candidates = self.format_screener_candidates(screener_data)
                     print(f"   ✅ DEBUG: Formatted candidates length: {len(formatted_candidates) if formatted_candidates else 0}")
                     screener_section += formatted_candidates
@@ -4600,8 +4602,9 @@ You must classify each recommendation with an explicit decision:
 - ENTER_SMALL: Reduced entry for speculative/uncertain setups (5-6% max)
 - PASS: Do not enter - catalyst interesting but insufficient conviction or excessive risk
 
-PASS is expected on 30-40% of candidates. Do not force trades on marginal setups.
-Quality over quantity is critical for system success.
+⚠️ PRIORITY: FILL ALL VACANT SLOTS - We want to be FULLY INVESTED at 10 positions.
+Only PASS if the candidate is clearly flawed (broken thesis, extreme technicals, excluded catalyst).
+Capital sitting idle is a COST - deploy it aggressively on reasonable setups.
 
 Examples:
 - Strong FDA catalyst + RSI 72 + good volume = ENTER at 9%
@@ -6136,11 +6139,17 @@ If conditions have changed, adjust recommendations accordingly and explain why.
         }
 
         # v8.8: Sync with Alpaca to detect/correct discrepancies
+        # v10.5: Also sync positions_value to fix integrity check (account_value = cash + positions)
         if self.use_alpaca and self.broker:
             try:
                 alpaca_account = self.broker.get_account()
                 alpaca_cash = float(alpaca_account.cash)
                 alpaca_equity = float(alpaca_account.equity)
+
+                # v10.5: Get positions market value from Alpaca
+                alpaca_positions = self.broker.get_all_positions()
+                alpaca_positions_value = sum(float(p.market_value) for p in alpaca_positions)
+                alpaca_cost_basis = sum(float(p.cost_basis) for p in alpaca_positions)
 
                 cash_diff = abs(alpaca_cash - cash_available)
                 equity_diff = abs(alpaca_equity - account_value)
@@ -6158,8 +6167,12 @@ If conditions have changed, adjust recommendations accordingly and explain why.
                     account['alpaca_synced'] = True
                     account['json_cash_before_sync'] = round(cash_available, 2)
                     account['json_equity_before_sync'] = round(account_value, 2)
-                else:
-                    account['alpaca_synced'] = True
+
+                # v10.5: Always sync positions_value from Alpaca for consistent math
+                account['positions_value'] = round(alpaca_positions_value, 2)
+                account['cost_basis'] = round(alpaca_cost_basis, 2)
+                account['unrealized_pl'] = round(alpaca_positions_value - alpaca_cost_basis, 2)
+                account['alpaca_synced'] = True
 
             except Exception as e:
                 print(f"   ⚠️ Could not sync with Alpaca: {e}")
@@ -6170,8 +6183,9 @@ If conditions have changed, adjust recommendations accordingly and explain why.
 
         final_cash = account['cash_available']
         final_equity = account['account_value']
-        unrealized_pl = portfolio_value - cost_basis
-        print(f"   ✓ Updated account status: ${final_equity:.2f} (Positions: ${portfolio_value:.2f} + Cash: ${final_cash:.2f}, Realized P&L: ${realized_pl:+.2f}, Unrealized P&L: ${unrealized_pl:+.2f})")
+        final_positions = account.get('positions_value', portfolio_value)
+        final_unrealized = account.get('unrealized_pl', portfolio_value - cost_basis)
+        print(f"   ✓ Updated account status: ${final_equity:.2f} (Positions: ${final_positions:.2f} + Cash: ${final_cash:.2f}, Realized P&L: ${realized_pl:+.2f}, Unrealized P&L: ${final_unrealized:+.2f})")
 
         # v8.9.5: Write Alpaca status for dashboard indicator
         self.write_alpaca_status()
@@ -7750,30 +7764,54 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
                         print(f"   ✗ {ticker}: REJECTED - {rejection_reasons[0]}")
                         continue  # Skip to next position
 
-                    # LEARNED EXCLUSIONS: Check if catalyst was historically poor (soft warning)
+                    # v10.5: HARD ENFORCEMENT of catalyst exclusions based on Q1 2026 analysis
+                    # M&A_Target: 22% win rate, -$143 → HARD REJECT
+                    # FDA_Approval: 29% win rate, -$56 → SOFT REJECT (allow HIGH conviction override)
                     exclusions = self.load_catalyst_exclusions()
                     excluded_catalysts = {e['catalyst'].lower(): e for e in exclusions}
 
                     if catalyst_type.lower() in excluded_catalysts:
                         excl = excluded_catalysts[catalyst_type.lower()]
+                        catalyst_lower = catalyst_type.lower()
 
-                        # Log usage of excluded catalyst (Claude made this choice with full context)
-                        print(f"   ⚠️  {ticker}: Using historically poor catalyst '{catalyst_type}'")
-                        print(f"      Historical: {excl['win_rate']:.1f}% win rate over {excl['total_trades']} trades")
-                        print(f"      Claude's reasoning: {buy_pos.get('reasoning', 'Not specified')}")
+                        # M&A_Target is HARD EXCLUDED - never trade regardless of conviction
+                        if catalyst_lower == 'm&a_target':
+                            print(f"   ✗ {ticker}: REJECTED - M&A_Target catalyst HARD EXCLUDED")
+                            print(f"      Q1 2026: {excl['win_rate']:.1f}% win rate, ${excl['total_pnl']:.2f} P/L across {excl['total_trades']} trades")
+                            print(f"      Merger arbitrage consistently fails - no override allowed")
+                            rejected_positions.append({
+                                'ticker': ticker,
+                                'status': 'REJECTED',
+                                'reason': f"M&A_Target catalyst (v10.5 hard exclusion)",
+                                'original_decision': buy_pos.get('decision', 'ENTER')
+                            })
+                            continue  # Skip to next position
 
-                        # Log for dashboard accountability tracking
-                        self.log_exclusion_override(
-                            ticker,
-                            catalyst_type,
-                            buy_pos.get('reasoning', 'Claude chose despite historical underperformance'),
-                            excl
-                        )
+                        # FDA_Approval allows HIGH conviction override
+                        if catalyst_lower == 'fda_approval':
+                            conviction = buy_pos.get('confidence_level', 'MEDIUM')
+                            if conviction != 'HIGH':
+                                print(f"   ✗ {ticker}: REJECTED - FDA_Approval requires HIGH conviction (got {conviction})")
+                                print(f"      Q1 2026: {excl['win_rate']:.1f}% win rate - binary outcomes unpredictable")
+                                rejected_positions.append({
+                                    'ticker': ticker,
+                                    'status': 'REJECTED',
+                                    'reason': f"FDA_Approval without HIGH conviction (v10.5 enforcement)",
+                                    'original_decision': buy_pos.get('decision', 'ENTER')
+                                })
+                                continue  # Skip to next position
+                            else:
+                                print(f"   ⚠️  {ticker}: FDA_Approval with HIGH conviction - proceeding with caution")
+                                buy_pos['used_excluded_catalyst'] = True
+                                buy_pos['exclusion_override_reason'] = 'HIGH conviction override'
 
-                        # Mark position for close monitoring
-                        buy_pos['used_excluded_catalyst'] = True
-                        buy_pos['exclusion_win_rate'] = excl['win_rate']
-                        buy_pos['requires_close_monitoring'] = True
+                        # Other excluded catalysts - log warning but allow for now
+                        else:
+                            print(f"   ⚠️  {ticker}: Using historically poor catalyst '{catalyst_type}'")
+                            print(f"      Historical: {excl['win_rate']:.1f}% win rate over {excl['total_trades']} trades")
+                            buy_pos['used_excluded_catalyst'] = True
+                            buy_pos['exclusion_win_rate'] = excl['win_rate']
+                            buy_pos['requires_close_monitoring'] = True
 
                     # PHASE 2: Check catalyst tier
                     tier_result = self.classify_catalyst_tier(catalyst_type, catalyst_details)
@@ -7981,17 +8019,36 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
                         revenue_beat=revenue_beat
                     )
 
-                    # v8.4: Conviction calculation kept for LOGGING/LEARNING only
-                    # Claude now sees RS percentile, options flow, dark pool data directly
-                    # Claude's position size recommendation is trusted - no override
-                    # Conviction level stored for attribution analysis, not for overriding Claude
-                    if conviction_result['conviction'] in ('SKIP', 'LOW'):
-                        print(f"   ℹ️  {ticker}: Quant factors suggest {conviction_result['conviction']} ({conviction_result['reasoning']})")
-                        print(f"   ℹ️  Claude recommended {buy_pos.get('position_size_pct', 0)}% - TRUSTING Claude (v8.4)")
+                    # v10.5: HARD ENFORCEMENT of conviction rules based on Q1 2026 analysis
+                    # Q1 data showed SKIP and MEDIUM-HIGH underperform significantly
+                    # These are now HARD REJECTIONS, not soft warnings
+                    if conviction_result['conviction'] == 'SKIP':
+                        print(f"   ✗ {ticker}: REJECTED - SKIP conviction (Q1 showed consistent underperformance)")
+                        print(f"      Reason: {conviction_result['reasoning']}")
+                        rejected_positions.append({
+                            'ticker': ticker,
+                            'status': 'REJECTED',
+                            'reason': 'SKIP conviction (v10.5 enforcement)',
+                            'original_decision': buy_pos.get('decision', 'ENTER')
+                        })
+                        continue  # Skip to next position
+
+                    if conviction_result['conviction'] == 'MEDIUM-HIGH':
+                        print(f"   ✗ {ticker}: REJECTED - MEDIUM-HIGH conviction (ambiguous - commit to HIGH or MEDIUM)")
+                        print(f"      Reason: {conviction_result['reasoning']}")
+                        rejected_positions.append({
+                            'ticker': ticker,
+                            'status': 'REJECTED',
+                            'reason': 'MEDIUM-HIGH conviction (v10.5 enforcement)',
+                            'original_decision': buy_pos.get('decision', 'ENTER')
+                        })
+                        continue  # Skip to next position
+
+                    if conviction_result['conviction'] == 'LOW':
+                        print(f"   ℹ️  {ticker}: LOW conviction - proceeding with caution")
                         if 'risk_flags' not in buy_pos:
                             buy_pos['risk_flags'] = []
-                        buy_pos['risk_flags'].append(f"quant_signal: {conviction_result['conviction']} ({conviction_result['reasoning']})")
-                        # v8.4: NO LONGER OVERRIDING - Claude has all data and made informed decision
+                        buy_pos['risk_flags'].append(f"quant_signal: LOW ({conviction_result['reasoning']})")
 
                     # v8.4: SANITY CHECKS (catch broken outputs, not second-guess judgment)
                     claude_size = buy_pos.get('position_size_pct', 0)
@@ -8616,6 +8673,24 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
 
         # Cash available = account value - currently invested positions
         cash_available = current_account_value - portfolio_value
+
+        # v10.5: Sync with Alpaca as source of truth for cash and account value
+        # This fixes discrepancy where CSV includes pre-Alpaca paper trades
+        if self.use_alpaca and self.broker:
+            try:
+                alpaca_account = self.broker.get_account()
+                alpaca_cash = float(alpaca_account.cash)
+                alpaca_equity = float(alpaca_account.equity)
+
+                cash_diff = abs(alpaca_cash - cash_available)
+                equity_diff = abs(alpaca_equity - current_account_value)
+
+                if cash_diff > 1.0 or equity_diff > 1.0:
+                    print(f"   ℹ️ Alpaca sync: Using broker values (CSV diff: cash ${cash_diff:.2f}, equity ${equity_diff:.2f})")
+                    cash_available = alpaca_cash
+                    current_account_value = alpaca_equity
+            except Exception as e:
+                print(f"   ⚠️ Could not sync with Alpaca: {e}")
 
         if buy_positions:
             print(f"   Account Value: ${current_account_value:.2f} (Cash: ${cash_available:.2f}, Invested: ${portfolio_value:.2f})")
@@ -9270,6 +9345,23 @@ IMPORTANT: Output ONLY the JSON block above. Nothing else."""
 
         # Cash available = account value - currently invested positions
         cash_available = current_account_value - portfolio_value
+
+        # v10.5: Sync with Alpaca as source of truth for cash and account value
+        if self.use_alpaca and self.broker:
+            try:
+                alpaca_account = self.broker.get_account()
+                alpaca_cash = float(alpaca_account.cash)
+                alpaca_equity = float(alpaca_account.equity)
+
+                cash_diff = abs(alpaca_cash - cash_available)
+                equity_diff = abs(alpaca_equity - current_account_value)
+
+                if cash_diff > 1.0 or equity_diff > 1.0:
+                    print(f"   ℹ️ Alpaca sync: Using broker values (CSV diff: cash ${cash_diff:.2f}, equity ${equity_diff:.2f})")
+                    cash_available = alpaca_cash
+                    current_account_value = alpaca_equity
+            except Exception as e:
+                print(f"   ⚠️ Could not sync with Alpaca: {e}")
 
         print(f"   Account Value: ${current_account_value:.2f} (Cash: ${cash_available:.2f}, Invested: ${portfolio_value:.2f})")
 
